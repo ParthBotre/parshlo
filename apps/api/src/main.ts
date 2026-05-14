@@ -1,5 +1,8 @@
-// IMPORTANT: telemetry must be imported & started BEFORE any other imports
-// that we want to auto-instrument. Keep this block at the top of the file.
+/* eslint-disable import/order, import/no-duplicates --
+   OpenTelemetry auto-instrumentation requires startOtel() to execute BEFORE
+   any other instrumented module is imported. We therefore split the
+   @parshlo/telemetry import into a side-effect block at the very top and a
+   regular import below, which intentionally trips both rules. */
 import { startOtel, startSentry } from '@parshlo/telemetry';
 
 startOtel({ serviceName: 'parshlo-api' });
@@ -12,21 +15,15 @@ import helmet from '@fastify/helmet';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import {
-  FastifyAdapter,
-  type NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import {
-  httpRequestDuration,
-  httpRequestsTotal,
-  registry,
-} from '@parshlo/telemetry';
+import { httpRequestDuration, httpRequestsTotal, registry } from '@parshlo/telemetry';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module.js';
-import { type AppConfig } from './config/configuration.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { type AppConfig } from './config/configuration.js';
+/* eslint-enable import/order, import/no-duplicates */
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -36,9 +33,8 @@ async function bootstrap(): Promise<void> {
       trustProxy: 1,
       bodyLimit: 5 * 1024 * 1024, // 5 MB
       // Generate request id automatically if not present
-      genReqId: (req) =>
-        (req.headers['x-request-id'] as string | undefined) ??
-        crypto.randomUUID(),
+      genReqId: (req: { headers: Record<string, string | string[] | undefined> }) =>
+        (req.headers['x-request-id'] as string | undefined) ?? crypto.randomUUID(),
     }),
     {
       bufferLogs: true,
@@ -63,20 +59,15 @@ async function bootstrap(): Promise<void> {
   });
 
   await app.register(cors, {
-    origin: config.getOrThrow('cors.allowedOrigins', { infer: true }),
+    origin: config.getOrThrow<AppConfig['cors']>('cors').allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Request-Id',
-      'Idempotency-Key',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
     exposedHeaders: ['X-Request-Id'],
   });
 
   await app.register(cookie, {
-    secret: config.getOrThrow('cookieSecret', { infer: true }),
+    secret: config.getOrThrow<string>('cookieSecret'),
   });
 
   await app.register(compress, { encodings: ['gzip', 'deflate'] });
@@ -126,7 +117,8 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new AllExceptionsFilter(app.get(Logger)));
 
   // --- API versioning: /v1/... ---
-  app.setGlobalPrefix('v1', { exclude: ['health', 'health/(.*)'] });
+  // NOTE: URI versioning already prepends `v<defaultVersion>`, so we must NOT
+  // also setGlobalPrefix('v1') or routes end up at /v1/v1/... .
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   // --- Swagger / OpenAPI ---
@@ -135,10 +127,7 @@ async function bootstrap(): Promise<void> {
       .setTitle('Parshlo API')
       .setDescription('Enterprise pharmaceutical B2B ordering API')
       .setVersion('1.0')
-      .addBearerAuth(
-        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        'AccessToken',
-      )
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'AccessToken')
       .build();
     const doc = SwaggerModule.createDocument(app, docConfig);
     SwaggerModule.setup('docs', app, doc, {
@@ -154,8 +143,9 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err: unknown) => {
-   
   console.error('Fatal bootstrap error', err);
-   
+  // Bootstrap failures are unrecoverable — exit non-zero so the orchestrator
+  // (k8s / ECS / pm2) restarts the process instead of leaving it half-initialized.
+  // eslint-disable-next-line no-process-exit
   process.exit(1);
 });

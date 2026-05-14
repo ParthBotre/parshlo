@@ -1,6 +1,6 @@
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
+import { Resource } from '@opentelemetry/resources';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
@@ -30,7 +30,7 @@ export function startOtel(opts: OtelInitOptions): void {
   }
 
   sdk = new NodeSDK({
-    resource: resourceFromAttributes({
+    resource: new Resource({
       [ATTR_SERVICE_NAME]: opts.serviceName,
       [ATTR_SERVICE_VERSION]: opts.serviceVersion ?? process.env.SERVICE_VERSION ?? '0.0.0',
     }),

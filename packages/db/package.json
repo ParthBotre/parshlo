@@ -3,29 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "description": "Prisma schema, migrations, and typed client for the Parshlo platform",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "source": "./src/index.ts"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "src", "prisma", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "prisma",
+    "README.md"
+  ],
   "scripts": {
-    "build": "prisma generate && tsup",
+    "build": "dotenv -e ../../.env -- prisma generate && tsup",
     "dev": "tsup --watch",
-    "generate": "prisma generate",
-    "migrate": "prisma migrate deploy",
-    "migrate:dev": "prisma migrate dev",
-    "migrate:reset": "prisma migrate reset --force",
-    "studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts",
+    "generate": "dotenv -e ../../.env -- prisma generate",
+    "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "migrate:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
+    "studio": "dotenv -e ../../.env -- prisma studio",
+    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist .turbo"
@@ -36,6 +39,7 @@
   "devDependencies": {
     "@parshlo/config": "workspace:*",
     "@types/node": "22.10.5",
+    "dotenv-cli": "8.0.0",
     "prisma": "5.22.0",
     "tsup": "8.3.5",
     "tsx": "4.19.2",

@@ -5,8 +5,10 @@ import typography from '@tailwindcss/typography';
 
 import type { Config } from 'tailwindcss';
 
-export default {
+const config: Config = {
   content: ['./src/**/*.{ts,tsx,mdx}'],
   presets: [preset],
   plugins: [animate, forms, typography],
-} satisfies Config;
+};
+
+export default config;

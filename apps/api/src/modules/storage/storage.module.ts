@@ -1,11 +1,12 @@
+import { S3Client } from '@aws-sdk/client-s3';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client } from '@aws-sdk/client-s3';
 
 import { StorageController } from './storage.controller.js';
 import { StorageService } from './storage.service.js';
+import { S3_CLIENT } from './storage.tokens.js';
 
-export const S3_CLIENT = Symbol('S3_CLIENT');
+export { S3_CLIENT };
 
 @Module({
   controllers: [StorageController],

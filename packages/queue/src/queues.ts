@@ -1,7 +1,9 @@
-/** Centralized queue identifiers — single source of truth for routing. */
-export const QUEUE_EMAIL = 'parshlo:email';
-export const QUEUE_INVOICE = 'parshlo:invoice';
-export const QUEUE_KYC = 'parshlo:kyc';
+/** Centralized queue identifiers — single source of truth for routing.
+ *  NOTE: BullMQ rejects ':' in queue names (it's used as a Redis key separator),
+ *  so we use '-' delimiters. The queueing prefix can still namespace these in Redis. */
+export const QUEUE_EMAIL = 'parshlo-email';
+export const QUEUE_INVOICE = 'parshlo-invoice';
+export const QUEUE_KYC = 'parshlo-kyc';
 
 export const QUEUES = [QUEUE_EMAIL, QUEUE_INVOICE, QUEUE_KYC] as const;
 export type QueueName = (typeof QUEUES)[number];

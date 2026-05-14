@@ -2,10 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  experimental: {
-    typedRoutes: true,
-  },
-  transpilePackages: ['@parshlo/types'],
+  transpilePackages: [
+    '@parshlo/types',
+    '@parshlo/logger',
+    '@parshlo/db',
+    '@parshlo/queue',
+    '@parshlo/telemetry',
+  ],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },

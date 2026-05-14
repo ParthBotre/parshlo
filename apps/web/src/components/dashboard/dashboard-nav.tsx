@@ -1,22 +1,45 @@
 'use client';
 
-import { type LucideIcon } from 'lucide-react';
+import {
+  BadgeCheck,
+  LayoutDashboard,
+  type LucideIcon,
+  Package,
+  PackageSearch,
+  ScrollText,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
 
-interface NavItem {
+// Icons must be resolved on the client. The parent server layout sends a
+// JSON-serializable key, and we look up the actual lucide component here —
+// passing function references across the RSC boundary is forbidden.
+const ICONS = {
+  dashboard: LayoutDashboard,
+  kyc: BadgeCheck,
+  orders: ScrollText,
+  buyers: Users,
+  products: Package,
+  catalog: PackageSearch,
+} as const satisfies Record<string, LucideIcon>;
+
+export type NavIconKey = keyof typeof ICONS;
+
+export interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIconKey;
 }
 
-export function DashboardNav({ items }: { items: ReadonlyArray<NavItem> }): JSX.Element {
+export function DashboardNav({ items }: { items: readonly NavItem[] }): JSX.Element {
   const pathname = usePathname();
   return (
     <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col">
       {items.map((item) => {
+        const Icon = ICONS[item.icon];
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
@@ -29,7 +52,7 @@ export function DashboardNav({ items }: { items: ReadonlyArray<NavItem> }): JSX.
                 : 'text-muted-foreground hover:bg-accent hover:text-foreground',
             )}
           >
-            <item.icon className="h-4 w-4" />
+            <Icon className="h-4 w-4" />
             {item.label}
           </Link>
         );

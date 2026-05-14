@@ -5,11 +5,12 @@ import {
   type NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { type Prisma } from '@parshlo/db';
 import { type FastifyRequest } from 'fastify';
 import { type Observable, tap } from 'rxjs';
 
-import { AUDIT_KEY, type AuditMeta } from '../decorators/audit.decorator.js';
 import { PrismaService } from '../../modules/prisma/prisma.service.js';
+import { AUDIT_KEY, type AuditMeta } from '../decorators/audit.decorator.js';
 import { type AuthenticatedRequest } from '../types/request.js';
 
 /**
@@ -25,23 +26,16 @@ export class AuditInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const meta = this.reflector.get<AuditMeta | undefined>(
-      AUDIT_KEY,
-      context.getHandler(),
-    );
+    const meta = this.reflector.get<AuditMeta | undefined>(AUDIT_KEY, context.getHandler());
     if (!meta) {
       return next.handle();
     }
 
-    const req = context
-      .switchToHttp()
-      .getRequest<FastifyRequest & AuthenticatedRequest>();
+    const req = context.switchToHttp().getRequest<FastifyRequest & AuthenticatedRequest>();
 
     return next.handle().pipe(
       tap((result: unknown) => {
-        const resourceId = meta.resolveResourceId
-          ? meta.resolveResourceId(req, result)
-          : undefined;
+        const resourceId = meta.resolveResourceId ? meta.resolveResourceId(req, result) : undefined;
         // Best-effort; failures must NOT break the request.
         this.prisma.auditLog
           .create({
@@ -53,7 +47,8 @@ export class AuditInterceptor implements NestInterceptor {
               ipAddress: req.ip,
               userAgent: req.headers['user-agent'] ?? null,
               requestId: (req.id as string | undefined) ?? null,
-              metadata: meta.metadata?.(req, result) ?? undefined,
+              metadata:
+                (meta.metadata?.(req, result) as Prisma.InputJsonValue | undefined) ?? undefined,
             },
           })
           .catch(() => {

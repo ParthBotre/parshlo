@@ -1,22 +1,30 @@
+/* eslint-disable import/order --
+   dotenv/config must run before our config module reads env vars, and
+   OpenTelemetry auto-instrumentation requires startOtel() to execute BEFORE
+   any other instrumented module is imported. Those interleaved side-effect
+   blocks intentionally violate strict import grouping. */
+import 'dotenv/config';
+
 import { startOtel, startSentry } from '@parshlo/telemetry';
 
 startOtel({ serviceName: 'parshlo-worker' });
 startSentry({});
 
 import { logger } from '@parshlo/logger';
-import IORedis from 'ioredis';
+import { Redis } from 'ioredis';
 
 import { config } from './config.js';
 import { prisma } from './db.js';
-import { S3Client, createS3Client } from './s3.js';
+import { type S3Client, createS3Client } from './s3.js';
 import { createEmailWorker } from './workers/email.worker.js';
 import { createInvoiceWorker } from './workers/invoice.worker.js';
 import { createKycWorker } from './workers/kyc.worker.js';
+/* eslint-enable import/order */
 
-async function main(): Promise<void> {
+function main(): void {
   logger.info('Worker booting…');
 
-  const connection = new IORedis(config.REDIS_URL, {
+  const connection = new Redis(config.REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
   });
@@ -43,6 +51,9 @@ async function main(): Promise<void> {
     await Promise.allSettled(workers.map((w) => w.close()));
     await connection.quit();
     await prisma.$disconnect();
+    // Graceful shutdown completed; exit cleanly so the orchestrator records
+    // a successful termination rather than restarting the pod.
+    // eslint-disable-next-line no-process-exit
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
@@ -51,7 +62,11 @@ async function main(): Promise<void> {
   logger.info('Worker ready · queues: email, invoice, kyc');
 }
 
-main().catch((err: unknown) => {
+try {
+  main();
+} catch (err: unknown) {
   logger.error({ err }, 'worker bootstrap failed');
+  // Bootstrap failures are unrecoverable — exit non-zero so k8s / pm2 restarts.
+  // eslint-disable-next-line no-process-exit
   process.exit(1);
-});
+}

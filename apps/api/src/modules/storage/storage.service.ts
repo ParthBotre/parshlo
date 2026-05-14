@@ -1,10 +1,11 @@
+import { randomUUID } from 'node:crypto';
+
 import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
 
-import { S3_CLIENT } from './storage.module.js';
+import { S3_CLIENT } from './storage.tokens.js';
 
 const ALLOWED_CONTENT_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg']);
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
@@ -71,11 +72,9 @@ export class StorageService {
   async createInvoiceDownloadUrl(s3Key: string): Promise<{ url: string; expiresIn: number }> {
     const bucket = this.config.get<string>('S3_BUCKET_INVOICES') ?? 'parshlo-invoices';
     const expiresIn = 5 * 60;
-    const url = await getSignedUrl(
-      this.s3,
-      new GetObjectCommand({ Bucket: bucket, Key: s3Key }),
-      { expiresIn },
-    );
+    const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: bucket, Key: s3Key }), {
+      expiresIn,
+    });
     return { url, expiresIn };
   }
 }

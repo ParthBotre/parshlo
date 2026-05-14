@@ -19,10 +19,14 @@ const badgeVariants = cva(
   },
 );
 
+// Render as <span> (not <div>) so a Badge is valid inline content — it can
+// safely live inside <p>, <td>, <button>, etc. without producing HTML
+// hydration errors. Visual layout is unchanged because the variants use
+// `inline-flex`.
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps): JSX.Element {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }

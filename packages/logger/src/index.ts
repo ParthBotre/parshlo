@@ -76,3 +76,16 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
 }
 
 export type { Logger } from 'pino';
+
+/**
+ * Pre-configured singleton logger. Convenience export for apps that just want
+ * `import { logger } from '@parshlo/logger'` without thinking about wiring.
+ *
+ * The service name is taken from `SERVICE_NAME` (set in each app's env), so
+ * the same singleton emits correctly labeled logs in api / worker / scripts.
+ * Apps that need per-request child loggers should still use `createLogger`
+ * directly and pass it through their DI container (NestJS) or context.
+ */
+export const logger: Logger = createLogger({
+  service: process.env.SERVICE_NAME ?? 'parshlo',
+});

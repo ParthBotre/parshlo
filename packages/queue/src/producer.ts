@@ -1,17 +1,8 @@
 import { Queue } from 'bullmq';
-import IORedis, { type Redis } from 'ioredis';
+import { Redis } from 'ioredis';
 
-import {
-  GenerateInvoiceJob,
-  KycDecisionJob,
-  SendEmailJob,
-} from './payloads.js';
-import {
-  DEFAULT_JOB_OPTIONS,
-  QUEUE_EMAIL,
-  QUEUE_INVOICE,
-  QUEUE_KYC,
-} from './queues.js';
+import { GenerateInvoiceJob, KycDecisionJob, SendEmailJob } from './payloads.js';
+import { DEFAULT_JOB_OPTIONS, QUEUE_EMAIL, QUEUE_INVOICE, QUEUE_KYC } from './queues.js';
 
 /**
  * Typed producer that the NestJS API uses to enqueue work.
@@ -28,7 +19,7 @@ export class JobProducer {
   constructor(redisUrl: string, connection?: Redis) {
     this.connection =
       connection ??
-      new IORedis(redisUrl, {
+      new Redis(redisUrl, {
         maxRetriesPerRequest: null,
         enableReadyCheck: true,
       });

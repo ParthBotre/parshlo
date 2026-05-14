@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { DEV_PERSONAS, type DevPersona, issueDevAccessToken, setSessionCookie } from '@/lib/auth/session';
+import {
+  DEV_PERSONAS,
+  type DevPersona,
+  issueDevAccessToken,
+  setSessionCookie,
+} from '@/lib/auth/session';
 
 /**
  * Dev-only sign-in endpoint. Disabled when AUTH_MODE !== 'dev'.
@@ -32,7 +37,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Resolve the internal user id from the API via a dev-only endpoint.
   const apiBase = process.env.API_BASE_URL ?? 'http://localhost:4000';
-  let userId = p.userId;
+  let userId: string = p.userId;
   try {
     const res = await fetch(`${apiBase}/v1/auth/dev/resolve?email=${encodeURIComponent(p.email)}`, {
       headers: { 'X-Dev-Auth-Secret': process.env.AUTH_DEV_SECRET ?? '' },
