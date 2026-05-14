@@ -70,24 +70,26 @@ export default function HomePage(): JSX.Element {
   return (
     <>
       {/* HERO ---------------------------------------------------------- */}
-      <section className="grid-hero relative overflow-hidden border-b border-border/60">
-        <div className="container relative grid gap-12 py-20 md:grid-cols-2 md:py-28">
-          <div className="flex flex-col justify-center gap-6 animate-fade-in">
-            <Badge variant="outline" className="w-fit gap-2 border-primary/30 bg-primary/5 text-primary">
+      <section className="grid-hero border-border/40 relative overflow-hidden border-b">
+        <div className="container relative grid gap-12 py-24 md:grid-cols-2 md:py-32">
+          <div className="animate-fade-in flex flex-col justify-center gap-7">
+            <Badge
+              variant="outline"
+              className="border-primary/30 bg-primary/10 text-primary w-fit gap-2 backdrop-blur"
+            >
               <ShieldCheck className="h-3.5 w-3.5" /> Strictly B2B · Not for retail sale
             </Badge>
-            <h1 className="text-balance font-display text-4xl font-semibold tracking-tight md:text-6xl">
+            <h1 className="tracking-display-tight font-display text-balance text-5xl font-bold leading-[1.05] md:text-7xl">
               The wholesale platform for{' '}
-              <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
-                verified pharmacies
-              </span>{' '}
-              and distributors.
+              <span className="from-primary via-primary to-brand-300 bg-gradient-to-br bg-clip-text text-transparent">
+                verified pharmacies.
+              </span>
             </h1>
-            <p className="max-w-xl text-balance text-lg text-muted-foreground">
+            <p className="text-muted-foreground max-w-xl text-balance text-lg leading-relaxed md:text-xl">
               Parshlo manufactures WHO-GMP certified formulations and supplies authorized partners
               across India through a secure, audit-trailed ordering platform.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-2 flex flex-wrap gap-3">
               <Button asChild size="xl">
                 <Link href="/auth/register">Request B2B Access</Link>
               </Button>
@@ -95,22 +97,23 @@ export default function HomePage(): JSX.Element {
                 <Link href="/products">View Catalog</Link>
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Wholesale pricing is unlocked only after compliance review. No public checkout.
             </p>
           </div>
 
           {/* Hero visual ---------------------------------------------- */}
           <div className="relative hidden md:block">
-            <div className="absolute inset-0 grid-noise opacity-60" aria-hidden />
-            <div className="relative grid gap-4 lg:grid-cols-2">
-              {PARTNER_TYPES.map((p) => (
+            <div className="grid-noise absolute inset-0 -z-10 opacity-40" aria-hidden />
+            <div className="relative grid gap-3.5 lg:grid-cols-2">
+              {PARTNER_TYPES.map((p, i) => (
                 <Card
                   key={p.label}
-                  className="border-border/60 bg-card/70 backdrop-blur"
+                  className="lift group"
+                  style={{ animationDelay: `${String(i * 60)}ms` }}
                 >
                   <CardContent className="flex items-center gap-3 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
                       <p.icon className="h-5 w-5" />
                     </div>
                     <p className="text-sm font-medium">{p.label}</p>
@@ -123,43 +126,48 @@ export default function HomePage(): JSX.Element {
       </section>
 
       {/* STATS --------------------------------------------------------- */}
-      <section className="border-b border-border/60 bg-secondary/30">
-        <div className="container grid grid-cols-2 gap-6 py-12 md:grid-cols-4">
+      <section className="border-border/40 bg-card/30 border-b">
+        <div className="container grid grid-cols-2 gap-6 py-16 md:grid-cols-4 md:gap-10">
           {STATS.map((s) => (
-            <div key={s.label} className="space-y-1">
-              <div className="font-display text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+            <div key={s.label} className="space-y-2">
+              <div className="tracking-display-tight from-foreground to-foreground/60 font-display bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
                 {s.value}
               </div>
-              <div className="text-sm text-muted-foreground">{s.label}</div>
+              <div className="text-muted-foreground text-sm">{s.label}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* FEATURES ------------------------------------------------------ */}
-      <section className="container py-20 md:py-28">
+      <section className="container py-24 md:py-28">
         <div className="mx-auto max-w-2xl text-center">
-          <Badge variant="outline" className="mb-4 border-primary/30 bg-primary/5 text-primary">
+          <Badge
+            variant="outline"
+            className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
+          >
             Built for compliance
           </Badge>
-          <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
-            Procurement infrastructure your auditors will love.
+          <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
+            Procurement infrastructure
+            <br />
+            your auditors will love.
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            Every order on Parshlo is tied to a verified GST identity, an immutable audit trail,
-            and a digitally retained invoice — for seven years.
+          <p className="text-muted-foreground mt-5 text-lg leading-relaxed">
+            Every order on Parshlo is tied to a verified GST identity, an immutable audit trail, and
+            a digitally retained invoice — for seven years.
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <Card key={f.title} className="group h-full border-border/60">
-              <CardContent className="space-y-3 p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
+            <Card key={f.title} className="lift group h-full">
+              <CardContent className="space-y-4 p-7">
+                <div className="bg-primary/10 text-primary ring-primary/20 flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-110">
                   <f.icon className="h-5 w-5" />
                 </div>
                 <h3 className="font-display text-lg font-semibold">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{f.body}</p>
+                <p className="text-muted-foreground text-sm leading-relaxed">{f.body}</p>
               </CardContent>
             </Card>
           ))}
@@ -167,19 +175,30 @@ export default function HomePage(): JSX.Element {
       </section>
 
       {/* CTA STRIP ----------------------------------------------------- */}
-      <section className="border-t border-border/60 bg-primary text-primary-foreground">
-        <div className="container flex flex-col items-center justify-between gap-6 py-12 md:flex-row">
-          <div className="max-w-xl space-y-1">
-            <h2 className="font-display text-2xl font-semibold md:text-3xl">
-              Ready to onboard your business?
-            </h2>
-            <p className="text-primary-foreground/80">
-              Submit GSTIN, drug license, and pharmacy registration — get approved within 48 hours.
-            </p>
+      <section className="container pb-24">
+        <div className="border-primary/20 from-primary/15 via-card to-card relative overflow-hidden rounded-3xl border bg-gradient-to-br p-10 md:p-14">
+          <div
+            className="absolute inset-0 -z-10 opacity-50"
+            style={{
+              backgroundImage:
+                'radial-gradient(at 80% 20%, hsl(var(--primary) / 0.35) 0px, transparent 50%)',
+            }}
+            aria-hidden
+          />
+          <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+            <div className="max-w-xl space-y-2">
+              <h2 className="tracking-display-tight font-display text-3xl font-bold md:text-4xl">
+                Ready to onboard your business?
+              </h2>
+              <p className="text-muted-foreground text-base md:text-lg">
+                Submit GSTIN, drug license, and pharmacy registration — get approved within 48
+                hours.
+              </p>
+            </div>
+            <Button asChild size="xl">
+              <Link href="/auth/register">Start verification</Link>
+            </Button>
           </div>
-          <Button asChild size="xl" variant="secondary">
-            <Link href="/auth/register">Start verification</Link>
-          </Button>
         </div>
       </section>
     </>

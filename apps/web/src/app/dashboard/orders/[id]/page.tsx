@@ -5,8 +5,8 @@ import { notFound, redirect } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ApiError } from '@/lib/api-client';
 import { getOrder } from '@/lib/api/orders';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { formatINR } from '@/lib/utils';
 
@@ -53,7 +53,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
     <div className="space-y-6">
       <Link
         href="/dashboard/orders"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
       >
         <ArrowLeft className="h-4 w-4" /> All orders
       </Link>
@@ -63,22 +63,24 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
           <h1 className="font-display text-3xl font-semibold tracking-tight">
             {order.orderNumber}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Placed {new Date(order.placedAt).toLocaleString('en-IN')}
           </p>
         </div>
-        <Badge variant={isTerminalBad ? 'warning' : order.status === 'DELIVERED' ? 'success' : 'default'}>
+        <Badge
+          variant={isTerminalBad ? 'warning' : order.status === 'DELIVERED' ? 'success' : 'default'}
+        >
           {order.status.replace(/_/g, ' ')}
         </Badge>
       </div>
 
       <Card>
         <CardContent className="p-6">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
             Progress
           </h2>
           {isTerminalBad ? (
-            <div className="mt-4 flex items-center gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
               <CircleX className="h-4 w-4" />
               This order was {order.status.toLowerCase()}.
             </div>
@@ -94,11 +96,9 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
                         className={`h-5 w-5 ${active ? 'text-primary' : 'text-emerald-600'}`}
                       />
                     ) : (
-                      <Circle className="h-5 w-5 text-muted-foreground/40" />
+                      <Circle className="text-muted-foreground/40 h-5 w-5" />
                     )}
-                    <span
-                      className={`mt-1 ${done ? 'font-medium' : 'text-muted-foreground'}`}
-                    >
+                    <span className={`mt-1 ${done ? 'font-medium' : 'text-muted-foreground'}`}>
                       {stage.replace(/_/g, ' ')}
                     </span>
                   </li>
@@ -126,7 +126,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3">Product</th>
                 <th className="px-5 py-3 text-right">Qty</th>
@@ -143,7 +143,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
                   <td className="px-5 py-3 text-right font-mono">
                     {formatINR(line.unitPricePaise)}
                   </td>
-                  <td className="px-5 py-3 text-right font-mono text-muted-foreground">
+                  <td className="text-muted-foreground px-5 py-3 text-right font-mono">
                     {formatINR(line.lineGstPaise)}
                   </td>
                   <td className="px-5 py-3 text-right font-mono">
@@ -171,9 +171,9 @@ function InfoCard({
   return (
     <Card>
       <CardContent className="space-y-1 p-4">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
         <p className="font-medium">{value}</p>
-        <p className="text-xs text-muted-foreground">{sub}</p>
+        <p className="text-muted-foreground text-xs">{sub}</p>
       </CardContent>
     </Card>
   );

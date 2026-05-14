@@ -37,21 +37,21 @@ export function DevSignInPanel({ redirectTo }: { redirectTo?: string }): JSX.Ele
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+      <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200">
         <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
-        <p>
-          <span className="font-semibold">Dev mode.</span> Real builds use Auth0 with MFA.
-          Pick a seeded persona to explore the platform end-to-end.
+        <p className="leading-relaxed">
+          <span className="font-semibold">Dev mode.</span> Real builds use Auth0 with MFA. Pick a
+          seeded persona to explore the platform end-to-end.
         </p>
       </div>
 
       {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm">
           {error}
         </div>
       ) : null}
 
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         <Button
           onClick={() => void handle('buyer')}
           disabled={loading !== null}

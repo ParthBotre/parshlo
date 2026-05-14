@@ -11,8 +11,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiError } from '@/lib/api-client';
 import { submitInquiry } from '@/lib/api/inquiries';
+import { ApiError } from '@/lib/api-client';
 
 const ContactSchema = z.object({
   name: z.string().trim().min(2, 'Please enter your name.'),
@@ -50,7 +50,7 @@ export function ContactForm(): JSX.Element {
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? err.problem.detail ?? err.problem.title
+          ? (err.problem.detail ?? err.problem.title)
           : err instanceof Error
             ? err.message
             : 'Failed to submit inquiry. Please try again.';
@@ -60,12 +60,14 @@ export function ContactForm(): JSX.Element {
 
   if (submitted) {
     return (
-      <Card className="border-emerald-200 bg-emerald-50 text-emerald-900">
+      <Card className="border-emerald-500/30 bg-emerald-500/10 text-emerald-100">
         <CardContent className="flex items-start gap-4 p-8">
-          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-600" />
+          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-300" />
           <div>
-            <h3 className="font-display text-lg font-semibold">Thank you — we received your message.</h3>
-            <p className="mt-1 text-sm">
+            <h3 className="font-display text-lg font-semibold">
+              Thank you — we received your message.
+            </h3>
+            <p className="mt-1 text-sm text-emerald-200/90">
               Our team responds within one business day. For urgent requests, please call us.
             </p>
           </div>
@@ -78,13 +80,15 @@ export function ContactForm(): JSX.Element {
     <Card>
       <CardContent className="p-6 md:p-8">
         {submitError ? (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-4 rounded-md border p-3 text-sm">
             {submitError}
           </div>
         ) : null}
         <form
           className="space-y-4"
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
+          }}
           noValidate
         >
           <div className="grid gap-4 md:grid-cols-2">
@@ -92,14 +96,14 @@ export function ContactForm(): JSX.Element {
               <Label htmlFor="name">Full name</Label>
               <Input id="name" autoComplete="name" {...register('name')} />
               {errors.name ? (
-                <p className="text-xs text-destructive">{errors.name.message}</p>
+                <p className="text-destructive text-xs">{errors.name.message}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Business email</Label>
               <Input id="email" type="email" autoComplete="email" {...register('email')} />
               {errors.email ? (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
+                <p className="text-destructive text-xs">{errors.email.message}</p>
               ) : null}
             </div>
           </div>
@@ -113,7 +117,7 @@ export function ContactForm(): JSX.Element {
             <Label htmlFor="subject">Subject</Label>
             <Input id="subject" {...register('subject')} />
             {errors.subject ? (
-              <p className="text-xs text-destructive">{errors.subject.message}</p>
+              <p className="text-destructive text-xs">{errors.subject.message}</p>
             ) : null}
           </div>
 
@@ -121,7 +125,7 @@ export function ContactForm(): JSX.Element {
             <Label htmlFor="message">Message</Label>
             <Textarea id="message" rows={6} {...register('message')} />
             {errors.message ? (
-              <p className="text-xs text-destructive">{errors.message.message}</p>
+              <p className="text-destructive text-xs">{errors.message.message}</p>
             ) : null}
           </div>
 

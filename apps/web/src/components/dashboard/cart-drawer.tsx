@@ -131,7 +131,7 @@ export function CartDrawer({
           ) : null}
 
           {!PRICING_ENABLED ? (
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+            <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200">
               <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
               <span>
                 Order placement is paused while we finalise wholesale pricing. You can still build

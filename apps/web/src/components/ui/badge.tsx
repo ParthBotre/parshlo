@@ -10,9 +10,12 @@ const badgeVariants = cva(
       variant: {
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        outline: 'text-foreground',
-        success: 'border-transparent bg-emerald-100 text-emerald-800',
-        warning: 'border-transparent bg-amber-100 text-amber-800',
+        outline: 'border-border/60 text-foreground',
+        // iOS-style status colours — translucent fill with bright text so they
+        // glow against the dark surface but don't burn at small sizes.
+        success: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300',
+        warning: 'border-amber-500/30 bg-amber-500/15 text-amber-300',
+        destructive: 'border-red-500/30 bg-red-500/15 text-red-300',
       },
     },
     defaultVariants: { variant: 'default' },

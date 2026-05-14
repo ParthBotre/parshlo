@@ -4,6 +4,15 @@
 
 @layer base {
   :root {
+    /* Apple-style system font stack — SF Pro on Apple, Segoe on Win, Roboto on Android. */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto,
+      Helvetica, Arial, system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI',
+      system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, 'Cascadia Mono', 'JetBrains Mono', Menlo,
+      Consolas, monospace;
+
+    /* LIGHT THEME — kept for forms/auth/print contexts. */
     --background: 0 0% 100%;
     --foreground: 220 25% 12%;
 
@@ -32,40 +41,77 @@
     --input: 220 13% 91%;
     --ring: 175 49% 28%;
 
-    --radius: 0.625rem;
+    --radius: 1rem;
+
+    color-scheme: light;
   }
 
+  /* iOS-flavoured dark theme.
+   *   - Near-black base (#070708) with warm undertone, OLED-friendly.
+   *   - Layered system grays for elevated surfaces (card → popover → accent).
+   *   - Vibrant teal accent tuned to pop on black without burning the eyes.
+   *   - Borders are deliberately faint so cards read as lifted glass.
+   */
   .dark {
-    --background: 220 30% 6%;
-    --foreground: 0 0% 96%;
-    --card: 220 25% 10%;
-    --card-foreground: 0 0% 96%;
-    --popover: 220 25% 10%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 175 60% 50%;
-    --primary-foreground: 220 30% 6%;
-    --secondary: 220 20% 14%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 220 20% 16%;
-    --muted-foreground: 220 10% 65%;
-    --accent: 220 20% 18%;
-    --accent-foreground: 0 0% 96%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 96%;
-    --border: 220 20% 18%;
-    --input: 220 20% 18%;
-    --ring: 175 60% 50%;
+    --background: 240 7% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 6% 8%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 7% 11%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 174 72% 56%;
+    --primary-foreground: 240 10% 6%;
+
+    --secondary: 240 5% 13%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 5% 12%;
+    --muted-foreground: 240 5% 68%;
+
+    --accent: 240 5% 17%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 75% 58%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5% 17%;
+    --input: 240 5% 15%;
+    --ring: 174 72% 56%;
+
+    color-scheme: dark;
   }
 
   * {
     @apply border-border;
   }
+
   html {
     @apply antialiased;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   body {
     @apply bg-background text-foreground;
+    background-attachment: fixed;
+  }
+
+  /* Ambient depth — a very subtle teal aurora visible only at the top of dark
+     pages. Echoes the iOS lock-screen wallpaper feel without distracting. */
+  .dark body {
+    background-image: radial-gradient(at 18% 0%, hsl(174 70% 45% / 0.08) 0px, transparent 55%),
+      radial-gradient(at 82% 0%, hsl(174 70% 45% / 0.05) 0px, transparent 50%);
+  }
+
+  /* Native iOS-style selection colour. */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
   }
 }
 
@@ -73,16 +119,61 @@
   .text-balance {
     text-wrap: balance;
   }
-  .grid-hero {
-    background-image:
-      radial-gradient(at 20% 0%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
-      radial-gradient(at 80% 0%, hsl(var(--primary) / 0.08) 0px, transparent 50%);
+
+  /* Display-text letter-spacing à la SF Pro Display. */
+  .tracking-display {
+    letter-spacing: -0.015em;
   }
+  .tracking-display-tight {
+    letter-spacing: -0.028em;
+  }
+
+  /* iOS frosted-glass surface — used for cards, sticky headers, sheets. */
+  .glass {
+    background-color: hsl(var(--card) / 0.55);
+    backdrop-filter: saturate(160%) blur(20px);
+    -webkit-backdrop-filter: saturate(160%) blur(20px);
+    border: 1px solid hsl(var(--border) / 0.7);
+  }
+  .glass-strong {
+    background-color: hsl(var(--card) / 0.78);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  .glass-nav {
+    background-color: hsl(var(--background) / 0.65);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+  }
+
+  /* Hero-section aurora wash. Stronger than the body ambient gradient. */
+  .grid-hero {
+    background-image: radial-gradient(at 50% -10%, hsl(var(--primary) / 0.22) 0px, transparent 55%),
+      radial-gradient(at 85% 25%, hsl(174 90% 50% / 0.1) 0px, transparent 45%),
+      radial-gradient(at 15% 40%, hsl(280 70% 55% / 0.06) 0px, transparent 50%);
+  }
+
+  /* Soft separator gridlines for hero visuals — works on light and dark. */
   .grid-noise {
-    background-image:
-      linear-gradient(to bottom, hsl(var(--background)) 0%, transparent 100%),
+    background-image: linear-gradient(to bottom, hsl(var(--background)) 0%, transparent 100%),
       linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
-    background-size: 100% 100%, 48px 48px, 48px 48px;
+    background-size:
+      100% 100%,
+      48px 48px,
+      48px 48px;
+  }
+
+  /* Hover-lift used on interactive cards (iOS pressed-up feel). */
+  .lift {
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease,
+      background-color 0.25s ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -12px hsl(0 0% 0% / 0.55);
   }
 }

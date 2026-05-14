@@ -1,12 +1,12 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { BusinessType, Gstin, IndianMobile, IndianPin, Pan } from '@parshlo/types';
 import { CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { BusinessType, Gstin, IndianMobile, IndianPin, Pan } from '@parshlo/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,10 +21,7 @@ const Schema = z.object({
   gstin: Gstin,
   pan: Pan.optional().or(z.literal('')),
   drugLicenseNumber: z.string().trim().min(3, 'Drug license number is required.'),
-  pharmacyRegistrationNumber: z
-    .string()
-    .trim()
-    .min(3, 'Pharmacy registration number is required.'),
+  pharmacyRegistrationNumber: z.string().trim().min(3, 'Pharmacy registration number is required.'),
   mobile: IndianMobile,
   businessEmail: z.string().email('Valid business email required.'),
   addressLine1: z.string().trim().min(3, 'Address is required.'),
@@ -51,16 +48,16 @@ export function RegistrationForm(): JSX.Element {
 
   if (submitted) {
     return (
-      <Card className="border-emerald-200 bg-emerald-50">
+      <Card className="border-emerald-500/30 bg-emerald-500/10">
         <CardContent className="flex items-start gap-4 p-8">
-          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-600" />
+          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-300" />
           <div>
-            <h3 className="font-display text-lg font-semibold text-emerald-900">
+            <h3 className="font-display text-lg font-semibold text-emerald-100">
               Application received — review in progress.
             </h3>
-            <p className="mt-1 text-sm text-emerald-900/90">
-              We will email <span className="font-medium">verification updates</span> within 48 hours.
-              You will be able to sign in once approved.
+            <p className="mt-1 text-sm text-emerald-200/90">
+              We will email <span className="font-medium">verification updates</span> within 48
+              hours. You will be able to sign in once approved.
             </p>
           </div>
         </CardContent>
@@ -71,17 +68,23 @@ export function RegistrationForm(): JSX.Element {
   return (
     <Card>
       <CardContent className="p-6 md:p-8">
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-sm text-amber-200">
           <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <p>
-            All information is verified against government records. False or
-            duplicate submissions will be rejected and may be reported.
+            All information is verified against government records. False or duplicate submissions
+            will be rejected and may be reported.
           </p>
         </div>
 
-        <form className="grid gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form
+          className="grid gap-6"
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
+          }}
+          noValidate
+        >
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Business details
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
@@ -94,7 +97,7 @@ export function RegistrationForm(): JSX.Element {
               <Field label="Business type" error={errors.businessType?.message}>
                 <select
                   {...register('businessType')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="border-input bg-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2"
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -117,7 +120,7 @@ export function RegistrationForm(): JSX.Element {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Compliance identifiers
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
@@ -148,7 +151,7 @@ export function RegistrationForm(): JSX.Element {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Address
             </h2>
             <Field label="Address line 1" error={errors.addressLine1?.message}>
@@ -168,14 +171,13 @@ export function RegistrationForm(): JSX.Element {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Documents (uploaded after submission)
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Once you submit the form, you will be asked to upload your GST
-              certificate, drug license, and pharmacy registration certificate
-              as PDF or image (max 10 MB each). Uploads use signed URLs and your
-              files are encrypted at rest.
+            <p className="text-muted-foreground text-sm">
+              Once you submit the form, you will be asked to upload your GST certificate, drug
+              license, and pharmacy registration certificate as PDF or image (max 10 MB each).
+              Uploads use signed URLs and your files are encrypted at rest.
             </p>
           </section>
 
@@ -207,7 +209,7 @@ function Field({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-destructive text-xs">{error}</p> : null}
     </div>
   );
 }
