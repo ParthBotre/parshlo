@@ -15,8 +15,7 @@
 // =============================================================================
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -316,7 +315,7 @@ model Order {
   statusEvents OrderStatusEvent[]
   invoice      Invoice?
 
-  /** Idempotency: identical key + buyer returns the same order. */
+  /// Idempotency: identical key + buyer returns the same order.
   idempotencyKey String
 
   placedAt      DateTime  @default(now())
