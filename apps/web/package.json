@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "clean": "rm -rf .next .turbo",
-    "compress:product-images": "tsx scripts/compress-product-images.ts"
+    "compress:product-images": "tsx scripts/compress-product-images.ts",
+    "build:brand": "tsx scripts/build-brand-assets.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "3.5.0",
