@@ -52,21 +52,27 @@ export default async function ProductsPage(): Promise<JSX.Element> {
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => (
             <Link key={p.slug} href={`/products/${p.slug}`} className="block">
-              <Card className="h-full">
-                <CardContent className="space-y-3 p-6">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary">{p.category}</Badge>
-                    {p.prescriptionRequired ? (
-                      <Badge variant="warning" className="gap-1">
-                        <ShieldCheck className="h-3 w-3" />
-                        Rx
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <div className="h-32 overflow-hidden rounded-lg">
-                    <ProductImage slug={p.slug} alt={p.name} className="h-full w-full" />
-                  </div>
-                  <h2 className="font-display text-lg font-semibold">{p.name}</h2>
+              <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
+                <div className="relative aspect-square overflow-hidden border-b">
+                  <ProductImage
+                    slug={p.slug}
+                    alt={p.name}
+                    className="h-full w-full"
+                    iconClassName="h-20 w-20"
+                  />
+                  {p.prescriptionRequired ? (
+                    <Badge
+                      variant="warning"
+                      className="absolute right-3 top-3 gap-1 shadow-sm backdrop-blur"
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      Rx
+                    </Badge>
+                  ) : null}
+                </div>
+                <CardContent className="space-y-2 p-5">
+                  <Badge variant="secondary">{p.category}</Badge>
+                  <h2 className="font-display text-lg font-semibold leading-tight">{p.name}</h2>
                   <p className="text-muted-foreground text-sm">{p.composition}</p>
                   <p className="text-muted-foreground text-xs uppercase tracking-wider">
                     {p.form} · {p.packaging}

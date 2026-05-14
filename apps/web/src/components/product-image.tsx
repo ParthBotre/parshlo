@@ -6,19 +6,20 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Renders a product image from `apps/web/public/products/<slug>.<ext>`.
+ * Renders a product image from `apps/web/public/product-images/<slug>.<ext>`.
  *
- * Tries `.jpg`, `.png`, `.webp` in order. If none are found, falls back to a
- * styled Pill placeholder so missing assets never break the page. Parent
- * controls the box (height/width/aspect) via `className`.
+ * Tries `.webp` first (the compressed dist created by `pnpm compress:product-images`),
+ * then `.jpg` / `.png` for SKUs we haven't compressed yet. If nothing matches,
+ * falls back to a styled Pill placeholder so missing assets never break the page.
+ * Parent controls the box (height/width/aspect) via `className`.
  *
  * We deliberately use a native <img> rather than next/image:
- *   - The dev workflow (drop a file in /public/products) needs no extra config.
+ *   - The dev workflow (drop a file in /public/product-images) needs no config.
  *   - The product catalog is small; image-CDN optimization isn't a bottleneck.
  *   - It lets the parent fully own layout via Tailwind utilities — no need to
  *     mark every container as `position: relative` for `fill` mode.
  */
-const EXTS = ['jpg', 'png', 'webp'] as const;
+const EXTS = ['webp', 'jpg', 'png'] as const;
 
 export interface ProductImageProps {
   slug: string;
@@ -55,9 +56,12 @@ export function ProductImage({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/products/${slug}.${EXTS[extIdx]}`}
+      src={`/product-images/${slug}.${EXTS[extIdx]}`}
       alt={alt}
-      className={cn('object-cover', className)}
+      // `object-contain` shows the full product (no cropping). White letterbox
+      // bands keep the pharma photo on a clean clinical background regardless of
+      // the image's own aspect ratio.
+      className={cn('h-full w-full bg-white object-contain p-2', className)}
       onError={() => setExtIdx((i) => i + 1)}
       loading="lazy"
       decoding="async"

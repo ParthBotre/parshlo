@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "clean": "rm -rf .next .turbo"
+    "clean": "rm -rf .next .turbo",
+    "compress:product-images": "tsx scripts/compress-product-images.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "3.5.0",
@@ -51,7 +52,9 @@
     "eslint": "9.18.0",
     "eslint-config-next": "15.1.4",
     "postcss": "8.4.49",
+    "sharp": "^0.34.5",
     "tailwindcss": "3.4.17",
+    "tsx": "4.19.2",
     "typescript": "5.7.3",
     "vitest": "2.1.8"
   }
