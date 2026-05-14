@@ -1,11 +1,12 @@
 'use client';
 
-import { Minus, Pill, Plus, ShoppingCart } from 'lucide-react';
+import { type BuyerProductView } from '@parshlo/types';
+import { Minus, Plus, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 
-import { type BuyerProductView } from '@parshlo/types';
-
 import { CartDrawer } from './cart-drawer';
+
+import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,16 +26,14 @@ export function BuyerCatalog({
 
   return (
     <>
-      <div className="sticky top-20 z-30 -mx-4 mb-2 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-2 backdrop-blur md:mx-0 md:rounded-lg md:border md:px-3">
-        <p className="text-sm text-muted-foreground">
+      <div className="bg-background/80 sticky top-20 z-30 -mx-4 mb-2 flex items-center justify-between gap-3 border-b px-4 py-2 backdrop-blur md:mx-0 md:rounded-lg md:border md:px-3">
+        <p className="text-muted-foreground text-sm">
           {products.length} products · prices shown ex-GST
         </p>
         <Button onClick={() => setDrawerOpen(true)} size="sm" className="gap-2">
           <ShoppingCart className="h-4 w-4" />
           Cart
-          {itemCount > 0 ? (
-            <Badge className="ml-1 bg-white text-primary">{itemCount}</Badge>
-          ) : null}
+          {itemCount > 0 ? <Badge className="text-primary ml-1 bg-white">{itemCount}</Badge> : null}
         </Button>
       </div>
 
@@ -69,12 +68,17 @@ function ProductCard({ product }: { product: BuyerProductView }): JSX.Element {
             <Badge variant="success">OTC</Badge>
           )}
         </div>
-        <div className="flex h-28 items-center justify-center rounded-lg bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600">
-          <Pill className="h-8 w-8" />
+        <div className="h-28 overflow-hidden rounded-lg">
+          <ProductImage
+            slug={product.slug}
+            alt={product.name}
+            className="h-full w-full"
+            iconClassName="h-8 w-8"
+          />
         </div>
         <div>
           <h3 className="font-display text-base font-semibold leading-tight">{product.name}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">{product.composition}</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">{product.composition}</p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <Field label="Wholesale" value={formatINR(product.wholesalePricePaise)} mono />
@@ -129,7 +133,7 @@ function Field({
 }): JSX.Element {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-muted-foreground text-[10px] uppercase tracking-wider">{label}</p>
       <p
         className={`text-xs font-medium ${mono ? 'font-mono' : ''} ${muted ? 'text-muted-foreground' : ''}`}
       >
