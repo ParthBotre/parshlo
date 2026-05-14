@@ -1,0 +1,77 @@
+import { type Metadata } from 'next';
+
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { ApiError } from '@/lib/api-client';
+import { listAllBuyers } from '@/lib/api/admin';
+import { getSession } from '@/lib/auth/session';
+
+export const metadata: Metadata = {
+  title: 'Admin · Buyers',
+  robots: { index: false, follow: false },
+};
+
+const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
+  APPROVED: 'success',
+  PENDING_VERIFICATION: 'warning',
+  UNDER_REVIEW: 'secondary',
+  REJECTED: 'warning',
+  SUSPENDED: 'warning',
+};
+
+export default async function BuyersPage(): Promise<JSX.Element> {
+  const session = await getSession();
+  if (!session) {
+    return <></>;
+  }
+  let buyers: Awaited<ReturnType<typeof listAllBuyers>> = [];
+  try {
+    buyers = await listAllBuyers(session.accessToken, { next: { revalidate: 0 } });
+  } catch (err) {
+    if (!(err instanceof ApiError)) {
+      throw err;
+    }
+  }
+  return (
+    <div className="space-y-6">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Buyers</h1>
+      <Card>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-5 py-3">Business</th>
+                <th className="px-5 py-3">Contact</th>
+                <th className="px-5 py-3">GSTIN</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buyers.map((b) => (
+                <tr key={b.id} className="border-t">
+                  <td className="px-5 py-3 font-medium">{b.businessName ?? '—'}</td>
+                  <td className="px-5 py-3">
+                    <p>{b.fullName}</p>
+                    <p className="text-xs text-muted-foreground">{b.email}</p>
+                  </td>
+                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                    {b.gstin ?? '—'}
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge variant={STATUS_VARIANTS[b.accountStatus] ?? 'secondary'}>
+                      {b.accountStatus.replace(/_/g, ' ')}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    {new Date(b.createdAt).toLocaleDateString('en-IN')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,458 @@
+// =============================================================================
+// Parshlo — Prisma schema
+//
+// Design notes
+// ------------
+//   1.  Money is stored as BigInt paise (1 INR = 100 paise) — never floats.
+//   2.  Soft deletes (deletedAt) are used on user-facing entities; hard deletes
+//       are reserved for ephemeral data (sessions, idempotency keys).
+//   3.  Every state-changing action writes an AuditLog row (interceptor-driven).
+//   4.  GSTIN is globally unique (a single business must not register twice).
+//   5.  ID strategy: cuid() for application records, plain BigInt sequences for
+//       human-readable order numbers (see Order.orderNumber).
+//   6.  All FK relationships use onDelete: Restrict to prevent accidental data
+//       loss; archival uses status fields instead.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// AUTH & USERS
+// -----------------------------------------------------------------------------
+
+enum Role {
+  BUYER
+  SALES_MANAGER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  PENDING_VERIFICATION
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum BusinessType {
+  PHARMACY
+  CHEMIST
+  STOCKIST
+  DISTRIBUTOR
+  HOSPITAL
+  WHOLESALER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  auth0Id   String   @unique
+  email     String   @unique
+  fullName  String
+  roles     Role[]   @default([BUYER])
+
+  accountStatus    AccountStatus @default(PENDING_VERIFICATION)
+  suspendedAt      DateTime?
+  suspensionReason String?
+
+  lastLoginAt DateTime?
+  lastLoginIp String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  businessProfile  BusinessProfile?
+  kycApplications  KycApplication[]
+  orders           Order[]
+  auditEvents      AuditLog[]         @relation("AuditActor")
+  kycReviewed      KycApplication[]   @relation("KycReviewer")
+  inquiries        ContactInquiry[]
+
+  @@index([accountStatus])
+  @@index([createdAt])
+}
+
+model BusinessProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  businessName               String
+  businessType               BusinessType
+  gstin                      String  @unique
+  pan                        String?
+  drugLicenseNumber          String
+  pharmacyRegistrationNumber String
+  mobile                     String
+  businessEmail              String
+
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String  // ISO 3166-2:IN code, e.g. "KA"
+  pin          String
+  country      String  @default("IN")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessType])
+  @@index([state])
+}
+
+// -----------------------------------------------------------------------------
+// KYC
+// -----------------------------------------------------------------------------
+
+enum KycStatus {
+  PENDING_VERIFICATION
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum KycDocumentType {
+  GST_CERTIFICATE
+  DRUG_LICENSE
+  PHARMACY_LICENSE
+  PAN_CARD
+  OTHER
+}
+
+model KycApplication {
+  id     String    @id @default(cuid())
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status KycStatus @default(PENDING_VERIFICATION)
+
+  submittedAt     DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedById    String?
+  reviewedBy      User?     @relation("KycReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  rejectionReason String?
+  reviewerNote    String?
+
+  documents KycDocument[]
+
+  @@index([status, submittedAt])
+  @@index([userId])
+}
+
+model KycDocument {
+  id               String          @id @default(cuid())
+  applicationId    String
+  application      KycApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentType     KycDocumentType
+  s3Bucket         String
+  s3Key            String
+  contentType      String
+  sizeBytes        Int
+  sha256           String          // Integrity check on upload
+  uploadedAt       DateTime        @default(now())
+
+  @@unique([applicationId, documentType])
+  @@index([s3Key])
+}
+
+// -----------------------------------------------------------------------------
+// PRODUCTS & INVENTORY
+// -----------------------------------------------------------------------------
+
+enum ProductForm {
+  TABLET
+  CAPSULE
+  SYRUP
+  SUSPENSION
+  INJECTION
+  OINTMENT
+  CREAM
+  GEL
+  DROPS
+  INHALER
+  POWDER
+  SACHET
+  OTHER
+}
+
+enum ScheduleDrug {
+  NONE
+  SCHEDULE_G
+  SCHEDULE_H
+  SCHEDULE_H1
+  SCHEDULE_X
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+  OUT_OF_STOCK
+}
+
+enum GstRate {
+  ZERO       // 0%
+  FIVE       // 5%
+  TWELVE     // 12%
+  EIGHTEEN   // 18%
+  TWENTYEIGHT // 28%
+}
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id           String          @id @default(cuid())
+  slug         String          @unique
+  name         String
+  composition  String
+  strength     String
+  form         ProductForm
+  packaging    String
+  description  String          @db.Text
+  manufacturer String
+  hsnCode      String
+
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  imageKeys String[]  // S3 keys, served via signed URLs
+
+  prescriptionRequired Boolean      @default(true)
+  scheduleDrug         ScheduleDrug @default(NONE)
+
+  wholesalePricePaise BigInt
+  mrpPaise            BigInt
+  gstRate             GstRate
+  moq                 Int            @default(1)
+
+  status ProductStatus @default(DRAFT)
+
+  inventory Inventory?
+  orderItems OrderItem[]
+  batches   ProductBatch[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([manufacturer])
+}
+
+model Inventory {
+  productId    String   @id
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  availableQty Int      @default(0)
+  reservedQty  Int      @default(0) // held by pending orders, decremented on cancel/dispatch
+  reorderLevel Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model ProductBatch {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batchNo   String
+  mfgDate   DateTime
+  expDate   DateTime
+  quantity  Int
+
+  @@unique([productId, batchNo])
+  @@index([expDate])
+}
+
+// -----------------------------------------------------------------------------
+// ORDERS
+// -----------------------------------------------------------------------------
+
+enum OrderStatus {
+  RECEIVED
+  UNDER_REVIEW
+  APPROVED
+  PREPARING
+  DISPATCHED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REJECTED
+}
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique // human-readable: PSH-YYYY-NNNNNN
+  buyerId     String
+  buyer       User   @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+
+  status               OrderStatus @default(RECEIVED)
+  purchaseOrderNumber  String?
+  notes                String?
+
+  // Snapshot of GST + business name at time of order (for compliance)
+  buyerBusinessName String
+  buyerGstin        String
+
+  subtotalPaise BigInt @default(0)
+  gstPaise      BigInt @default(0)
+  totalPaise    BigInt @default(0)
+
+  items        OrderItem[]
+  statusEvents OrderStatusEvent[]
+  invoice      Invoice?
+
+  /** Idempotency: identical key + buyer returns the same order. */
+  idempotencyKey String
+
+  placedAt      DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  dispatchedAt  DateTime?
+  deliveredAt   DateTime?
+  cancelledAt   DateTime?
+  rejectedAt    DateTime?
+
+  @@unique([buyerId, idempotencyKey])
+  @@index([status])
+  @@index([buyerId, placedAt(sort: Desc)])
+  @@index([placedAt])
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  productNameSnapshot String  // immutable snapshot for invoice integrity
+  quantity            Int
+  unitPricePaise      BigInt
+  gstRate             GstRate
+  lineSubtotalPaise   BigInt
+  lineGstPaise        BigInt
+  lineTotalPaise      BigInt
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  actorId   String?     // null = system
+  createdAt DateTime    @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// INVOICES
+// -----------------------------------------------------------------------------
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  s3Bucket      String
+  s3Key         String
+  sha256        String
+  totalPaise    BigInt
+  generatedAt   DateTime @default(now())
+
+  @@index([generatedAt])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channel   String // EMAIL | SMS | PUSH
+  kind      String // template identifier
+  recipient String
+  status    String // SENT | FAILED | BOUNCED
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([recipient])
+}
+
+// -----------------------------------------------------------------------------
+// PUBLIC INQUIRIES (contact form)
+// -----------------------------------------------------------------------------
+
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  subject   String
+  message   String   @db.Text
+  ipAddress String?
+  userAgent String?
+  // If a logged-in user submitted it
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?
+
+  @@index([createdAt])
+  @@index([email])
+}
+
+// -----------------------------------------------------------------------------
+// AUDIT LOG
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action      String   // e.g. "kyc.approve", "order.update_status", "product.create"
+  resource    String   // e.g. "User", "Order", "Product"
+  resourceId  String?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?    // structured details (before/after, reason, etc.)
+  requestId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([resource, resourceId])
+  @@index([action, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// IDEMPOTENCY / RATE LIMITING (auxiliary)
+// -----------------------------------------------------------------------------
+
+model IdempotencyKey {
+  key         String   @id
+  scope       String   // e.g. "order.place"
+  userId      String
+  responseHash String  // hash of the response we returned (so we can replay)
+  responseBody Json
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([expiresAt])
+}

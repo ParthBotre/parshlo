@@ -1,0 +1,145 @@
+import { BadgeCheck, IndianRupee, ScrollText, Users } from 'lucide-react';
+import { type Metadata } from 'next';
+import Link from 'next/link';
+
+import { Card, CardContent } from '@/components/ui/card';
+import { ApiError } from '@/lib/api-client';
+import { getAnalyticsSummary, listPendingKyc } from '@/lib/api/admin';
+import { getSession } from '@/lib/auth/session';
+import { formatINR } from '@/lib/utils';
+
+export const metadata: Metadata = {
+  title: 'Analytics',
+  robots: { index: false, follow: false },
+};
+
+export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
+  const session = await getSession();
+  if (!session) {
+    return <></>;
+  }
+
+  let summary: Awaited<ReturnType<typeof getAnalyticsSummary>> | null = null;
+  let pending: Awaited<ReturnType<typeof listPendingKyc>> = [];
+
+  try {
+    [summary, pending] = await Promise.all([
+      getAnalyticsSummary(session.accessToken, { next: { revalidate: 30 } }),
+      listPendingKyc(session.accessToken, { next: { revalidate: 30 } }),
+    ]);
+  } catch (err) {
+    if (!(err instanceof ApiError)) {
+      throw err;
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Analytics</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          High-level overview of platform health and inbound work.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          icon={BadgeCheck}
+          label="Pending KYC"
+          value={summary?.pendingKyc ?? 0}
+          href="/admin/kyc"
+          accent="warning"
+        />
+        <Stat
+          icon={Users}
+          label="Approved buyers"
+          value={summary?.approvedBuyers ?? 0}
+          href="/admin/buyers"
+        />
+        <Stat
+          icon={ScrollText}
+          label="Orders this month"
+          value={summary?.ordersThisMonth ?? 0}
+          href="/admin/orders"
+        />
+        <Stat
+          icon={IndianRupee}
+          label="Gross this month"
+          value={formatINR(summary?.grossThisMonthPaise ?? 0)}
+          href="/admin/orders"
+        />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between p-5">
+            <h2 className="font-display text-base font-semibold">Pending verification</h2>
+            <Link href="/admin/kyc" className="text-sm text-primary hover:underline">
+              Open queue →
+            </Link>
+          </div>
+          {pending.length === 0 ? (
+            <p className="border-t p-8 text-center text-sm text-muted-foreground">
+              Nothing in the queue. Nicely done.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3">Business</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.slice(0, 6).map((k) => (
+                  <tr key={k.id} className="border-t">
+                    <td className="px-5 py-3 font-medium">{k.businessName}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{k.status.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3 text-muted-foreground">
+                      {new Date(k.submittedAt).toLocaleDateString('en-IN')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  href,
+  accent,
+}: {
+  icon: typeof BadgeCheck;
+  label: string;
+  value: number | string;
+  href: string;
+  accent?: 'warning';
+}): JSX.Element {
+  return (
+    <Link href={href} className="block">
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="flex items-center gap-3 p-4">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+              accent === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-primary/10 text-primary'
+            }`}
+          >
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+            <p className="truncate font-display text-xl font-semibold">{value}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}

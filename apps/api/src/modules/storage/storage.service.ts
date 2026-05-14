@@ -1,0 +1,81 @@
+import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
+
+import { S3_CLIENT } from './storage.module.js';
+
+const ALLOWED_CONTENT_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+const MAX_BYTES = 10 * 1024 * 1024; // 10MB
+
+export type KycDocumentType = 'GST_CERTIFICATE' | 'DRUG_LICENSE' | 'PHARMACY_LICENSE' | 'PAN_CARD';
+
+@Injectable()
+export class StorageService {
+  constructor(
+    @Inject(S3_CLIENT) private readonly s3: S3Client,
+    private readonly config: ConfigService,
+  ) {}
+
+  /**
+   * Generate a short-lived presigned PUT URL for a KYC document upload.
+   * Returns the URL, the S3 key the client must remember, and HTTP method.
+   *
+   * Security controls:
+   *   - Bucket and key are server-generated; client cannot overwrite arbitrary objects.
+   *   - Content-Type is bound into the signed URL.
+   *   - Object size cap is enforced via Content-Length condition.
+   *   - URL expires in 15 minutes.
+   */
+  async createKycUploadUrl(opts: {
+    userId: string;
+    documentType: KycDocumentType;
+    contentType: string;
+    sizeBytes: number;
+  }): Promise<{ url: string; bucket: string; key: string; method: 'PUT'; expiresIn: number }> {
+    if (!ALLOWED_CONTENT_TYPES.has(opts.contentType)) {
+      throw new BadRequestException({
+        code: 'CONTENT_TYPE_NOT_ALLOWED',
+        message: `Only PDF, PNG, JPEG allowed. Got ${opts.contentType}.`,
+      });
+    }
+    if (opts.sizeBytes > MAX_BYTES) {
+      throw new BadRequestException({
+        code: 'FILE_TOO_LARGE',
+        message: `Maximum upload size is ${String(MAX_BYTES / 1024 / 1024)} MB.`,
+      });
+    }
+    const bucket = this.config.get<string>('S3_BUCKET_KYC') ?? 'parshlo-kyc';
+    const key = `kyc/${opts.userId}/${opts.documentType.toLowerCase()}/${randomUUID()}-${Date.now()}`;
+    const expiresIn = 15 * 60;
+
+    const url = await getSignedUrl(
+      this.s3,
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: opts.contentType,
+        ContentLength: opts.sizeBytes,
+      }),
+      { expiresIn },
+    );
+
+    return { url, bucket, key, method: 'PUT', expiresIn };
+  }
+
+  /**
+   * Generate a short-lived presigned GET URL for the buyer to download their
+   * own invoice. Admins use the same endpoint with their RBAC scope.
+   */
+  async createInvoiceDownloadUrl(s3Key: string): Promise<{ url: string; expiresIn: number }> {
+    const bucket = this.config.get<string>('S3_BUCKET_INVOICES') ?? 'parshlo-invoices';
+    const expiresIn = 5 * 60;
+    const url = await getSignedUrl(
+      this.s3,
+      new GetObjectCommand({ Bucket: bucket, Key: s3Key }),
+      { expiresIn },
+    );
+    return { url, expiresIn };
+  }
+}

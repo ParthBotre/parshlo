@@ -1,0 +1,172 @@
+'use client';
+
+import { Loader2, Trash2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { placeOrder } from '@/lib/api/orders';
+import { totals, useCart } from '@/lib/cart-store';
+import { formatINR } from '@/lib/utils';
+
+export function CartDrawer({
+  open,
+  onClose,
+  accessToken,
+}: {
+  open: boolean;
+  onClose: () => void;
+  accessToken: string;
+}): JSX.Element | null {
+  const router = useRouter();
+  const cart = useCart();
+  const t = totals(cart.lines);
+  const [poNumber, setPoNumber] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onCheckout = async (): Promise<void> => {
+    if (cart.lines.length === 0) {
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const order = await placeOrder(accessToken, {
+        items: cart.lines.map((l) => ({ productId: l.productId, quantity: l.qty })),
+        purchaseOrderNumber: poNumber.trim() || undefined,
+        notes: notes.trim() || undefined,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      cart.clear();
+      onClose();
+      router.push(`/dashboard/orders/${order.id}`);
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.problem.detail ?? err.problem.title
+          : err instanceof Error
+            ? err.message
+            : 'Order failed. Please try again.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+       
+      <div className="flex-1 bg-foreground/30 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <aside className="flex w-full max-w-md flex-col border-l bg-background shadow-xl">
+        <div className="flex items-center justify-between border-b p-4">
+          <h2 className="font-display text-lg font-semibold">Your cart</h2>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close cart">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {cart.lines.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              Your cart is empty.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {cart.lines.map((line) => (
+                <li key={line.productId} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{line.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {line.qty} × {formatINR(line.unitPricePaise)} · GST {line.gstRate}%
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cart.remove(line.productId)}
+                      aria-label="Remove"
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="space-y-3 border-t p-4">
+          <div className="space-y-2">
+            <input
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground"
+              placeholder="PO number (optional)"
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+            />
+            <textarea
+              className="min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground"
+              placeholder="Notes for fulfilment (optional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <dl className="space-y-1 text-sm">
+            <Row label="Subtotal" value={formatINR(t.subtotal)} />
+            <Row label="GST" value={formatINR(t.gst)} muted />
+            <Row label="Total" value={formatINR(t.total)} bold />
+          </dl>
+
+          {error ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          <Button
+            className="w-full"
+            size="lg"
+            disabled={submitting || cart.lines.length === 0}
+            onClick={() => void onCheckout()}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Placing order…
+              </>
+            ) : (
+              `Place order · ${formatINR(t.total)}`
+            )}
+          </Button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  muted = false,
+  bold = false,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  bold?: boolean;
+}): JSX.Element {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className={muted ? 'text-muted-foreground' : ''}>{label}</dt>
+      <dd className={`font-mono ${bold ? 'text-base font-semibold' : ''}`}>{value}</dd>
+    </div>
+  );
+}
