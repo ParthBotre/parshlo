@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { Role } from './auth.js';
-import { IsoDateString, Uuid } from './common.js';
+import { EntityId, IsoDateString } from './common.js';
 
 /** Lifecycle of a B2B account. */
 export const AccountStatus = z.enum([
@@ -26,7 +26,7 @@ export type BusinessType = z.infer<typeof BusinessType>;
 
 /** Public user profile (safe to expose). */
 export const PublicUser = z.object({
-  id: Uuid,
+  id: EntityId,
   email: z.string().email(),
   fullName: z.string().min(1),
   roles: z.array(Role),

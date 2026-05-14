@@ -1,13 +1,46 @@
 import { z } from 'zod';
 
-import { Gstin, IndianMobile, IndianPin, IsoDateString, Pan, Uuid } from './common.js';
+import { EntityId, Gstin, IndianMobile, IndianPin, IsoDateString, Pan } from './common.js';
 import { BusinessType } from './user.js';
 
 /** Indian states & UTs (ISO-3166-2:IN codes). */
 export const IndianStateCode = z.enum([
-  'AN', 'AP', 'AR', 'AS', 'BR', 'CH', 'CT', 'DN', 'DD', 'DL', 'GA', 'GJ',
-  'HR', 'HP', 'JK', 'JH', 'KA', 'KL', 'LA', 'LD', 'MP', 'MH', 'MN', 'ML',
-  'MZ', 'NL', 'OR', 'PY', 'PB', 'RJ', 'SK', 'TN', 'TS', 'TR', 'UP', 'UT',
+  'AN',
+  'AP',
+  'AR',
+  'AS',
+  'BR',
+  'CH',
+  'CT',
+  'DN',
+  'DD',
+  'DL',
+  'GA',
+  'GJ',
+  'HR',
+  'HP',
+  'JK',
+  'JH',
+  'KA',
+  'KL',
+  'LA',
+  'LD',
+  'MP',
+  'MH',
+  'MN',
+  'ML',
+  'MZ',
+  'NL',
+  'OR',
+  'PY',
+  'PB',
+  'RJ',
+  'SK',
+  'TN',
+  'TS',
+  'TR',
+  'UP',
+  'UT',
   'WB',
 ]);
 export type IndianStateCode = z.infer<typeof IndianStateCode>;
@@ -60,7 +93,11 @@ export type KycDocumentType = z.infer<typeof KycDocumentType>;
 export const PresignedUploadRequest = z.object({
   documentType: KycDocumentType,
   contentType: z.enum(['application/pdf', 'image/jpeg', 'image/png']),
-  contentLength: z.number().int().positive().max(10 * 1024 * 1024), // 10 MB
+  contentLength: z
+    .number()
+    .int()
+    .positive()
+    .max(10 * 1024 * 1024), // 10 MB
 });
 export type PresignedUploadRequest = z.infer<typeof PresignedUploadRequest>;
 
@@ -83,8 +120,8 @@ export type KycRejectionInput = z.infer<typeof KycRejectionInput>;
 
 /** Admin view of a pending KYC application. */
 export const KycApplicationView = z.object({
-  id: Uuid,
-  userId: Uuid,
+  id: EntityId,
+  userId: EntityId,
   status: z.enum(['PENDING_VERIFICATION', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']),
   businessName: z.string(),
   businessType: BusinessType,
@@ -93,7 +130,7 @@ export const KycApplicationView = z.object({
   pharmacyRegistrationNumber: z.string(),
   submittedAt: IsoDateString,
   reviewedAt: IsoDateString.nullable(),
-  reviewedBy: Uuid.nullable(),
+  reviewedBy: EntityId.nullable(),
   rejectionReason: z.string().nullable(),
 });
 export type KycApplicationView = z.infer<typeof KycApplicationView>;

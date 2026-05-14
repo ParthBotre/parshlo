@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { IsoDateString, Uuid } from './common.js';
+import { EntityId, IsoDateString } from './common.js';
 import { Paise } from './product.js';
 
 export const OrderStatus = z.enum([
@@ -17,7 +17,7 @@ export const OrderStatus = z.enum([
 export type OrderStatus = z.infer<typeof OrderStatus>;
 
 export const OrderItemInput = z.object({
-  productId: Uuid,
+  productId: EntityId,
   quantity: z.number().int().positive(),
 });
 export type OrderItemInput = z.infer<typeof OrderItemInput>;
@@ -32,7 +32,7 @@ export const PlaceOrderInput = z.object({
 export type PlaceOrderInput = z.infer<typeof PlaceOrderInput>;
 
 export const OrderItemView = z.object({
-  productId: Uuid,
+  productId: EntityId,
   productName: z.string(),
   quantity: z.number().int().positive(),
   unitPricePaise: Paise,
@@ -44,10 +44,10 @@ export const OrderItemView = z.object({
 export type OrderItemView = z.infer<typeof OrderItemView>;
 
 export const OrderView = z.object({
-  id: Uuid,
+  id: EntityId,
   orderNumber: z.string(), // human-readable, e.g. PSH-2026-000123
   status: OrderStatus,
-  buyerId: Uuid,
+  buyerId: EntityId,
   buyerBusinessName: z.string(),
   buyerGstin: z.string(),
   purchaseOrderNumber: z.string().nullable(),

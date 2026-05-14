@@ -4,9 +4,19 @@ import { z } from 'zod';
 export const IsoDateString = z.string().datetime({ offset: true });
 export type IsoDateString = z.infer<typeof IsoDateString>;
 
-/** UUID v4. */
+/** UUID v4. Use ONLY for client-supplied UUIDs (idempotency keys, Auth0 sub). */
 export const Uuid = z.string().uuid();
 export type Uuid = z.infer<typeof Uuid>;
+
+/**
+ * Database-issued entity ID.
+ *
+ * Prisma generates these via `@default(cuid())` (e.g. `clxyz0a1b2c3d4e5f6g7h8i9j`),
+ * not RFC 4122 UUIDs. We accept any reasonable opaque string so swapping the ID
+ * strategy later (cuid2, ulid, xid, etc.) doesn't break the API contract.
+ */
+export const EntityId = z.string().min(1).max(128);
+export type EntityId = z.infer<typeof EntityId>;
 
 /** Pagination params accepted by list endpoints. */
 export const PaginationQuery = z.object({
@@ -57,10 +67,7 @@ export const Gstin = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(
-    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-    'Invalid GSTIN format',
-  );
+  .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GSTIN format');
 export type Gstin = z.infer<typeof Gstin>;
 
 /** PAN: 10 chars (5 letters + 4 digits + 1 letter). */

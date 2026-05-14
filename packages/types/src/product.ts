@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { IsoDateString, Uuid } from './common.js';
+import { EntityId, IsoDateString } from './common.js';
 
 export const ProductForm = z.enum([
   'TABLET',
@@ -41,7 +41,7 @@ export type GstRate = z.infer<typeof GstRate>;
 
 /** Public-facing product view (NO wholesale price, NO MRP exposed publicly per spec). */
 export const PublicProductView = z.object({
-  id: Uuid,
+  id: EntityId,
   slug: z.string(),
   name: z.string(),
   composition: z.string(),

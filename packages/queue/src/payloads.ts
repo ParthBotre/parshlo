@@ -30,15 +30,18 @@ export type SendEmailJob = z.infer<typeof SendEmailJob>;
 
 // ----- Invoice jobs -----
 
+/** DB-issued id (cuid). Kept as a generic non-empty string so id strategy can evolve. */
+const EntityId = z.string().min(1).max(128);
+
 export const GenerateInvoiceJob = z.object({
-  orderId: z.string().uuid(),
+  orderId: EntityId,
 });
 export type GenerateInvoiceJob = z.infer<typeof GenerateInvoiceJob>;
 
 // ----- KYC notifications -----
 
 export const KycDecisionJob = z.object({
-  applicationId: z.string().uuid(),
+  applicationId: EntityId,
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().max(2000).optional(),
 });
