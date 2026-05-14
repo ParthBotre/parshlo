@@ -3,53 +3,62 @@
 import { Pill } from 'lucide-react';
 import { useState } from 'react';
 
-import { productImageUrl } from '@/lib/product-images';
 import { cn } from '@/lib/utils';
 
 /**
- * Renders a product photo with a graceful fallback.
+ * Renders a product image from `apps/web/public/products/<slug>.<ext>`.
  *
- * - Tries to load `/product-images/<slug>.jpg`.
- * - If the file is missing (or any load error) it falls back to a soft
- *   gradient + pill icon so the layout never breaks.
+ * Tries `.jpg`, `.png`, `.webp` in order. If none are found, falls back to a
+ * styled Pill placeholder so missing assets never break the page. Parent
+ * controls the box (height/width/aspect) via `className`.
  *
- * Marked `'use client'` because we need React state to track the
- * onError → fallback transition. The wrapping pages can stay server
- * components.
+ * We deliberately use a native <img> rather than next/image:
+ *   - The dev workflow (drop a file in /public/products) needs no extra config.
+ *   - The product catalog is small; image-CDN optimization isn't a bottleneck.
+ *   - It lets the parent fully own layout via Tailwind utilities — no need to
+ *     mark every container as `position: relative` for `fill` mode.
  */
+const EXTS = ['jpg', 'png', 'webp'] as const;
+
+export interface ProductImageProps {
+  slug: string;
+  alt: string;
+  /** Tailwind classes applied to the rendered <img> AND the fallback box. */
+  className?: string;
+  /** Tailwind classes for the fallback Pill icon (size, color). */
+  iconClassName?: string;
+}
+
 export function ProductImage({
   slug,
   alt,
   className,
   iconClassName,
-}: {
-  slug: string;
-  alt: string;
-  className?: string;
-  iconClassName?: string;
-}): JSX.Element {
-  const [failed, setFailed] = useState(false);
+}: ProductImageProps): JSX.Element {
+  const [extIdx, setExtIdx] = useState(0);
 
-  if (failed) {
+  if (extIdx >= EXTS.length) {
     return (
       <div
         className={cn(
           'from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center bg-gradient-to-br',
           className,
         )}
+        role="img"
+        aria-label={alt}
       >
-        <Pill className={cn('h-10 w-10', iconClassName)} aria-hidden />
+        <Pill className={cn('h-10 w-10', iconClassName)} aria-hidden="true" />
       </div>
     );
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- onError fallback is incompatible with next/image without further plumbing; local public assets are already small.
+    // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={productImageUrl(slug)}
+      src={`/products/${slug}.${EXTS[extIdx]}`}
       alt={alt}
-      onError={() => setFailed(true)}
-      className={cn('h-full w-full object-cover', className)}
+      className={cn('object-cover', className)}
+      onError={() => setExtIdx((i) => i + 1)}
       loading="lazy"
       decoding="async"
     />
