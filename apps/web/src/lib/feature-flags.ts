@@ -9,5 +9,10 @@
  * restart `pnpm dev` (env vars are baked in at boot for Next).
  */
 
-/** Pricing displayed in the UI + order placement enabled. */
-export const PRICING_ENABLED: boolean = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true';
+/**
+ * Pricing displayed in the UI + order placement enabled.
+ * Defaults to on in development unless explicitly set to `false`.
+ */
+export const PRICING_ENABLED: boolean =
+  process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true' ||
+  (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_PRICING_ENABLED !== 'false');

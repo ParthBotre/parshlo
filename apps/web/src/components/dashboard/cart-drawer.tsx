@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { placeOrder } from '@/lib/api/orders';
+import { placeOrderFromBrowser } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api-client';
 import { totals, useCart } from '@/lib/cart-store';
 import { PRICING_ENABLED } from '@/lib/feature-flags';
@@ -14,11 +14,9 @@ import { formatINR } from '@/lib/utils';
 export function CartDrawer({
   open,
   onClose,
-  accessToken,
 }: {
   open: boolean;
   onClose: () => void;
-  accessToken: string;
 }): JSX.Element | null {
   const router = useRouter();
   const cart = useCart();
@@ -35,11 +33,10 @@ export function CartDrawer({
     setError(null);
     setSubmitting(true);
     try {
-      const order = await placeOrder(accessToken, {
+      const order = await placeOrderFromBrowser({
         items: cart.lines.map((l) => ({ productId: l.productId, quantity: l.qty })),
         purchaseOrderNumber: poNumber.trim() || undefined,
         notes: notes.trim() || undefined,
-        idempotencyKey: crypto.randomUUID(),
       });
       cart.clear();
       onClose();

@@ -16,13 +16,7 @@ import { PRICING_ENABLED } from '@/lib/feature-flags';
 import { useCatalogFilters } from '@/lib/use-catalog-filters';
 import { formatINR } from '@/lib/utils';
 
-export function BuyerCatalog({
-  products,
-  accessToken,
-}: {
-  products: BuyerProductView[];
-  accessToken: string;
-}): JSX.Element {
+export function BuyerCatalog({ products }: { products: BuyerProductView[] }): JSX.Element {
   const cart = useCart();
   const { itemCount } = totals(cart.lines);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,11 +72,7 @@ export function BuyerCatalog({
         </div>
       )}
 
-      <CartDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        accessToken={accessToken}
-      />
+      <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
   );
 }

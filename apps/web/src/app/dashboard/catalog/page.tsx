@@ -40,10 +40,16 @@ export default async function CatalogPage(): Promise<JSX.Element> {
 
       {error ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
-          {error}
+          <p>{error}</p>
+          {error.toLowerCase().includes('not yet approved') ? (
+            <p className="text-muted-foreground mt-2">
+              Your B2B application is still in review. You will be able to browse pricing and place
+              orders once an admin approves your account.
+            </p>
+          ) : null}
         </div>
       ) : (
-        <BuyerCatalog products={products} accessToken={session.accessToken} />
+        <BuyerCatalog products={products} />
       )}
     </div>
   );
