@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { DevSignInPanel } from '@/components/dev-sign-in-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { authErrorMessage } from '@/lib/auth/auth0-errors';
 import { getSession } from '@/lib/auth/session';
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
@@ -15,11 +16,18 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; error_description?: string }>;
 }
 
 export default async function SignInPage({ searchParams }: PageProps): Promise<JSX.Element> {
-  const { next } = await searchParams;
+  const { next, error, error_description } = await searchParams;
+  const authError = error || error_description ? authErrorMessage(error, error_description) : null;
+  const returnTo = next?.startsWith('/') ? next : '/dashboard';
+  const loginParams = new URLSearchParams({ returnTo });
+  if (error) {
+    loginParams.set('prompt', 'login');
+  }
+  const loginHref = `/api/auth/login?${loginParams.toString()}`;
   const session = await getSession();
   if (session) {
     const isAdmin = session.user.roles.some((r) => ADMIN_ROLES.has(r));
@@ -43,13 +51,20 @@ export default async function SignInPage({ searchParams }: PageProps): Promise<J
             </p>
           </div>
 
+          {authError ? (
+            <p
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+              role="alert"
+            >
+              {authError}
+            </p>
+          ) : null}
+
           {isDevMode ? (
             <DevSignInPanel redirectTo={next} />
           ) : (
             <Button asChild size="lg" className="w-full">
-              <Link href={`/api/auth/login?returnTo=${encodeURIComponent(next ?? '/admin')}`}>
-                Continue with Auth0
-              </Link>
+              <Link href={loginHref}>Continue with Auth0</Link>
             </Button>
           )}
 
