@@ -2,8 +2,8 @@ import { type Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { BuyerCatalog } from '@/components/dashboard/buyer-catalog';
-import { ApiError } from '@/lib/api-client';
 import { listBuyerCatalog } from '@/lib/api/products';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
 export const metadata: Metadata = {
@@ -33,13 +33,13 @@ export default async function CatalogPage(): Promise<JSX.Element> {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Catalog</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Live wholesale pricing. Minimum order quantities apply.
         </p>
       </div>
 
       {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
           {error}
         </div>
       ) : (

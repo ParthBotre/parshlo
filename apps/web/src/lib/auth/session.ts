@@ -1,8 +1,7 @@
+import { type Role } from '@parshlo/types';
 import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import 'server-only';
-
-import { type Role } from '@parshlo/types';
 
 /**
  * Parshlo session model.

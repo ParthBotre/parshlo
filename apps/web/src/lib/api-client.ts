@@ -1,3 +1,4 @@
+import { ApiErrorResponse } from '@parshlo/types';
 import { z, type ZodSchema } from 'zod';
 
 /**
@@ -13,12 +14,8 @@ import { z, type ZodSchema } from 'zod';
  *     actions, and the browser. No isomorphic-fetch shim needed.
  */
 
-import { ApiErrorResponse } from '@parshlo/types';
-
 const DEFAULT_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.API_BASE_URL ??
-  'http://localhost:4000';
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:4000';
 
 export interface ApiCallOptions extends Omit<RequestInit, 'body'> {
   /** Pre-serialized body or a plain object that will be JSON-stringified. */
@@ -38,16 +35,16 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly problem: z.infer<typeof ApiErrorResponse>,
   ) {
-    super(problem.detail ?? problem.title ?? `API ${String(status)}`);
+    super(problem.detail ?? problem.title);
     this.name = 'ApiError';
   }
 }
 
-export async function apiCall<TSchema extends ZodSchema>(
+export async function apiCall<T>(
   path: string,
-  schema: TSchema,
+  schema: ZodSchema<T>,
   options: ApiCallOptions = {},
-): Promise<z.infer<TSchema>> {
+): Promise<T> {
   const url = new URL(path, options.baseUrl ?? DEFAULT_BASE).toString();
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -105,11 +102,19 @@ export async function apiCall<TSchema extends ZodSchema>(
   }
 
   if (res.status === 204) {
-    return undefined as z.infer<TSchema>;
+    const empty = schema.safeParse(undefined);
+    if (empty.success) {
+      return empty.data;
+    }
+    return undefined as T;
   }
 
-  const json = (await res.json()) as unknown;
-  return schema.parse(json);
+  const json: unknown = await res.json();
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    throw parsed.error;
+  }
+  return parsed.data;
 }
 
 /** Helper for endpoints that return a paginated envelope. */

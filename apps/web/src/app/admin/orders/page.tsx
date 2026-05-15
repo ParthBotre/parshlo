@@ -3,8 +3,8 @@ import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ApiError } from '@/lib/api-client';
 import { listAllOrders } from '@/lib/api/admin';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { formatINR } from '@/lib/utils';
 
@@ -46,7 +46,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Orders</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Operations view across every buyer. Click an order to drill in.
         </p>
       </div>
@@ -73,10 +73,10 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
       <Card>
         <CardContent className="p-0">
           {orders.length === 0 ? (
-            <p className="p-10 text-center text-sm text-muted-foreground">No orders match.</p>
+            <p className="text-muted-foreground p-10 text-center text-sm">No orders match.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3">Order #</th>
                   <th className="px-5 py-3">Buyer</th>
@@ -88,16 +88,16 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
               </thead>
               <tbody>
                 {orders.map((o) => (
-                  <tr key={o.id} className="border-t hover:bg-accent/40">
+                  <tr key={o.id} className="hover:bg-accent/40 border-t">
                     <td className="px-5 py-3 font-medium">{o.orderNumber}</td>
                     <td className="px-5 py-3">{o.buyerBusinessName}</td>
-                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
                       {o.buyerGstin}
                     </td>
                     <td className="px-5 py-3">
                       <Badge variant="secondary">{o.status.replace(/_/g, ' ')}</Badge>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">
+                    <td className="text-muted-foreground px-5 py-3">
                       {new Date(o.placedAt).toLocaleDateString('en-IN')}
                     </td>
                     <td className="px-5 py-3 text-right font-mono">{formatINR(o.totalPaise)}</td>

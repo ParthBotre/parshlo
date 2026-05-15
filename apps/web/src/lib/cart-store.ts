@@ -1,9 +1,8 @@
 'use client';
 
+import { type BuyerProductView } from '@parshlo/types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-import { type BuyerProductView } from '@parshlo/types';
 
 export interface CartLine {
   productId: string;

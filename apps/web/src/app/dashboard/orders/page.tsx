@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ApiError } from '@/lib/api-client';
 import { listMyOrders } from '@/lib/api/orders';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { formatINR } from '@/lib/utils';
 
@@ -14,17 +14,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const STATUS_VARIANT: Record<string, 'secondary' | 'success' | 'warning' | 'outline' | 'default'> = {
-  RECEIVED: 'secondary',
-  UNDER_REVIEW: 'secondary',
-  APPROVED: 'default',
-  PREPARING: 'default',
-  DISPATCHED: 'default',
-  OUT_FOR_DELIVERY: 'default',
-  DELIVERED: 'success',
-  CANCELLED: 'warning',
-  REJECTED: 'warning',
-};
+const STATUS_VARIANT: Record<string, 'secondary' | 'success' | 'warning' | 'outline' | 'default'> =
+  {
+    RECEIVED: 'secondary',
+    UNDER_REVIEW: 'secondary',
+    APPROVED: 'default',
+    PREPARING: 'default',
+    DISPATCHED: 'default',
+    OUT_FOR_DELIVERY: 'default',
+    DELIVERED: 'success',
+    CANCELLED: 'warning',
+    REJECTED: 'warning',
+  };
 
 export default async function OrdersPage(): Promise<JSX.Element> {
   const session = await getSession();
@@ -48,7 +49,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
       <Card>
         <CardContent className="p-0">
           {orders.length === 0 ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">
+            <div className="text-muted-foreground p-10 text-center text-sm">
               No orders yet. Start in the{' '}
               <Link href="/dashboard/catalog" className="text-primary hover:underline">
                 catalog
@@ -57,7 +58,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3">Order #</th>
                   <th className="px-5 py-3">Status</th>
@@ -68,7 +69,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
               </thead>
               <tbody>
                 {orders.map((o) => (
-                  <tr key={o.id} className="border-t hover:bg-accent/40">
+                  <tr key={o.id} className="hover:bg-accent/40 border-t">
                     <td className="px-5 py-3">
                       <Link
                         href={`/dashboard/orders/${o.id}`}
@@ -82,8 +83,8 @@ export default async function OrdersPage(): Promise<JSX.Element> {
                         {o.status.replace(/_/g, ' ')}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">{o.items.length}</td>
-                    <td className="px-5 py-3 text-muted-foreground">
+                    <td className="text-muted-foreground px-5 py-3">{o.items.length}</td>
+                    <td className="text-muted-foreground px-5 py-3">
                       {new Date(o.placedAt).toLocaleString('en-IN')}
                     </td>
                     <td className="px-5 py-3 text-right font-mono">{formatINR(o.totalPaise)}</td>

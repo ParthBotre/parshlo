@@ -2,8 +2,8 @@ import { type Metadata } from 'next';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ApiError } from '@/lib/api-client';
 import { listAllBuyers } from '@/lib/api/admin';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
 export const metadata: Metadata = {
@@ -38,7 +38,7 @@ export default async function BuyersPage(): Promise<JSX.Element> {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3">Business</th>
                 <th className="px-5 py-3">Contact</th>
@@ -53,9 +53,9 @@ export default async function BuyersPage(): Promise<JSX.Element> {
                   <td className="px-5 py-3 font-medium">{b.businessName ?? '—'}</td>
                   <td className="px-5 py-3">
                     <p>{b.fullName}</p>
-                    <p className="text-xs text-muted-foreground">{b.email}</p>
+                    <p className="text-muted-foreground text-xs">{b.email}</p>
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                  <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
                     {b.gstin ?? '—'}
                   </td>
                   <td className="px-5 py-3">
@@ -63,7 +63,7 @@ export default async function BuyersPage(): Promise<JSX.Element> {
                       {b.accountStatus.replace(/_/g, ' ')}
                     </Badge>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">
+                  <td className="text-muted-foreground px-5 py-3">
                     {new Date(b.createdAt).toLocaleDateString('en-IN')}
                   </td>
                 </tr>
