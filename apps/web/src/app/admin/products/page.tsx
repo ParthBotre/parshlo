@@ -18,10 +18,13 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
     return <></>;
   }
   let products: Awaited<ReturnType<typeof listBuyerCatalog>> = [];
+  let error: string | null = null;
   try {
     products = await listBuyerCatalog(session.accessToken, { next: { revalidate: 30 } });
   } catch (err) {
-    if (!(err instanceof ApiError)) {
+    if (err instanceof ApiError) {
+      error = err.problem.detail ?? err.problem.title;
+    } else {
       throw err;
     }
   }
@@ -35,16 +38,25 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
         </p>
       </div>
 
-      {products.length === 0 ? (
+      {error ? (
+        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
+          {error}
+        </div>
+      ) : null}
+
+      {!error && products.length === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground flex flex-col items-center gap-3 p-12 text-center">
             <Package className="h-10 w-10 opacity-60" />
             <p className="text-sm">No products in the catalog yet.</p>
+            <p className="text-xs opacity-80">
+              Run <code className="font-mono">make db-seed</code> if this is a fresh database.
+            </p>
           </CardContent>
         </Card>
-      ) : (
+      ) : !error ? (
         <AdminCatalogGrid products={products} />
-      )}
+      ) : null}
     </div>
   );
 }

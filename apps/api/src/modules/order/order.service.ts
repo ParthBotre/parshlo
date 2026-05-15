@@ -81,7 +81,8 @@ export class OrderService {
       where: { id: buyerId },
       include: { businessProfile: true },
     });
-    if (!buyer || buyer.accountStatus !== 'APPROVED' || !buyer.businessProfile) {
+    const businessProfile = buyer?.businessProfile;
+    if (!buyer || buyer.accountStatus !== 'APPROVED' || !businessProfile) {
       throw new ForbiddenException({ code: 'ACCOUNT_NOT_APPROVED' });
     }
 
@@ -99,7 +100,7 @@ export class OrderService {
         const itemData: Prisma.OrderItemCreateManyOrderInput[] = [];
         let subtotal = 0n;
         let gstTotal = 0n;
-        const stockUpdates: Array<{ productId: string; qty: number }> = [];
+        const stockUpdates: { productId: string; qty: number }[] = [];
 
         for (const item of input.items) {
           const product = products.find((p) => p.id === item.productId);
@@ -115,7 +116,8 @@ export class OrderService {
               message: `Minimum order quantity for ${product.name} is ${String(product.moq)}.`,
             });
           }
-          const available = (product.inventory?.availableQty ?? 0) - (product.inventory?.reservedQty ?? 0);
+          const available =
+            (product.inventory?.availableQty ?? 0) - (product.inventory?.reservedQty ?? 0);
           if (item.quantity > available) {
             throw new ConflictException({
               code: 'INSUFFICIENT_STOCK',
@@ -158,8 +160,8 @@ export class OrderService {
           data: {
             orderNumber,
             buyerId,
-            buyerBusinessName: buyer.businessProfile!.businessName,
-            buyerGstin: buyer.businessProfile!.gstin,
+            buyerBusinessName: businessProfile.businessName,
+            buyerGstin: businessProfile.gstin,
             purchaseOrderNumber: input.purchaseOrderNumber ?? null,
             notes: input.notes ?? null,
             subtotalPaise: subtotal,
@@ -181,12 +183,11 @@ export class OrderService {
 
     // Side-effects after commit. Best-effort: failures are logged but never
     // propagate back to the user — their order is already durable.
-    void this.dispatchOrderPlacedSideEffects(view, buyer.email, buyer.fullName).catch((err: unknown) => {
-      this.log.error(
-        { err, orderId: view.id },
-        'failed to dispatch order-placed side effects',
-      );
-    });
+    void this.dispatchOrderPlacedSideEffects(view, buyer.email, buyer.fullName).catch(
+      (err: unknown) => {
+        this.log.error({ err, orderId: view.id }, 'failed to dispatch order-placed side effects');
+      },
+    );
 
     return view;
   }
@@ -347,7 +348,7 @@ export class OrderService {
       dispatchedAt: Date | null;
       deliveredAt: Date | null;
     },
-    items: Array<{
+    items: {
       productId: string;
       productNameSnapshot: string;
       quantity: number;
@@ -356,7 +357,7 @@ export class OrderService {
       lineSubtotalPaise: bigint;
       lineGstPaise: bigint;
       lineTotalPaise: bigint;
-    }>,
+    }[],
   ): OrderView {
     const itemViews: OrderItemView[] = items.map((i) => ({
       productId: i.productId,

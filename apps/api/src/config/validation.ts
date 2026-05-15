@@ -29,7 +29,7 @@ export const configValidationSchema = z
   })
   .superRefine((env, ctx) => {
     if (env.AUTH_MODE === 'auth0') {
-      const required: Array<keyof typeof env> = [
+      const required: (keyof typeof env)[] = [
         'AUTH0_DOMAIN',
         'AUTH0_AUDIENCE',
         'AUTH0_ISSUER_BASE_URL',

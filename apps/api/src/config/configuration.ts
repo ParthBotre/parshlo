@@ -34,8 +34,15 @@ export interface AppConfig {
   };
 }
 
+function parseNodeEnv(value: string | undefined): AppConfig['nodeEnv'] {
+  if (value === 'production' || value === 'test') {
+    return value;
+  }
+  return 'development';
+}
+
 export const configuration = (): AppConfig => ({
-  nodeEnv: (process.env.NODE_ENV as AppConfig['nodeEnv']) ?? 'development',
+  nodeEnv: parseNodeEnv(process.env.NODE_ENV),
   port: Number.parseInt(process.env.PORT ?? '4000', 10),
   cookieSecret: process.env.AUTH0_SECRET ?? 'dev-cookie-secret-change-me',
   cors: {

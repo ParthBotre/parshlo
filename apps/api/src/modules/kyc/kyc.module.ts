@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { QueueModule } from '../queue/queue.module.js';
+
 import { KycController } from './kyc.controller.js';
 import { KycService } from './kyc.service.js';
-import { QueueModule } from '../queue/queue.module.js';
 
 @Module({
   imports: [QueueModule],

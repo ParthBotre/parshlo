@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { type AuthPrincipal, type PublicUser } from '@parshlo/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+
 import { UserService } from './user.service.js';
 
 @ApiTags('users')

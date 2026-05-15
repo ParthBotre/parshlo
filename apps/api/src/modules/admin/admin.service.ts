@@ -7,11 +7,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listAllOrders(filters: {
-    status?: OrderStatus;
-    take?: number;
-  }): Promise<
-    Array<{
+  async listAllOrders(filters: { status?: OrderStatus; take?: number }): Promise<
+    {
       id: string;
       orderNumber: string;
       status: string;
@@ -20,7 +17,7 @@ export class AdminService {
       buyerGstin: string;
       totalPaise: number;
       itemCount: number;
-    }>
+    }[]
   > {
     const orders = await this.prisma.order.findMany({
       where: filters.status ? { status: filters.status } : undefined,
@@ -41,7 +38,7 @@ export class AdminService {
   }
 
   async listBuyers(): Promise<
-    Array<{
+    {
       id: string;
       email: string;
       fullName: string;
@@ -49,7 +46,7 @@ export class AdminService {
       businessName: string | null;
       gstin: string | null;
       createdAt: string;
-    }>
+    }[]
   > {
     const users = await this.prisma.user.findMany({
       where: { roles: { has: 'BUYER' }, deletedAt: null },
@@ -69,13 +66,13 @@ export class AdminService {
   }
 
   async listPendingKyc(): Promise<
-    Array<{
+    {
       id: string;
       userId: string;
       status: string;
       businessName: string;
       submittedAt: string;
-    }>
+    }[]
   > {
     const apps = await this.prisma.kycApplication.findMany({
       where: { status: { in: ['PENDING_VERIFICATION', 'UNDER_REVIEW'] } },

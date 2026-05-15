@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -26,6 +28,8 @@ import { UserModule } from './modules/user/user.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Load app-local first, then monorepo root (later files override earlier).
+      envFilePath: ['.env', join(__dirname, '..', '..', '..', '.env')],
       load: [configuration],
       validate: (raw) => configValidationSchema.parse(raw),
       cache: true,
