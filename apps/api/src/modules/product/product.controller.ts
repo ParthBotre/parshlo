@@ -1,14 +1,13 @@
 import { Controller, ForbiddenException, Get, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import {
-  type AuthPrincipal,
-  type BuyerProductView,
-  type PublicProductView,
-} from '@parshlo/types';
+import { Throttle } from '@nestjs/throttler';
+import { type AuthPrincipal, type BuyerProductView, type PublicProductView } from '@parshlo/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
+import { THROTTLE_PUBLIC_READ } from '../../common/throttling/throttle.constants.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+
 import { ProductService } from './product.service.js';
 
 @ApiTags('products')
@@ -21,12 +20,14 @@ export class ProductController {
 
   /** Public catalog — NO wholesale prices, NO MOQ, NO inventory exposed. */
   @Public()
+  @Throttle(THROTTLE_PUBLIC_READ)
   @Get('public')
   listPublic(): Promise<PublicProductView[]> {
     return this.products.listPublic();
   }
 
   @Public()
+  @Throttle(THROTTLE_PUBLIC_READ)
   @Get('public/:slug')
   getPublic(@Param('slug') slug: string): Promise<PublicProductView> {
     return this.products.getPublicBySlug(slug);

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { rejectKyc } from '@/lib/api/admin';
 import { getSession } from '@/lib/auth/session';
+import { clientErrorResponse } from '@/lib/safe-error';
 
 const Body = z.object({ reason: z.string().min(3).max(1000) });
 
@@ -24,10 +25,7 @@ export async function POST(
   try {
     await rejectKyc(session.accessToken, id, body.reason);
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Rejection failed' },
-      { status: 500 },
-    );
+  } catch {
+    return clientErrorResponse('Rejection failed. Please try again.', 500);
   }
 }

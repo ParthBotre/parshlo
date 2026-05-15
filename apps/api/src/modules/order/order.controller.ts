@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   type AuthPrincipal,
   type OrderView,
@@ -11,6 +12,11 @@ import { Audit } from '../../common/decorators/audit.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireRoles } from '../../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import {
+  THROTTLE_MUTATION,
+  THROTTLE_ORDER_PLACE,
+} from '../../common/throttling/throttle.constants.js';
+
 import { OrderService } from './order.service.js';
 
 @ApiTags('orders')
@@ -21,6 +27,7 @@ export class OrderController {
 
   @Post()
   @HttpCode(201)
+  @Throttle(THROTTLE_ORDER_PLACE)
   @Audit({
     action: 'order.place',
     resource: 'Order',
@@ -44,6 +51,7 @@ export class OrderController {
   }
 
   @Patch(':id/status')
+  @Throttle(THROTTLE_MUTATION)
   @RequireRoles('ADMIN', 'SALES_MANAGER', 'SUPER_ADMIN')
   @Audit({
     action: 'order.update_status',

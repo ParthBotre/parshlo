@@ -1,17 +1,31 @@
-import { BadRequestException, Body, Controller, NotFoundException, Param, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  NotFoundException,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { type AuthPrincipal } from '@parshlo/types';
 import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { THROTTLE_MUTATION } from '../../common/throttling/throttle.constants.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+
 import { StorageService } from './storage.service.js';
 
 const KycUploadRequest = z.object({
   documentType: z.enum(['GST_CERTIFICATE', 'DRUG_LICENSE', 'PHARMACY_LICENSE', 'PAN_CARD']),
   contentType: z.enum(['application/pdf', 'image/png', 'image/jpeg']),
-  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(10 * 1024 * 1024),
   filename: z.string().min(1).max(256).optional(),
 });
 type KycUploadRequest = z.infer<typeof KycUploadRequest>;
@@ -26,6 +40,7 @@ export class StorageController {
   ) {}
 
   @ApiOperation({ summary: 'Presigned PUT URL for KYC document upload' })
+  @Throttle(THROTTLE_MUTATION)
   @Post('kyc-upload-url')
   createKycUpload(
     @CurrentUser() user: AuthPrincipal,
@@ -40,6 +55,7 @@ export class StorageController {
   }
 
   @ApiOperation({ summary: 'Presigned GET URL for an invoice' })
+  @Throttle(THROTTLE_MUTATION)
   @Post('invoice/:orderId/download-url')
   async createInvoiceDownload(
     @CurrentUser() user: AuthPrincipal,

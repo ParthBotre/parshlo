@@ -9,6 +9,13 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Logger } from 'nestjs-pino';
 import { ZodError } from 'zod';
 
+function isErrorBody(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const HTTP_TOO_MANY_REQUESTS = HttpStatus.TOO_MANY_REQUESTS as number;
+const HTTP_INTERNAL_SERVER_ERROR = HttpStatus.INTERNAL_SERVER_ERROR as number;
+
 /**
  * Global exception filter producing RFC 7807-style problem details.
  * All errors are logged; only safe details are returned to the client.
@@ -23,11 +30,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<FastifyRequest>();
     const requestId = (request.id as string | undefined) ?? 'unknown';
 
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let code = 'INTERNAL_ERROR';
     let title = 'Internal Server Error';
     let detail: string | undefined;
-    let errors: Array<{ path: string; message: string; code?: string }> | undefined;
+    let errors: { path: string; message: string; code?: string }[] | undefined;
 
     if (exception instanceof ZodError) {
       status = HttpStatus.BAD_REQUEST;
@@ -40,21 +47,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }));
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
+      const statusCode = Number(status);
+      if (statusCode === HTTP_TOO_MANY_REQUESTS) {
+        code = 'RATE_LIMITED';
+        title = 'Too Many Requests';
+        detail = 'Please slow down and try again later.';
+      }
       const res = exception.getResponse();
       if (typeof res === 'string') {
         title = res;
-      } else if (typeof res === 'object' && res !== null) {
-        const obj = res as { message?: unknown; error?: unknown; code?: unknown };
-        if (typeof obj.error === 'string') {
-          title = obj.error;
+      } else if (isErrorBody(res)) {
+        if (typeof res.error === 'string') {
+          title = res.error;
         }
-        if (Array.isArray(obj.message)) {
-          errors = obj.message.map((m: string) => ({ path: '', message: m }));
-        } else if (typeof obj.message === 'string') {
-          detail = obj.message;
+        if (Array.isArray(res.message)) {
+          errors = res.message.map((m: string) => ({ path: '', message: m }));
+        } else if (statusCode !== HTTP_TOO_MANY_REQUESTS && typeof res.message === 'string') {
+          detail = res.message;
         }
-        if (typeof obj.code === 'string') {
-          code = obj.code;
+        if (typeof res.code === 'string') {
+          code = res.code;
         }
       }
     } else if (exception instanceof Error) {
@@ -70,6 +82,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
     });
 
+    const statusCode = Number(status);
     void response
       .header('X-Request-Id', requestId)
       .status(status)
@@ -78,7 +91,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         title,
         status,
         code,
-        detail: status >= 500 ? 'An unexpected error occurred.' : detail,
+        detail: statusCode >= HTTP_INTERNAL_SERVER_ERROR ? 'An unexpected error occurred.' : detail,
         instance: request.url,
         requestId,
         errors,

@@ -7,8 +7,12 @@ import { site } from '@/lib/site';
 
 import './globals.css';
 
+const appBaseUrl =
+  process.env.WEB_BASE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : site.url);
+
 export const metadata: Metadata = {
-  metadataBase: new URL(site.url),
+  metadataBase: new URL(appBaseUrl),
   title: {
     default: `${site.name} — ${site.tagline}`,
     template: `%s | ${site.name}`,

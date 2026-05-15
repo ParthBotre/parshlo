@@ -5,7 +5,8 @@ export const site = {
   description:
     'Parshlo manufactures and supplies WHO-GMP certified pharmaceutical formulations to authorized stockists, distributors, pharmacies, hospitals, and wholesalers across India.',
   url: 'https://parshlo.com',
-  ogImage: '/og-image.png',
+  /** Served by `src/app/opengraph-image.png` (Next.js file-based metadata). */
+  ogImage: '/opengraph-image.png',
   contact: {
     email: 'partners@parshlo.com',
     phone: '+91 80 4567 8900',

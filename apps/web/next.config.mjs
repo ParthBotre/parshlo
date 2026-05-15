@@ -2,13 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: [
-    '@parshlo/types',
-    '@parshlo/logger',
-    '@parshlo/db',
-    '@parshlo/queue',
-    '@parshlo/telemetry',
-  ],
+  compiler: {
+    // Strip console.* from client bundles in production — API traffic must not leak.
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  transpilePackages: ['@parshlo/types'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },

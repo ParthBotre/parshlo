@@ -1,10 +1,12 @@
 import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { type FastifyRequest } from 'fastify';
 
 import { Public } from '../../common/decorators/public.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { THROTTLE_CONTACT } from '../../common/throttling/throttle.constants.js';
+
 import { ContactInquiryInput, InquiryService } from './inquiry.service.js';
 
 @ApiTags('inquiries')
@@ -17,7 +19,7 @@ export class InquiryController {
    * IP throttling. Production should also enforce hCaptcha/Cloudflare Turnstile.
    */
   @Public()
-  @Throttle({ short: { ttl: 60_000, limit: 3 } })
+  @Throttle(THROTTLE_CONTACT)
   @Post()
   @HttpCode(201)
   submit(
