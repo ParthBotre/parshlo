@@ -39,8 +39,6 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException({ code: 'TOKEN_MISSING' });
     }
 
-    // Pick verifier by token shape: HS256 dev tokens vs RS256 Auth0 tokens.
-    // Header alg is base64url-encoded JSON; cheap to peek.
     const alg = peekAlg(token);
     const useDev = process.env.AUTH_MODE === 'dev' && alg === 'HS256';
 

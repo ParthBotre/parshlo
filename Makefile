@@ -37,7 +37,7 @@ db-reset: ## Reset the dev DB and re-seed (destructive).
 	$(PNPM) --filter @parshlo/db migrate:reset
 
 .PHONY: dev
-dev: ## Run web + api in parallel via Turbo.
+dev: up ## Run web + api in parallel via Turbo (starts Postgres/Redis first).
 	$(PNPM) dev
 
 .PHONY: build

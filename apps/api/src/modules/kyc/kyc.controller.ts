@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   type AuthPrincipal,
+  type B2BApplicationInput,
+  B2BApplicationInputSchema,
   KycApprovalInput,
   KycRejectionInput,
   RegisterBusinessInput,
@@ -10,6 +12,7 @@ import {
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { RequireRoles } from '../../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { THROTTLE_AUTH, THROTTLE_MUTATION } from '../../common/throttling/throttle.constants.js';
@@ -21,6 +24,21 @@ import { KycService } from './kyc.service.js';
 @Controller('kyc')
 export class KycController {
   constructor(private readonly kyc: KycService) {}
+
+  /**
+   * Public B2B access request — no sign-in required. Creates a pending buyer
+   * account and KYC application for the admin queue.
+   */
+  @Public()
+  @Post('apply')
+  @HttpCode(201)
+  @Throttle(THROTTLE_AUTH)
+  @Audit({ action: 'kyc.apply', resource: 'KycApplication' })
+  apply(
+    @Body(new ZodValidationPipe(B2BApplicationInputSchema)) body: B2BApplicationInput,
+  ): Promise<{ applicationId: string }> {
+    return this.kyc.applyForAccess(body);
+  }
 
   @Post('register')
   @HttpCode(201)

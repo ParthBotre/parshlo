@@ -64,7 +64,7 @@ export const RegisterBusinessInput = z.object({
   gstin: Gstin,
   pan: Pan.optional(),
   drugLicenseNumber: z.string().trim().min(3).max(60),
-  pharmacyRegistrationNumber: z.string().trim().min(3).max(60),
+  pharmacyRegistrationNumber: z.string().trim().min(3).max(60).optional(),
   mobile: IndianMobile,
   businessEmail: z.string().email().max(254),
   address: BusinessAddress,
@@ -78,6 +78,13 @@ export const RegisterBusinessInput = z.object({
   }),
 });
 export type RegisterBusinessInput = z.infer<typeof RegisterBusinessInput>;
+
+/**
+ * Public B2B access request (no auth). Documents are provisioned server-side
+ * as placeholders until the applicant uploads files after approval prep.
+ */
+export const B2BApplicationInputSchema = RegisterBusinessInput.omit({ documents: true });
+export type B2BApplicationInput = z.infer<typeof B2BApplicationInputSchema>;
 
 /** KYC document types we accept. */
 export const KycDocumentType = z.enum([
@@ -127,7 +134,7 @@ export const KycApplicationView = z.object({
   businessType: BusinessType,
   gstin: Gstin,
   drugLicenseNumber: z.string(),
-  pharmacyRegistrationNumber: z.string(),
+  pharmacyRegistrationNumber: z.string().nullable(),
   submittedAt: IsoDateString,
   reviewedAt: IsoDateString.nullable(),
   reviewedBy: EntityId.nullable(),

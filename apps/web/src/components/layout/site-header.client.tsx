@@ -2,7 +2,7 @@
 
 import { LogOut, Menu, X } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { ThemeToggleCompact } from '@/components/theme-toggle';
@@ -29,16 +29,15 @@ const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
 
 export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const isAdmin = session?.user.roles.some((r) => ADMIN_ROLES.has(r)) ?? false;
   const dashboardHref = isAdmin ? '/admin' : '/dashboard';
 
-  const onLogout = async (): Promise<void> => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/');
-    router.refresh();
+  const onLogout = (): void => {
+    // Auth0 logout requires browser redirects (tenant logout + cookie clear).
+    // fetch() cannot complete that flow reliably.
+    window.location.assign('/api/auth/logout');
   };
 
   return (
@@ -69,7 +68,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
               <p className="text-xs font-medium leading-tight">{session.user.fullName}</p>
               <p className="text-muted-foreground text-[10px]">{session.user.email}</p>
             </div>
-            <Button onClick={() => void onLogout()} size="sm" variant="outline">
+            <Button onClick={onLogout} size="sm" variant="outline">
               <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign out
             </Button>
           </>
@@ -119,7 +118,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
                   <Button asChild size="sm">
                     <Link href={dashboardHref}>{isAdmin ? 'Admin' : 'Dashboard'}</Link>
                   </Button>
-                  <Button onClick={() => void onLogout()} size="sm" variant="outline">
+                  <Button onClick={onLogout} size="sm" variant="outline">
                     Sign out
                   </Button>
                 </>

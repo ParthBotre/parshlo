@@ -1,10 +1,10 @@
 import { type Metadata } from 'next';
 
-import { KycActionRow } from '@/components/admin/kyc-action-row';
-import { Card, CardContent } from '@/components/ui/card';
+import { KycApplicationCard } from '@/components/admin/kyc-application-card';
 import { listPendingKyc } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateTimeIst } from '@/lib/format-datetime';
 
 export const metadata: Metadata = {
   title: 'KYC Queue',
@@ -31,41 +31,27 @@ export default async function KycQueuePage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">KYC Queue</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Verify GST, drug license, and pharmacy registration documents before approving B2B access.
+          Review full business details before approving B2B access.
         </p>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {queue.length === 0 ? (
-            <p className="text-muted-foreground p-12 text-center text-sm">
-              No applications waiting. The queue is empty.
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3">Business</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Submitted</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queue.map((row) => (
-                  <KycActionRow
-                    key={row.id}
-                    id={row.id}
-                    businessName={row.businessName}
-                    status={row.status}
-                    submittedAt={row.submittedAt}
-                  />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {queue.length === 0 ? (
+        <p className="text-muted-foreground rounded-xl border p-12 text-center text-sm">
+          No applications waiting. The queue is empty.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {queue.map((application) => (
+            <KycApplicationCard
+              key={application.id}
+              application={{
+                ...application,
+                submittedAtLabel: formatDateTimeIst(application.submittedAt),
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

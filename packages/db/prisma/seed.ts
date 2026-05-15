@@ -88,6 +88,24 @@ async function main(): Promise<void> {
   });
   console.log(`  ✓ Admin user: ${admin.email}`);
 
+  // ----- Platform owner (Auth0: sign in with same email; auth0Id linked on first login) -----
+  const owner = await prisma.user.upsert({
+    where: { email: 'pbotre@ttu.edu' },
+    update: {
+      fullName: 'Parth Botre',
+      roles: [Role.SUPER_ADMIN],
+      accountStatus: 'APPROVED',
+    },
+    create: {
+      auth0Id: 'pending|pbotre@ttu.edu',
+      email: 'pbotre@ttu.edu',
+      fullName: 'Parth Botre',
+      roles: [Role.SUPER_ADMIN],
+      accountStatus: 'APPROVED',
+    },
+  });
+  console.log(`  ✓ Owner user: ${owner.email} (${owner.roles.join(', ')})`);
+
   // ----- Demo buyer (pre-approved, with business profile for end-to-end demo) -----
   const buyer = await prisma.user.upsert({
     where: { email: 'buyer@parshlo.local' },

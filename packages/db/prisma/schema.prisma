@@ -90,7 +90,7 @@ model BusinessProfile {
   gstin                      String  @unique
   pan                        String?
   drugLicenseNumber          String
-  pharmacyRegistrationNumber String
+  pharmacyRegistrationNumber String?
   mobile                     String
   businessEmail              String
 

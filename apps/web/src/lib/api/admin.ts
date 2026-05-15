@@ -2,13 +2,31 @@ import { z } from 'zod';
 
 import { apiCall, type ApiCallOptions } from '../api-client';
 
+const PendingKycAddress = z.object({
+  line1: z.string(),
+  line2: z.string().nullable(),
+  city: z.string(),
+  state: z.string(),
+  pin: z.string(),
+});
+
 const PendingKyc = z.array(
   z.object({
     id: z.string(),
     userId: z.string(),
     status: z.string(),
-    businessName: z.string(),
     submittedAt: z.string(),
+    ownerName: z.string(),
+    accountEmail: z.string(),
+    businessName: z.string(),
+    businessEmail: z.string(),
+    businessType: z.string().nullable(),
+    gstin: z.string().nullable(),
+    pan: z.string().nullable(),
+    drugLicenseNumber: z.string().nullable(),
+    pharmacyRegistrationNumber: z.string().nullable(),
+    mobile: z.string().nullable(),
+    address: PendingKycAddress.nullable(),
   }),
 );
 
@@ -64,11 +82,7 @@ export function getAnalyticsSummary(
   });
 }
 
-export function approveKyc(
-  accessToken: string,
-  id: string,
-  note?: string,
-): Promise<void> {
+export function approveKyc(accessToken: string, id: string, note?: string): Promise<void> {
   return apiCall(`/v1/kyc/${encodeURIComponent(id)}/approve`, z.void(), {
     method: 'POST',
     accessToken,
@@ -76,11 +90,7 @@ export function approveKyc(
   });
 }
 
-export function rejectKyc(
-  accessToken: string,
-  id: string,
-  reason: string,
-): Promise<void> {
+export function rejectKyc(accessToken: string, id: string, reason: string): Promise<void> {
   return apiCall(`/v1/kyc/${encodeURIComponent(id)}/reject`, z.void(), {
     method: 'POST',
     accessToken,

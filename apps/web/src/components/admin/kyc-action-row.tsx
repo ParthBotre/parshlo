@@ -10,11 +10,15 @@ import { Button } from '@/components/ui/button';
 export function KycActionRow({
   id,
   businessName,
+  businessEmail,
+  gstin,
   status,
   submittedAt,
 }: {
   id: string;
   businessName: string;
+  businessEmail: string;
+  gstin: string | null;
   status: string;
   submittedAt: string;
 }): JSX.Element {
@@ -68,15 +72,17 @@ export function KycActionRow({
   return (
     <tr className="border-t align-middle">
       <td className="px-5 py-3 font-medium">{businessName}</td>
+      <td className="text-muted-foreground px-5 py-3 text-sm">{businessEmail}</td>
+      <td className="text-muted-foreground px-5 py-3 font-mono text-xs">{gstin ?? '—'}</td>
       <td className="px-5 py-3">
         <Badge variant="secondary">{status.replace(/_/g, ' ')}</Badge>
       </td>
-      <td className="px-5 py-3 text-muted-foreground">
+      <td className="text-muted-foreground px-5 py-3">
         {new Date(submittedAt).toLocaleString('en-IN')}
       </td>
       <td className="px-5 py-3">
         <div className="flex items-center justify-end gap-2">
-          {error ? <span className="text-xs text-destructive">{error}</span> : null}
+          {error ? <span className="text-destructive text-xs">{error}</span> : null}
           <Button
             size="sm"
             variant="outline"

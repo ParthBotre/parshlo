@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "build": "dotenv -e ../../.env -- prisma generate && tsup",
-    "dev": "tsup --watch",
+    "dev": "dotenv -e ../../.env -- prisma generate && tsup --watch",
     "generate": "dotenv -e ../../.env -- prisma generate",
     "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",

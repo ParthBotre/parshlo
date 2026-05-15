@@ -1,18 +1,19 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BusinessType, Gstin, IndianMobile, IndianPin, Pan } from '@parshlo/types';
+import { BusinessType, Gstin, IndianMobile, IndianPin, IndianStateCode, Pan } from '@parshlo/types';
 import { CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { submitB2BApplication } from '@/lib/api/registration';
+import { ApiError } from '@/lib/api-client';
 
 const Schema = z.object({
   businessName: z.string().trim().min(2, 'Business name is required.'),
@@ -21,29 +22,64 @@ const Schema = z.object({
   gstin: Gstin,
   pan: Pan.optional().or(z.literal('')),
   drugLicenseNumber: z.string().trim().min(3, 'Drug license number is required.'),
-  pharmacyRegistrationNumber: z.string().trim().min(3, 'Pharmacy registration number is required.'),
+  pharmacyRegistrationNumber: z.string().trim().min(3).max(60).optional().or(z.literal('')),
   mobile: IndianMobile,
   businessEmail: z.string().email('Valid business email required.'),
   addressLine1: z.string().trim().min(3, 'Address is required.'),
   city: z.string().trim().min(2, 'City is required.'),
-  state: z.string().trim().length(2, 'State code (2 letters).'),
+  state: IndianStateCode,
   pin: IndianPin,
 });
 type Values = z.infer<typeof Schema>;
 
 export function RegistrationForm(): JSX.Element {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(Schema) });
 
-  const onSubmit = (_values: Values): void => {
-    // TODO: 1) request presigned URLs for KYC docs → upload to S3
-    //       2) POST /v1/kyc/register with object keys
-    // For the scaffold, simulate success.
-    setSubmitted(true);
+  const onSubmit = async (values: Values): Promise<void> => {
+    setSubmitError(null);
+    try {
+      await submitB2BApplication({
+        businessName: values.businessName,
+        ownerName: values.ownerName,
+        businessType: values.businessType,
+        gstin: values.gstin.toUpperCase(),
+        pan: values.pan?.trim() ? values.pan.toUpperCase() : undefined,
+        drugLicenseNumber: values.drugLicenseNumber,
+        pharmacyRegistrationNumber: values.pharmacyRegistrationNumber?.trim()
+          ? values.pharmacyRegistrationNumber.trim()
+          : undefined,
+        mobile: values.mobile,
+        businessEmail: values.businessEmail,
+        address: {
+          line1: values.addressLine1,
+          city: values.city,
+          state: values.state,
+          pin: values.pin,
+          country: 'IN',
+        },
+      });
+      setSubmitted(true);
+    } catch (err) {
+      let message = 'Failed to submit application. Please try again.';
+      if (err instanceof ApiError) {
+        message = err.problem.detail ?? err.problem.title;
+      } else if (
+        err instanceof TypeError ||
+        (err instanceof Error && err.message === 'Load failed')
+      ) {
+        message =
+          'Could not reach the server. Ensure `make dev` is running (API on port 4000) and try again.';
+      } else if (err instanceof Error && err.message) {
+        message = err.message;
+      }
+      setSubmitError(message);
+    }
   };
 
   if (submitted) {
@@ -142,7 +178,7 @@ export function RegistrationForm(): JSX.Element {
                 <Input {...register('drugLicenseNumber')} />
               </Field>
               <Field
-                label="Pharmacy registration number"
+                label="Pharmacy registration number (optional)"
                 error={errors.pharmacyRegistrationNumber?.message}
               >
                 <Input {...register('pharmacyRegistrationNumber')} />
@@ -172,14 +208,20 @@ export function RegistrationForm(): JSX.Element {
 
           <section className="space-y-4">
             <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
-              Documents (uploaded after submission)
+              Documents
             </h2>
             <p className="text-muted-foreground text-sm">
-              Once you submit the form, you will be asked to upload your GST certificate, drug
-              license, and pharmacy registration certificate as PDF or image (max 10 MB each).
-              Uploads use signed URLs and your files are encrypted at rest.
+              Document upload will be requested after your initial application is reviewed. For now,
+              we verify your GSTIN, drug license, and pharmacy registration numbers against your
+              submission.
             </p>
           </section>
+
+          {submitError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {submitError}
+            </p>
+          ) : null}
 
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? (

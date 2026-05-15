@@ -5,7 +5,8 @@ export default defineConfig({
   format: ['cjs', 'esm'],
   dts: true,
   sourcemap: true,
-  clean: true,
+  // Avoid wiping dist on every watch rebuild — breaks @parshlo/api types mid-compile.
+  clean: false,
   target: 'node22',
   splitting: false,
   external: ['@prisma/client'],

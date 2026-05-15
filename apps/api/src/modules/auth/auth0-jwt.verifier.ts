@@ -1,14 +1,20 @@
 import { Injectable, type OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AccessTokenClaims, type AuthPrincipal, ROLE_PERMISSIONS } from '@parshlo/types';
-import jwt, { type JwtHeader, type VerifyCallback } from 'jsonwebtoken';
+import { type AuthPrincipal, ROLE_PERMISSIONS, type Role } from '@parshlo/types';
+import jwt, { type JwtHeader } from 'jsonwebtoken';
 import jwksClient, { type JwksClient } from 'jwks-rsa';
 
 import { type AppConfig } from '../../config/configuration.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+interface VerifiedAuth0Claims {
+  sub: string;
+  email?: string;
+}
 
 /**
- * Verifies Auth0-issued RS256 JWTs using JWKS with key caching and rate limit.
- * Extracts our application's principal (internal user id, roles, permissions).
+ * Verifies Auth0-issued RS256 JWTs via JWKS.
+ * Roles and permissions always come from our database — not token claims.
  */
 @Injectable()
 export class Auth0JwtVerifier implements OnModuleInit {
@@ -16,9 +22,15 @@ export class Auth0JwtVerifier implements OnModuleInit {
   private issuer!: string;
   private audience!: string;
 
-  constructor(private readonly config: ConfigService<AppConfig, true>) {}
+  constructor(
+    private readonly config: ConfigService<AppConfig, true>,
+    private readonly prisma: PrismaService,
+  ) {}
 
   onModuleInit(): void {
+    if (process.env.AUTH_MODE !== 'auth0') {
+      return;
+    }
     const auth0 = this.config.get('auth0', { infer: true });
     this.issuer = auth0.issuer.endsWith('/') ? auth0.issuer : `${auth0.issuer}/`;
     this.audience = auth0.audience;
@@ -33,15 +45,17 @@ export class Auth0JwtVerifier implements OnModuleInit {
     });
   }
 
-  /** Verifies the token and returns the application principal. */
+  /** Verifies the token signature and resolves the user from our database. */
   async verify(token: string): Promise<AuthPrincipal> {
+    const claims = await this.verifyTokenClaims(token);
+    return this.principalFromClaims(claims);
+  }
+
+  /** Verify signature/audience only — used by /auth/sync before DB link exists. */
+  async verifyTokenClaims(token: string): Promise<VerifiedAuth0Claims> {
     let decoded: unknown;
     try {
       decoded = await new Promise<unknown>((resolve, reject) => {
-        const getKey: VerifyCallback = () => {
-          // unused; placeholder to satisfy the type system
-        };
-        void getKey;
         jwt.verify(
           token,
           (header: JwtHeader, cb) => {
@@ -78,35 +92,49 @@ export class Auth0JwtVerifier implements OnModuleInit {
       });
     }
 
-    const parsed = AccessTokenClaims.safeParse(decoded);
-    if (!parsed.success) {
+    if (typeof decoded !== 'object' || decoded === null) {
+      throw new UnauthorizedException({ code: 'TOKEN_CLAIMS_INVALID' });
+    }
+    const record = decoded as Record<string, unknown>;
+    const sub = record.sub;
+    if (typeof sub !== 'string') {
       throw new UnauthorizedException({
         code: 'TOKEN_CLAIMS_INVALID',
-        message: 'Token payload missing required claims',
+        message: 'Token missing subject',
       });
     }
-    const claims = parsed.data;
-    const roles = claims['https://parshlo.com/roles'];
-    const tokenPermissions = claims['https://parshlo.com/permissions'];
-    const derived = new Set([
-      ...tokenPermissions,
-      ...roles.flatMap((r) => ROLE_PERMISSIONS[r]),
-    ]);
+    const email = typeof record.email === 'string' ? record.email.toLowerCase() : undefined;
+    return { sub, email };
+  }
 
-    const userId = claims['https://parshlo.com/user_id'];
-    if (!userId) {
-      // First-time login: the post-login Action hasn't provisioned the internal
-      // user yet. The /v1/auth/sync endpoint handles that.
+  async principalFromClaims(claims: VerifiedAuth0Claims): Promise<AuthPrincipal> {
+    let user = await this.prisma.user.findUnique({ where: { auth0Id: claims.sub } });
+
+    if (!user && claims.email) {
+      user = await this.prisma.user.findUnique({ where: { email: claims.email } });
+      if (user && user.auth0Id !== claims.sub) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { auth0Id: claims.sub },
+        });
+      }
+    }
+
+    if (!user || user.deletedAt) {
       throw new UnauthorizedException({
         code: 'USER_NOT_PROVISIONED',
-        message: 'Account is not yet provisioned. Call /v1/auth/sync.',
+        message:
+          'No Parshlo account linked to this Auth0 user. Request B2B access or contact support.',
       });
     }
+
+    const roles = user.roles as Role[];
+    const derived = new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role]));
 
     return {
       auth0Id: claims.sub,
-      userId,
-      email: claims.email,
+      userId: user.id,
+      email: user.email,
       roles,
       permissions: [...derived],
     };
