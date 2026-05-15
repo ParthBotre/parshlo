@@ -8,9 +8,10 @@ export const site = {
   /** Served by `src/app/opengraph-image.png` (Next.js file-based metadata). */
   ogImage: '/opengraph-image.png',
   contact: {
-    email: 'partners@parshlo.com',
-    phone: '+91 80 4567 8900',
-    address: 'Plot No. 42, Industrial Area Phase II, Bengaluru, KA 560058, India',
+    email: 'parshlo@gmail.com',
+    phone: '+91 9372943053',
+    address:
+      'First Floor, Office No. 3, Laxminarayan Commercial Complex, Shahu College Marg, Sadhugu Gajanan Maharaj Chowk, Pune, Maharashtra 411009',
   },
   social: {
     linkedin: 'https://linkedin.com/company/parshlo',

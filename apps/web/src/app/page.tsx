@@ -1,7 +1,5 @@
 import {
   Activity,
-  BadgeCheck,
-  Building2,
   CircuitBoard,
   FileCheck2,
   Globe2,
@@ -18,9 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 const PARTNER_TYPES = [
-  { icon: Building2, label: 'Hospitals' },
+  // { icon: Building2, label: 'Hospitals' },
   { icon: Truck, label: 'Distributors' },
-  { icon: BadgeCheck, label: 'Pharmacies' },
+  // { icon: BadgeCheck, label: 'Pharmacies' },
   { icon: CircuitBoard, label: 'Stockists' },
   { icon: Activity, label: 'Chemists' },
   { icon: Globe2, label: 'Wholesalers' },
@@ -30,7 +28,7 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'KYC-Verified Buyers Only',
-    body: 'Drug license, pharmacy registration, and GSTIN are validated by our compliance team before pricing is unlocked.',
+    body: 'Drug licenses and GSTIN are validated by our compliance team before pricing is unlocked.',
   },
   {
     icon: Lock,
@@ -55,12 +53,12 @@ const FEATURES = [
   {
     icon: Globe2,
     title: 'Pan-India Logistics',
-    body: 'Same-day dispatch from Bengaluru, with cold-chain support for temperature-sensitive consignments.',
+    body: 'Same-day dispatch from Pune, MH',
   },
 ] as const;
 
 const STATS = [
-  { value: '12+', label: 'Years in pharma manufacturing' },
+  { value: '25+', label: 'Years in Pharma Industry' },
   { value: '850+', label: 'Verified B2B partners' },
   { value: '28', label: 'States served' },
   { value: '99.7%', label: 'On-time dispatch rate' },
@@ -191,8 +189,7 @@ export default function HomePage(): JSX.Element {
                 Ready to onboard your business?
               </h2>
               <p className="text-muted-foreground text-base md:text-lg">
-                Submit GSTIN, drug license, and pharmacy registration — get approved within 48
-                hours.
+                Submit GSTIN and drug license — get approved within 48 hours.
               </p>
             </div>
             <Button asChild size="xl">
