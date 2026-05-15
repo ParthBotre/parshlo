@@ -19,6 +19,8 @@ import {
 
 import { OrderService } from './order.service.js';
 
+const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
+
 @ApiTags('orders')
 @ApiBearerAuth('AccessToken')
 @Controller('orders')
@@ -47,6 +49,9 @@ export class OrderController {
 
   @Get(':id')
   get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string): Promise<OrderView> {
+    if (user.roles.some((role) => STAFF_ROLES.has(role))) {
+      return this.orders.getOrderById(id);
+    }
     return this.orders.getOrder(id, user.userId);
   }
 

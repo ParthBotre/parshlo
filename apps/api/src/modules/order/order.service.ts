@@ -11,6 +11,7 @@ import { JobProducer } from '@parshlo/queue';
 import {
   type GstRate,
   type OrderItemView,
+  ORDER_STATUS_TRANSITIONS,
   type OrderStatus,
   type OrderView,
   type PlaceOrderInput,
@@ -32,22 +33,6 @@ const GST_RATE_BASIS: Record<PrismaGstRate, bigint> = {
   TWELVE: 1200n,
   EIGHTEEN: 1800n,
   TWENTYEIGHT: 2800n,
-};
-
-/**
- * Allowed state transitions for an order. Used to validate updateStatus().
- * This is the canonical workflow for the platform.
- */
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  RECEIVED: ['UNDER_REVIEW', 'CANCELLED', 'REJECTED'],
-  UNDER_REVIEW: ['APPROVED', 'REJECTED', 'CANCELLED'],
-  APPROVED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['DISPATCHED', 'CANCELLED'],
-  DISPATCHED: ['OUT_FOR_DELIVERY', 'DELIVERED'],
-  OUT_FOR_DELIVERY: ['DELIVERED'],
-  DELIVERED: [],
-  CANCELLED: [],
-  REJECTED: [],
 };
 
 @Injectable()
@@ -244,8 +229,19 @@ export class OrderService {
       throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
     }
     if (order.buyerId !== requesterId) {
-      // Admins/sales managers bypass this via separate endpoint.
       throw new ForbiddenException({ code: 'NOT_ORDER_OWNER' });
+    }
+    return this.toView(order, order.items);
+  }
+
+  /** Full order detail for admin / sales staff. */
+  async getOrderById(orderId: string): Promise<OrderView> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
     }
     return this.toView(order, order.items);
   }
@@ -272,7 +268,7 @@ export class OrderService {
       if (!order) {
         throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
       }
-      if (!TRANSITIONS[order.status].includes(input.status)) {
+      if (!ORDER_STATUS_TRANSITIONS[order.status].includes(input.status)) {
         throw new BadRequestException({
           code: 'INVALID_STATE_TRANSITION',
           message: `Cannot transition ${order.status} → ${input.status}.`,

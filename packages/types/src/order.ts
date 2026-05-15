@@ -16,6 +16,19 @@ export const OrderStatus = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof OrderStatus>;
 
+/** Allowed status transitions (canonical workflow). */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  RECEIVED: ['UNDER_REVIEW', 'CANCELLED', 'REJECTED'],
+  UNDER_REVIEW: ['APPROVED', 'REJECTED', 'CANCELLED'],
+  APPROVED: ['PREPARING', 'CANCELLED'],
+  PREPARING: ['DISPATCHED', 'CANCELLED'],
+  DISPATCHED: ['OUT_FOR_DELIVERY', 'DELIVERED'],
+  OUT_FOR_DELIVERY: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: [],
+  REJECTED: [],
+};
+
 export const OrderItemInput = z.object({
   productId: EntityId,
   quantity: z.number().int().positive(),

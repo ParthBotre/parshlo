@@ -1,3 +1,4 @@
+import { type OrderStatus } from '@parshlo/types';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 
@@ -6,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { listAllOrders } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { orderStatusLabel } from '@/lib/order-workflow';
 import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -18,8 +20,11 @@ const STATUS_FILTERS = [
   { label: 'Received', value: 'RECEIVED' },
   { label: 'Under review', value: 'UNDER_REVIEW' },
   { label: 'Approved', value: 'APPROVED' },
+  { label: 'Preparing', value: 'PREPARING' },
   { label: 'Dispatched', value: 'DISPATCHED' },
+  { label: 'Out for delivery', value: 'OUT_FOR_DELIVERY' },
   { label: 'Delivered', value: 'DELIVERED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
 ] as const;
 
 interface PageProps {
@@ -89,13 +94,17 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-accent/40 border-t">
-                    <td className="px-5 py-3 font-medium">{o.orderNumber}</td>
+                    <td className="px-5 py-3">
+                      <Link href={`/admin/orders/${o.id}`} className="font-medium hover:underline">
+                        {o.orderNumber}
+                      </Link>
+                    </td>
                     <td className="px-5 py-3">{o.buyerBusinessName}</td>
                     <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
                       {o.buyerGstin}
                     </td>
                     <td className="px-5 py-3">
-                      <Badge variant="secondary">{o.status.replace(/_/g, ' ')}</Badge>
+                      <Badge variant="secondary">{orderStatusLabel(o.status as OrderStatus)}</Badge>
                     </td>
                     <td className="text-muted-foreground px-5 py-3">
                       {new Date(o.placedAt).toLocaleDateString('en-IN')}

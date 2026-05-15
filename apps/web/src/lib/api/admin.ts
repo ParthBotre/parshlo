@@ -1,3 +1,4 @@
+import { OrderView } from '@parshlo/types';
 import { z } from 'zod';
 
 import { apiCall, type ApiCallOptions } from '../api-client';
@@ -105,6 +106,18 @@ export function listAllOrders(
 ): Promise<z.infer<typeof AdminOrderList>> {
   const search = filters.status ? `?status=${encodeURIComponent(filters.status)}` : '';
   return apiCall(`/v1/admin/orders${search}`, AdminOrderList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function getAdminOrder(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<z.infer<typeof OrderView>> {
+  return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, OrderView, {
     method: 'GET',
     accessToken,
     ...options,
