@@ -6,7 +6,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
-    "dev": "pnpm --filter @parshlo/db build && nest start --watch",
+    "dev": "pnpm --filter @parshlo/db build && nest build && nest start --watch",
     "start": "node dist/main.js",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",

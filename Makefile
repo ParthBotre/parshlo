@@ -40,6 +40,12 @@ db-reset: ## Reset the dev DB and re-seed (destructive).
 dev: up ## Run web + api in parallel via Turbo (starts Postgres/Redis first).
 	$(PNPM) dev
 
+.PHONY: api-restart
+api-restart: ## Rebuild API and free port 4000 (then run `make dev` again).
+	$(PNPM) --filter @parshlo/api build
+	@-lsof -ti :4000 | xargs kill -9 2>/dev/null || true
+	@echo "API rebuilt and port 4000 cleared. Start with: make dev"
+
 .PHONY: build
 build: ## Build everything.
 	$(PNPM) build

@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/com
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  AttachCourierReceiptInput,
   type AuthPrincipal,
   type OrderView,
   PlaceOrderInput,
@@ -70,5 +71,20 @@ export class OrderController {
     @Body(new ZodValidationPipe(UpdateOrderStatusInput)) body: UpdateOrderStatusInput,
   ): Promise<OrderView> {
     return this.orders.updateStatus(id, user.userId, body);
+  }
+
+  @Patch(':id/courier-receipt')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SALES_MANAGER', 'SUPER_ADMIN')
+  @Audit({
+    action: 'order.attach_courier_receipt',
+    resource: 'Order',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  attachCourierReceipt(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(AttachCourierReceiptInput)) body: AttachCourierReceiptInput,
+  ): Promise<OrderView> {
+    return this.orders.attachCourierReceipt(id, body);
   }
 }

@@ -2,6 +2,7 @@ import { type OrderStatus } from '@parshlo/types';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 
+import { CourierReceiptLink } from '@/components/admin/courier-receipt-link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { listAllOrders } from '@/lib/api/admin';
@@ -89,6 +90,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Placed</th>
                   <th className="px-5 py-3 text-right">Total</th>
+                  <th className="px-5 py-3">Courier Receipt</th>
                 </tr>
               </thead>
               <tbody>
@@ -110,6 +112,13 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                       {new Date(o.placedAt).toLocaleDateString('en-IN')}
                     </td>
                     <td className="px-5 py-3 text-right font-mono">{formatINR(o.totalPaise)}</td>
+                    <td className="px-5 py-3">
+                      {o.hasCourierReceipt ? (
+                        <CourierReceiptLink orderId={o.id} compact />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -325,6 +325,12 @@ model Order {
   cancelledAt   DateTime?
   rejectedAt    DateTime?
 
+  /// Courier / logistics receipt photo or PDF captured at dispatch.
+  courierReceiptBucket      String?
+  courierReceiptKey         String?
+  courierReceiptContentType String?
+  courierReceiptUploadedAt  DateTime?
+
   @@unique([buyerId, idempotencyKey])
   @@index([status])
   @@index([buyerId, placedAt(sort: Desc)])

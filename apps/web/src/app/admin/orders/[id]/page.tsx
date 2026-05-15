@@ -4,6 +4,7 @@ import { type Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
+import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
 import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -103,14 +104,24 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardContent className="space-y-4 p-6">
-            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
-              Update status
-            </h2>
-            <OrderStatusActions orderId={order.id} status={order.status} />
-          </CardContent>
-        </Card>
+        <div className="space-y-4 lg:col-span-2">
+          <Card>
+            <CardContent className="space-y-4 p-6">
+              <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                Update status
+              </h2>
+              <OrderStatusActions orderId={order.id} status={order.status} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="space-y-4 p-6">
+              <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                Courier receipt
+              </h2>
+              <CourierReceiptUpload orderId={order.id} existing={order.courierReceipt} />
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardContent className="space-y-3 p-6 text-sm">

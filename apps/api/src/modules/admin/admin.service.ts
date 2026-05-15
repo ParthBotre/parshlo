@@ -14,16 +14,28 @@ export class AdminService {
       status: string;
       placedAt: string;
       buyerBusinessName: string;
+      buyerFullName: string;
       buyerGstin: string;
+      buyerCity: string;
+      buyerState: string;
       totalPaise: number;
       itemCount: number;
+      hasCourierReceipt: boolean;
     }[]
   > {
     const orders = await this.prisma.order.findMany({
       where: filters.status ? { status: filters.status } : undefined,
       orderBy: { placedAt: 'desc' },
-      take: Math.min(filters.take ?? 100, 500),
-      include: { _count: { select: { items: true } } },
+      take: Math.min(filters.take ?? 500, 500),
+      include: {
+        _count: { select: { items: true } },
+        buyer: {
+          select: {
+            fullName: true,
+            businessProfile: { select: { city: true, state: true } },
+          },
+        },
+      },
     });
     return orders.map((o) => ({
       id: o.id,
@@ -31,9 +43,13 @@ export class AdminService {
       status: o.status,
       placedAt: o.placedAt.toISOString(),
       buyerBusinessName: o.buyerBusinessName,
+      buyerFullName: o.buyer.fullName,
       buyerGstin: o.buyerGstin,
+      buyerCity: o.buyer.businessProfile?.city.trim() ?? 'Unknown',
+      buyerState: o.buyer.businessProfile?.state.trim() ?? 'Unknown',
       totalPaise: Number(o.totalPaise),
       itemCount: o._count.items,
+      hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
     }));
   }
 
@@ -131,21 +147,23 @@ export class AdminService {
     approvedBuyers: number;
     ordersThisMonth: number;
     grossThisMonthPaise: number;
+    salesByCity: Awaited<ReturnType<AdminService['grossSalesByCity']>>;
   }> {
-    const startOfMonth = new Date();
-    startOfMonth.setUTCDate(1);
-    startOfMonth.setUTCHours(0, 0, 0, 0);
+    const startOfMonth = AdminService.utcMonthStart();
 
-    const [pendingKyc, approvedBuyers, ordersAgg] = await Promise.all([
+    const [pendingKyc, approvedBuyers, ordersAgg, salesByCity] = await Promise.all([
       this.prisma.kycApplication.count({
         where: { status: { in: ['PENDING_VERIFICATION', 'UNDER_REVIEW'] } },
       }),
-      this.prisma.user.count({ where: { accountStatus: 'APPROVED' } }),
+      this.prisma.user.count({
+        where: { accountStatus: 'APPROVED', roles: { has: 'BUYER' }, deletedAt: null },
+      }),
       this.prisma.order.aggregate({
         where: { placedAt: { gte: startOfMonth } },
         _count: { _all: true },
         _sum: { totalPaise: true },
       }),
+      this.buildSalesByCityReport(startOfMonth),
     ]);
 
     return {
@@ -153,6 +171,98 @@ export class AdminService {
       approvedBuyers,
       ordersThisMonth: ordersAgg._count._all,
       grossThisMonthPaise: Number(ordersAgg._sum.totalPaise ?? 0n),
+      salesByCity,
+    };
+  }
+
+  /** Gross sales grouped by buyer business city (current calendar month, UTC). */
+  async grossSalesByCity(): Promise<{
+    monthStart: string;
+    totalGrossPaise: number;
+    totalOrders: number;
+    rows: {
+      city: string;
+      state: string;
+      orderCount: number;
+      grossPaise: number;
+      sharePercent: number;
+    }[];
+  }> {
+    return this.buildSalesByCityReport(AdminService.utcMonthStart());
+  }
+
+  private static utcMonthStart(): Date {
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+    return startOfMonth;
+  }
+
+  private async buildSalesByCityReport(startOfMonth: Date): Promise<{
+    monthStart: string;
+    totalGrossPaise: number;
+    totalOrders: number;
+    rows: {
+      city: string;
+      state: string;
+      orderCount: number;
+      grossPaise: number;
+      sharePercent: number;
+    }[];
+  }> {
+    const orders = await this.prisma.order.findMany({
+      where: { placedAt: { gte: startOfMonth } },
+      select: {
+        totalPaise: true,
+        buyer: {
+          select: {
+            businessProfile: { select: { city: true, state: true } },
+          },
+        },
+      },
+    });
+
+    const buckets = new Map<
+      string,
+      { city: string; state: string; orderCount: number; grossPaise: bigint }
+    >();
+
+    for (const order of orders) {
+      const profile = order.buyer.businessProfile;
+      const city = profile?.city.trim() ?? 'Unknown';
+      const state = profile?.state.trim() ?? 'Unknown';
+      const key = `${city}\0${state}`;
+      const existing = buckets.get(key) ?? { city, state, orderCount: 0, grossPaise: 0n };
+      existing.orderCount += 1;
+      existing.grossPaise += order.totalPaise;
+      buckets.set(key, existing);
+    }
+
+    const totalGrossPaise = orders.reduce((sum, o) => sum + o.totalPaise, 0n);
+    const totalOrders = orders.length;
+
+    const rows = [...buckets.values()]
+      .map((row) => {
+        const grossPaise = Number(row.grossPaise);
+        const sharePercent =
+          totalGrossPaise > 0n
+            ? Math.round((Number(row.grossPaise) * 1000) / Number(totalGrossPaise)) / 10
+            : 0;
+        return {
+          city: row.city,
+          state: row.state,
+          orderCount: row.orderCount,
+          grossPaise,
+          sharePercent,
+        };
+      })
+      .sort((a, b) => b.grossPaise - a.grossPaise);
+
+    return {
+      monthStart: startOfMonth.toISOString(),
+      totalGrossPaise: Number(totalGrossPaise),
+      totalOrders,
+      rows,
     };
   }
 }

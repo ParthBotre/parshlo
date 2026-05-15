@@ -66,7 +66,7 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
           icon={IndianRupee}
           label="Gross this month"
           value={formatINR(summary?.grossThisMonthPaise ?? 0)}
-          href="/admin/orders"
+          href="/admin/analytics/gross"
         />
       </div>
 

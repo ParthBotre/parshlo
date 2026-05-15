@@ -6,9 +6,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type GstRate as PrismaGstRate, Prisma } from '@parshlo/db';
 import { JobProducer } from '@parshlo/queue';
 import {
+  type AttachCourierReceiptInput,
+  type CourierReceiptRef,
   type GstRate,
   type OrderItemView,
   ORDER_STATUS_TRANSITIONS,
@@ -42,6 +45,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobs: JobProducer,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -255,6 +259,34 @@ export class OrderService {
     return orders.map((o) => this.toView(o, o.items));
   }
 
+  async attachCourierReceipt(
+    orderId: string,
+    input: AttachCourierReceiptInput,
+  ): Promise<OrderView> {
+    this.assertCourierReceiptRef(orderId, input);
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        courierReceiptBucket: input.bucket,
+        courierReceiptKey: input.key,
+        courierReceiptContentType: input.contentType,
+        courierReceiptUploadedAt: new Date(),
+      },
+      include: { items: true },
+    });
+
+    return this.toView(updated, updated.items);
+  }
+
   async updateStatus(
     orderId: string,
     actorId: string,
@@ -274,7 +306,6 @@ export class OrderService {
           message: `Cannot transition ${order.status} → ${input.status}.`,
         });
       }
-
       // On terminal cancel/reject, release reserved inventory.
       if (input.status === 'CANCELLED' || input.status === 'REJECTED') {
         for (const item of order.items) {
@@ -316,6 +347,22 @@ export class OrderService {
     });
   }
 
+  private assertCourierReceiptRef(orderId: string, receipt: CourierReceiptRef): void {
+    const bucket = this.config.get<string>('S3_BUCKET_INVOICES') ?? 'parshlo-invoices-dev';
+    if (receipt.bucket !== bucket) {
+      throw new BadRequestException({ code: 'INVALID_COURIER_RECEIPT_BUCKET' });
+    }
+    const prefix = `courier-receipts/${orderId}/`;
+    if (!receipt.key.startsWith(prefix)) {
+      throw new BadRequestException({ code: 'INVALID_COURIER_RECEIPT_KEY' });
+    }
+    if (
+      !['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(receipt.contentType)
+    ) {
+      throw new BadRequestException({ code: 'CONTENT_TYPE_NOT_ALLOWED' });
+    }
+  }
+
   /** Generates PSH-YYYY-NNNNNN where NNNNNN is a zero-padded yearly counter. */
   private async nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
     const year = new Date().getFullYear();
@@ -343,6 +390,8 @@ export class OrderService {
       updatedAt: Date;
       dispatchedAt: Date | null;
       deliveredAt: Date | null;
+      courierReceiptContentType: string | null;
+      courierReceiptUploadedAt: Date | null;
     },
     items: {
       productId: string;
@@ -382,6 +431,13 @@ export class OrderService {
       updatedAt: order.updatedAt.toISOString(),
       dispatchedAt: order.dispatchedAt?.toISOString() ?? null,
       deliveredAt: order.deliveredAt?.toISOString() ?? null,
+      courierReceipt:
+        order.courierReceiptUploadedAt && order.courierReceiptContentType
+          ? {
+              contentType: order.courierReceiptContentType,
+              uploadedAt: order.courierReceiptUploadedAt.toISOString(),
+            }
+          : null,
     };
   }
 }

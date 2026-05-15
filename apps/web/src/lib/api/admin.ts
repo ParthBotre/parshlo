@@ -31,11 +31,28 @@ const PendingKyc = z.array(
   }),
 );
 
+const SalesByCityRow = z.object({
+  city: z.string(),
+  state: z.string(),
+  orderCount: z.number(),
+  grossPaise: z.number(),
+  sharePercent: z.number(),
+});
+
+const SalesByCity = z.object({
+  monthStart: z.string(),
+  totalGrossPaise: z.number(),
+  totalOrders: z.number(),
+  rows: z.array(SalesByCityRow),
+});
+
 const AnalyticsSummary = z.object({
   pendingKyc: z.number(),
   approvedBuyers: z.number(),
   ordersThisMonth: z.number(),
   grossThisMonthPaise: z.number(),
+  /** Present once API includes location breakdown in summary (same month window as totals). */
+  salesByCity: SalesByCity.optional(),
 });
 
 const AdminOrderRow = z.object({
@@ -44,9 +61,13 @@ const AdminOrderRow = z.object({
   status: z.string(),
   placedAt: z.string(),
   buyerBusinessName: z.string(),
+  buyerFullName: z.string().optional(),
   buyerGstin: z.string(),
+  buyerCity: z.string().optional(),
+  buyerState: z.string().optional(),
   totalPaise: z.number(),
   itemCount: z.number(),
+  hasCourierReceipt: z.boolean().default(false),
 });
 const AdminOrderList = z.array(AdminOrderRow);
 
@@ -77,6 +98,17 @@ export function getAnalyticsSummary(
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
 ): Promise<z.infer<typeof AnalyticsSummary>> {
   return apiCall('/v1/admin/analytics/summary', AnalyticsSummary, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function getSalesByCity(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<z.infer<typeof SalesByCity>> {
+  return apiCall('/v1/admin/analytics/sales-by-city', SalesByCity, {
     method: 'GET',
     accessToken,
     ...options,

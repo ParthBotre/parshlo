@@ -73,8 +73,48 @@ export const OrderView = z.object({
   updatedAt: IsoDateString,
   dispatchedAt: IsoDateString.nullable(),
   deliveredAt: IsoDateString.nullable(),
+  /** Null when no receipt; omitted on older API builds — coerced to null on parse. */
+  courierReceipt: z
+    .object({
+      contentType: z.string(),
+      uploadedAt: IsoDateString,
+    })
+    .nullable()
+    .default(null),
 });
 export type OrderView = z.infer<typeof OrderView>;
+
+/** S3 location returned from presigned upload; sent back when marking DISPATCHED. */
+export const CourierReceiptRef = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  contentType: z.string().min(1),
+});
+export type CourierReceiptRef = z.infer<typeof CourierReceiptRef>;
+
+export const CourierReceiptUploadRequest = z.object({
+  contentType: z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(10 * 1024 * 1024),
+});
+export type CourierReceiptUploadRequest = z.infer<typeof CourierReceiptUploadRequest>;
+
+export const CourierReceiptPresignedUploadResponse = z.object({
+  url: z.string().url(),
+  bucket: z.string(),
+  key: z.string(),
+  method: z.literal('PUT'),
+  expiresIn: z.number().int().positive(),
+});
+export type CourierReceiptPresignedUploadResponse = z.infer<
+  typeof CourierReceiptPresignedUploadResponse
+>;
+
+export const AttachCourierReceiptInput = CourierReceiptRef;
+export type AttachCourierReceiptInput = z.infer<typeof AttachCourierReceiptInput>;
 
 export const UpdateOrderStatusInput = z.object({
   status: OrderStatus,

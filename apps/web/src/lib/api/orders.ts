@@ -1,6 +1,7 @@
 import {
   ApiErrorResponse,
   OrderView,
+  type AttachCourierReceiptInput,
   type PlaceOrderInput,
   type UpdateOrderStatusInput,
 } from '@parshlo/types';
@@ -99,6 +100,18 @@ export function updateOrderStatus(
   input: UpdateOrderStatusInput,
 ): Promise<z.infer<typeof OrderView>> {
   return apiCall(`/v1/orders/${encodeURIComponent(id)}/status`, OrderView, {
+    method: 'PATCH',
+    accessToken,
+    body: input,
+  });
+}
+
+export function attachCourierReceipt(
+  accessToken: string,
+  id: string,
+  input: AttachCourierReceiptInput,
+): Promise<z.infer<typeof OrderView>> {
+  return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}/courier-receipt`, OrderView, {
     method: 'PATCH',
     accessToken,
     body: input,

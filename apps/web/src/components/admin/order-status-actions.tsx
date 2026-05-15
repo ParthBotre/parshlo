@@ -25,7 +25,6 @@ export function OrderStatusActions({
   const [busy, setBusy] = useState<OrderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState('');
-
   const progressOptions = nextProgressOrderStatuses(status);
   const destructiveOptions = nextDestructiveOrderStatuses(status);
 
