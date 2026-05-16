@@ -110,54 +110,58 @@ export default async function GrossSalesByCityPage(): Promise<JSX.Element> {
                 : `No orders placed in ${monthLabel.toLowerCase()} yet.`}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3">City</th>
-                  <th className="px-5 py-3">State</th>
-                  <th className="px-5 py-3 text-right">Orders</th>
-                  <th className="px-5 py-3 text-right">Gross</th>
-                  <th className="px-5 py-3">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {breakdown.rows.map((row) => (
-                  <tr key={`${row.city}-${row.state}`} className="hover:bg-accent/40 border-t">
-                    <td className="px-5 py-3">
-                      <Link
-                        href={locationDetailHref(row.city, row.state)}
-                        className="font-medium hover:underline"
-                      >
-                        {row.city}
-                      </Link>
-                    </td>
-                    <td className="text-muted-foreground px-5 py-3">
-                      <Link
-                        href={locationDetailHref(row.city, row.state)}
-                        className="hover:text-foreground hover:underline"
-                      >
-                        {row.state}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono">{row.orderCount}</td>
-                    <td className="px-5 py-3 text-right font-mono">{formatINR(row.grossPaise)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex min-w-[140px] items-center gap-2">
-                        <div className="bg-secondary h-2 flex-1 overflow-hidden rounded-full">
-                          <div
-                            className="bg-primary h-full rounded-full transition-all"
-                            style={{ width: `${Math.min(row.sharePercent, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-muted-foreground w-10 shrink-0 text-right font-mono text-xs">
-                          {row.sharePercent}%
-                        </span>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-5 py-3">City</th>
+                    <th className="px-5 py-3">State</th>
+                    <th className="px-5 py-3 text-right">Orders</th>
+                    <th className="px-5 py-3 text-right">Gross</th>
+                    <th className="px-5 py-3">Share</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {breakdown.rows.map((row) => (
+                    <tr key={`${row.city}-${row.state}`} className="hover:bg-accent/40 border-t">
+                      <td className="px-5 py-3">
+                        <Link
+                          href={locationDetailHref(row.city, row.state)}
+                          className="font-medium hover:underline"
+                        >
+                          {row.city}
+                        </Link>
+                      </td>
+                      <td className="text-muted-foreground px-5 py-3">
+                        <Link
+                          href={locationDetailHref(row.city, row.state)}
+                          className="hover:text-foreground hover:underline"
+                        >
+                          {row.state}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono">{row.orderCount}</td>
+                      <td className="px-5 py-3 text-right font-mono">
+                        {formatINR(row.grossPaise)}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex min-w-[140px] items-center gap-2">
+                          <div className="bg-secondary h-2 flex-1 overflow-hidden rounded-full">
+                            <div
+                              className="bg-primary h-full rounded-full transition-all"
+                              style={{ width: `${Math.min(row.sharePercent, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-muted-foreground w-10 shrink-0 text-right font-mono text-xs">
+                            {row.sharePercent}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
