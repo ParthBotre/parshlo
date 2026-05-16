@@ -160,7 +160,14 @@ async function fetchParshloProfile(
 }
 
 async function getAuth0ParshloSession(): Promise<Session | null> {
-  const auth0Session = await getAuth0Session();
+  let auth0Session: Awaited<ReturnType<typeof getAuth0Session>>;
+  try {
+    auth0Session = await getAuth0Session();
+  } catch {
+    // Auth0 may throw when rolling sessions try to rewrite cookies during a
+    // Server Component render (Next.js only allows cookie writes in routes/actions).
+    return null;
+  }
   if (!auth0Session?.user) {
     return null;
   }

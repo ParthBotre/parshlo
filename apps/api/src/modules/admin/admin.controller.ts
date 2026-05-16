@@ -14,10 +14,11 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
   CourierReceiptUploadRequest,
+  PlaceOrderOnBehalfInput,
+  UpdateCourierTrackingInput,
   type AuthPrincipal,
   type OrderStatus,
   type OrderView,
-  PlaceOrderOnBehalfInput,
 } from '@parshlo/types';
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
@@ -136,6 +137,23 @@ export class AdminController {
     @Body(new ZodValidationPipe(AttachCourierReceiptInput)) body: AttachCourierReceiptInput,
   ): Promise<OrderView> {
     return this.orderService.attachCourierReceipt(orderId, body);
+  }
+
+  @Patch('orders/:id/courier-tracking')
+  @Throttle(THROTTLE_MUTATION)
+  @Audit({
+    action: 'order.update_courier_tracking',
+    resource: 'Order',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  updateCourierTracking(
+    @Param('id') orderId: string,
+    @Body(new ZodValidationPipe(UpdateCourierTrackingInput)) body: UpdateCourierTrackingInput,
+  ): Promise<OrderView> {
+    return this.orderService.updateCourierTracking(orderId, {
+      courierService: body.courierService,
+      docketNumber: body.docketNumber,
+    });
   }
 
   @Get('buyers')

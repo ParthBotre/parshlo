@@ -84,13 +84,12 @@ export function AdminCatalogGrid({ products }: { products: BuyerProductView[] })
                   </div>
                   <div className="mt-auto grid grid-cols-2 gap-2 pt-1 text-xs">
                     <Field label="Form" value={p.form} />
-                    <Field label="MOQ" value={String(p.moq)} />
+                    <Field label="GST" value={`${p.gstRate}%`} />
                     <Field
                       label="Stock"
                       value={String(p.availableQty)}
                       tone={isOut ? 'danger' : isLow ? 'warning' : 'default'}
                     />
-                    <Field label="GST" value={`${p.gstRate}%`} />
                   </div>
                 </CardContent>
               </Card>

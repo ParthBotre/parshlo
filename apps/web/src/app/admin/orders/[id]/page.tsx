@@ -4,7 +4,8 @@ import { type Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
-import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
+// import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
+import { CourierTrackingForm } from '@/components/admin/courier-tracking-form';
 import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getAdminOrder } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { courierServiceLabel } from '@/lib/courier-services';
+import { courierTrackingDateLabel } from '@/lib/courier-tracking-dates';
 import { formatDateTimeIst } from '@/lib/format-datetime';
 import { isTerminalOrderStatus, orderStatusLabel } from '@/lib/order-workflow';
 import { formatINR } from '@/lib/utils';
@@ -82,6 +85,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
     throw err;
   }
 
+  const shipmentRecordedLabel = order.courierTracking
+    ? courierTrackingDateLabel(order.courierTracking.bookedAt, order.courierTracking.updatedAt)
+    : null;
+
   return (
     <div className="space-y-6">
       <Link
@@ -116,11 +123,21 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
           <Card>
             <CardContent className="space-y-4 p-6">
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                Shipment tracking
+              </h2>
+              <CourierTrackingForm orderId={order.id} existing={order.courierTracking} />
+            </CardContent>
+          </Card>
+          {/* Courier receipt upload (disabled — kept for possible re-enable)
+          <Card>
+            <CardContent className="space-y-4 p-6">
+              <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
                 Courier receipt
               </h2>
               <CourierReceiptUpload orderId={order.id} existing={order.courierReceipt} />
             </CardContent>
           </Card>
+          */}
         </div>
 
         <Card>
@@ -145,6 +162,16 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                 Subtotal {formatINR(order.subtotalPaise)} · GST {formatINR(order.gstPaise)}
               </p>
             </div>
+            {order.courierTracking ? (
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wider">Shipment</p>
+                <p className="font-medium">{courierServiceLabel(order.courierTracking.service)}</p>
+                <p className="font-mono text-xs">{order.courierTracking.docketNumber}</p>
+                {shipmentRecordedLabel ? (
+                  <p className="text-muted-foreground mt-1 text-xs">{shipmentRecordedLabel}</p>
+                ) : null}
+              </div>
+            ) : null}
             {order.dispatchedAt ? (
               <div>
                 <p className="text-muted-foreground text-xs uppercase tracking-wider">Dispatched</p>

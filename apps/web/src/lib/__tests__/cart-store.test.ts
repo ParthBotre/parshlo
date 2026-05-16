@@ -8,7 +8,7 @@ const line = (overrides: Partial<CartLine> = {}): CartLine => ({
   name: 'Paracetamol 500mg',
   unitPricePaise: 1000, // ₹10.00 wholesale
   gstRate: '12',
-  moq: 100,
+  maxQty: 1000,
   qty: 100,
   ...overrides,
 });
@@ -35,9 +35,7 @@ describe('cart totals', () => {
     ]);
     expect(t.subtotal).toBe(10 * 1000 + 5 * 2000 + 4 * 500);
     expect(t.gst).toBe(
-      Math.round((10 * 1000 * 500) / 10_000) +
-        Math.round((5 * 2000 * 1200) / 10_000) +
-        0,
+      Math.round((10 * 1000 * 500) / 10_000) + Math.round((5 * 2000 * 1200) / 10_000) + 0,
     );
     expect(t.total).toBe(t.subtotal + t.gst);
     expect(t.itemCount).toBe(3);

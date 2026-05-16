@@ -133,7 +133,7 @@ export interface KycDecisionData {
 export function renderKycApproved(d: KycDecisionData): Rendered {
   const body = `
     <p>Hi ${d.buyerName},</p>
-    <p>Your B2B account for <strong>${d.businessName}</strong> has been verified and approved. You now have access to wholesale pricing, MOQ, live inventory, and order placement on Parshlo.</p>
+    <p>Your B2B account for <strong>${d.businessName}</strong> has been verified and approved. You now have access to wholesale pricing, live inventory, and order placement on Parshlo.</p>
   `;
   return {
     subject: `Welcome to Parshlo — ${d.businessName} approved`,

@@ -48,7 +48,7 @@ const FEATURES = [
   {
     icon: Sparkles,
     title: 'Reorder & Bulk',
-    body: 'Saved frequent orders, MOQ enforcement, and bulk imports cut procurement time by up to 60%.',
+    body: 'Saved frequent orders, flexible quantities, and bulk imports cut procurement time by up to 60%.',
   },
   {
     icon: Globe2,

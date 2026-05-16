@@ -68,6 +68,9 @@ const AdminOrderRow = z.object({
   totalPaise: z.number(),
   itemCount: z.number(),
   hasCourierReceipt: z.boolean().default(false),
+  courierService: z.string().nullable().optional(),
+  courierDocketNumber: z.string().nullable().optional(),
+  courierTrackingUpdatedAt: z.string().nullable().optional(),
 });
 const AdminOrderList = z.array(AdminOrderRow);
 

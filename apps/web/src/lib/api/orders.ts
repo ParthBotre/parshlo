@@ -3,6 +3,7 @@ import {
   OrderView,
   type AttachCourierReceiptInput,
   type PlaceOrderInput,
+  type UpdateCourierTrackingInput,
   type UpdateOrderStatusInput,
 } from '@parshlo/types';
 import { z } from 'zod';
@@ -112,6 +113,18 @@ export function attachCourierReceipt(
   input: AttachCourierReceiptInput,
 ): Promise<z.infer<typeof OrderView>> {
   return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}/courier-receipt`, OrderView, {
+    method: 'PATCH',
+    accessToken,
+    body: input,
+  });
+}
+
+export function updateCourierTracking(
+  accessToken: string,
+  id: string,
+  input: UpdateCourierTrackingInput,
+): Promise<z.infer<typeof OrderView>> {
+  return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}/courier-tracking`, OrderView, {
     method: 'PATCH',
     accessToken,
     body: input,

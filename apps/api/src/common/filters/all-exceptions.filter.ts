@@ -91,7 +91,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         title,
         status,
         code,
-        detail: statusCode >= HTTP_INTERNAL_SERVER_ERROR ? 'An unexpected error occurred.' : detail,
+        detail:
+          statusCode >= HTTP_INTERNAL_SERVER_ERROR
+            ? process.env.NODE_ENV === 'production'
+              ? 'An unexpected error occurred.'
+              : (detail ?? 'An unexpected error occurred.')
+            : detail,
         instance: request.url,
         requestId,
         errors,

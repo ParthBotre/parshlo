@@ -34,7 +34,7 @@ export default async function CatalogPage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Products</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Live wholesale pricing. Minimum order quantities apply.
+          Live wholesale pricing and stock levels for your account.
         </p>
       </div>
 

@@ -38,7 +38,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
           Therapeutic Portfolio
         </h1>
         <p className="text-muted-foreground mt-4">
-          Wholesale pricing, MOQ, and inventory levels are visible only to verified B2B accounts.
+          Wholesale pricing and inventory levels are visible only to verified B2B accounts.
         </p>
       </div>
 
@@ -53,7 +53,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
       <div className="bg-secondary/40 mt-14 rounded-xl border p-6 text-center md:p-10">
         <h2 className="font-display text-xl font-semibold">Looking for wholesale pricing?</h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          Get approved as a B2B partner to unlock pricing, MOQ, and live stock for all products.
+          Get approved as a B2B partner to unlock pricing and live stock for all products.
         </p>
         <Button asChild className="mt-6">
           <Link href="/auth/register">Request B2B Access</Link>

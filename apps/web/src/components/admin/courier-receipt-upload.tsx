@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * Courier receipt image/PDF upload — currently disabled in the admin UI.
+ * Re-enable by uncommenting the card in `app/admin/orders/[id]/page.tsx`.
+ */
+
 import { type OrderView } from '@parshlo/types';
 import { Loader2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';

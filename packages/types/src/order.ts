@@ -62,6 +62,15 @@ export const OrderItemView = z.object({
 });
 export type OrderItemView = z.infer<typeof OrderItemView>;
 
+export const CourierService = z.enum(['PROFESSIONAL', 'MARK', 'TEJ']);
+export type CourierService = z.infer<typeof CourierService>;
+
+export const UpdateCourierTrackingInput = z.object({
+  courierService: CourierService,
+  docketNumber: z.string().trim().min(1).max(80),
+});
+export type UpdateCourierTrackingInput = z.infer<typeof UpdateCourierTrackingInput>;
+
 export const OrderView = z.object({
   id: EntityId,
   orderNumber: z.string(), // human-readable, e.g. PSH-2026-000123
@@ -84,6 +93,17 @@ export const OrderView = z.object({
     .object({
       contentType: z.string(),
       uploadedAt: IsoDateString,
+    })
+    .nullable()
+    .default(null),
+  courierTracking: z
+    .object({
+      service: CourierService,
+      docketNumber: z.string(),
+      /** When courier + docket were first saved (omitted on rows saved before timestamps existed). */
+      bookedAt: IsoDateString.optional(),
+      /** When courier + docket were last saved. */
+      updatedAt: IsoDateString.optional(),
     })
     .nullable()
     .default(null),

@@ -1,17 +1,19 @@
 'use client';
 
 import { type BuyerProductView } from '@parshlo/types';
-import { Minus, Plus, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 
 import { CartDrawer } from './cart-drawer';
 
+import { AddToCartRow } from '@/components/cart/add-to-cart-row';
+import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { CatalogFilters } from '@/components/catalog/catalog-filters';
 import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useCart, totals } from '@/lib/cart-store';
+import { totals, useCart } from '@/lib/cart-store';
 import { PRICING_ENABLED } from '@/lib/feature-flags';
 import { useCatalogFilters } from '@/lib/use-catalog-filters';
 import { formatINR } from '@/lib/utils';
@@ -110,10 +112,7 @@ function ProductCard({ product }: { product: BuyerProductView }): JSX.Element {
         </div>
         <div className="space-y-2">
           <Field label="Wholesale" value={formatINR(product.wholesalePricePaise)} mono />
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="MOQ" value={String(product.moq)} />
-            <Field label="GST" value={`${product.gstRate}%`} />
-          </div>
+          <Field label="GST" value={`${product.gstRate}%`} />
         </div>
         <div className="mt-auto pt-1">
           {outOfStock ? (
@@ -121,29 +120,14 @@ function ProductCard({ product }: { product: BuyerProductView }): JSX.Element {
               Out of stock
             </Button>
           ) : inCart ? (
-            <div className="flex items-center justify-between rounded-md border p-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => cart.setQty(product.id, inCart.qty - product.moq)}
-                disabled={inCart.qty <= product.moq}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <span className="font-mono text-sm">{inCart.qty} units</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => cart.setQty(product.id, inCart.qty + product.moq)}
-                disabled={inCart.qty + product.moq > product.availableQty}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <CartQuantityInput
+              qty={inCart.qty}
+              maxQty={inCart.maxQty || product.availableQty}
+              onQtyChange={(next) => cart.setQty(product.id, next)}
+              className="w-full justify-center"
+            />
           ) : (
-            <Button onClick={() => cart.add(product)} className="w-full">
-              Add to cart · {product.moq}
-            </Button>
+            <AddToCartRow product={product} onAdd={(p, qty) => cart.add(p, qty)} />
           )}
         </div>
       </CardContent>

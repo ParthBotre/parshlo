@@ -293,6 +293,12 @@ enum OrderStatus {
   REJECTED
 }
 
+enum CourierService {
+  PROFESSIONAL
+  MARK
+  TEJ
+}
+
 model Order {
   id          String @id @default(cuid())
   orderNumber String @unique // human-readable: PSH-YYYY-NNNNNN
@@ -330,6 +336,12 @@ model Order {
   courierReceiptKey         String?
   courierReceiptContentType String?
   courierReceiptUploadedAt  DateTime?
+
+  /// Courier partner + docket for shipment tracking (admin-entered).
+  courierService            CourierService?
+  courierDocketNumber       String?
+  courierTrackingSetAt      DateTime?
+  courierTrackingUpdatedAt  DateTime?
 
   @@unique([buyerId, idempotencyKey])
   @@index([status])

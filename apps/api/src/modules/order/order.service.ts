@@ -53,7 +53,7 @@ export class OrderService {
    * Place a new B2B order with full transactional safety:
    *   1. Verify buyer is APPROVED.
    *   2. Lock product rows + inventory rows.
-   *   3. Validate MOQ, stock, and prescription/schedule requirements.
+   *   3. Validate stock and prescription/schedule requirements.
    *   4. Snapshot pricing & GST onto OrderItem (immutable).
    *   5. Reserve inventory atomically.
    *   6. Honor Idempotency-Key — return prior order on retry.
@@ -117,12 +117,6 @@ export class OrderService {
             throw new BadRequestException({
               code: 'PRODUCT_UNAVAILABLE',
               message: `Product ${item.productId} is not available.`,
-            });
-          }
-          if (item.quantity < product.moq) {
-            throw new BadRequestException({
-              code: 'MOQ_NOT_MET',
-              message: `Minimum order quantity for ${product.name} is ${String(product.moq)}.`,
             });
           }
           const available =
@@ -307,6 +301,33 @@ export class OrderService {
     return this.toView(updated, updated.items);
   }
 
+  async updateCourierTracking(
+    orderId: string,
+    input: { courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ'; docketNumber: string },
+  ): Promise<OrderView> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) {
+      throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        courierService: input.courierService,
+        courierDocketNumber: input.docketNumber,
+        courierTrackingUpdatedAt: now,
+        ...(order.courierTrackingSetAt == null ? { courierTrackingSetAt: now } : {}),
+      },
+      include: { items: true },
+    });
+
+    return this.toView(updated, updated.items);
+  }
+
   async updateStatus(
     orderId: string,
     actorId: string,
@@ -412,6 +433,10 @@ export class OrderService {
       deliveredAt: Date | null;
       courierReceiptContentType: string | null;
       courierReceiptUploadedAt: Date | null;
+      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | null;
+      courierDocketNumber: string | null;
+      courierTrackingSetAt: Date | null;
+      courierTrackingUpdatedAt: Date | null;
     },
     items: {
       productId: string;
@@ -456,6 +481,19 @@ export class OrderService {
           ? {
               contentType: order.courierReceiptContentType,
               uploadedAt: order.courierReceiptUploadedAt.toISOString(),
+            }
+          : null,
+      courierTracking:
+        order.courierService && order.courierDocketNumber
+          ? {
+              service: order.courierService,
+              docketNumber: order.courierDocketNumber,
+              bookedAt:
+                (order.courierTrackingSetAt ?? order.courierTrackingUpdatedAt)?.toISOString() ??
+                order.updatedAt.toISOString(),
+              updatedAt:
+                (order.courierTrackingUpdatedAt ?? order.courierTrackingSetAt)?.toISOString() ??
+                order.updatedAt.toISOString(),
             }
           : null,
     };

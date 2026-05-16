@@ -21,6 +21,9 @@ export class AdminService {
       totalPaise: number;
       itemCount: number;
       hasCourierReceipt: boolean;
+      courierService: string | null;
+      courierDocketNumber: string | null;
+      courierTrackingUpdatedAt: string | null;
     }[]
   > {
     const orders = await this.prisma.order.findMany({
@@ -50,6 +53,9 @@ export class AdminService {
       totalPaise: Number(o.totalPaise),
       itemCount: o._count.items,
       hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
+      courierService: o.courierService,
+      courierDocketNumber: o.courierDocketNumber,
+      courierTrackingUpdatedAt: o.courierTrackingUpdatedAt?.toISOString() ?? null,
     }));
   }
 

@@ -1,11 +1,13 @@
 'use client';
 
 import { type BuyerProductView } from '@parshlo/types';
-import { Minus, Plus, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { AdminCartDrawer } from '@/components/admin/admin-cart-drawer';
+import { AddToCartRow } from '@/components/cart/add-to-cart-row';
+import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { CatalogFilters } from '@/components/catalog/catalog-filters';
 import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
@@ -216,7 +218,7 @@ function AdminProductCard({
           {product.name}
         </h3>
         <p className="text-muted-foreground text-xs">
-          {formatINR(product.wholesalePricePaise)} · MOQ {product.moq} · GST {product.gstRate}%
+          {formatINR(product.wholesalePricePaise)} · GST {product.gstRate}%
         </p>
         <div className="mt-auto pt-1">
           {outOfStock ? (
@@ -224,29 +226,19 @@ function AdminProductCard({
               Out of stock
             </Button>
           ) : inCart ? (
-            <div className="flex items-center justify-between rounded-md border p-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => cart.setQty(product.id, inCart.qty - product.moq)}
-                disabled={inCart.qty <= product.moq || disabled}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <span className="font-mono text-sm">{inCart.qty} units</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => cart.setQty(product.id, inCart.qty + product.moq)}
-                disabled={inCart.qty + product.moq > product.availableQty || disabled}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <CartQuantityInput
+              qty={inCart.qty}
+              maxQty={inCart.maxQty || product.availableQty}
+              onQtyChange={(next) => cart.setQty(product.id, next)}
+              disabled={disabled}
+              className="w-full justify-center"
+            />
           ) : (
-            <Button onClick={() => cart.add(product)} className="w-full" disabled={disabled}>
-              Add to cart · {product.moq}
-            </Button>
+            <AddToCartRow
+              product={product}
+              disabled={disabled}
+              onAdd={(p, qty) => cart.add(p, qty)}
+            />
           )}
         </div>
       </CardContent>

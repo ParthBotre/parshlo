@@ -111,7 +111,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
             <CardContent className="p-5">
               <h3 className="font-display text-base font-semibold">Wholesale ordering</h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Pricing, MOQ, and real-time inventory are available to verified B2B accounts.
+                Pricing and real-time inventory are available to verified B2B accounts.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild>

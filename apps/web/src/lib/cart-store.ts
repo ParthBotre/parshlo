@@ -4,13 +4,16 @@ import { type BuyerProductView } from '@parshlo/types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { clampCartQuantity } from '@/lib/cart-quantity';
+
 export interface CartLine {
   productId: string;
   slug: string;
   name: string;
   unitPricePaise: number;
   gstRate: BuyerProductView['gstRate'];
-  moq: number;
+  /** Available units when added; used to cap manual quantity entry. */
+  maxQty: number;
   qty: number;
 }
 
@@ -26,13 +29,21 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       lines: [],
-      add: (product, qty = product.moq) =>
+      add: (product, qty = 1) =>
         set((state) => {
+          const nextQty = clampCartQuantity(qty, product.availableQty);
           const existing = state.lines.find((l) => l.productId === product.id);
           if (existing) {
+            const maxQty = Math.max(existing.maxQty, product.availableQty);
             return {
               lines: state.lines.map((l) =>
-                l.productId === product.id ? { ...l, qty: l.qty + qty } : l,
+                l.productId === product.id
+                  ? {
+                      ...l,
+                      maxQty,
+                      qty: clampCartQuantity(l.qty + nextQty, maxQty),
+                    }
+                  : l,
               ),
             };
           }
@@ -45,8 +56,8 @@ export const useCart = create<CartState>()(
                 name: product.name,
                 unitPricePaise: product.wholesalePricePaise,
                 gstRate: product.gstRate,
-                moq: product.moq,
-                qty,
+                maxQty: product.availableQty,
+                qty: nextQty,
               },
             ],
           };
@@ -54,7 +65,12 @@ export const useCart = create<CartState>()(
       setQty: (productId, qty) =>
         set((state) => ({
           lines: state.lines.map((l) =>
-            l.productId === productId ? { ...l, qty: Math.max(l.moq, qty) } : l,
+            l.productId === productId
+              ? {
+                  ...l,
+                  qty: clampCartQuantity(qty, l.maxQty || qty),
+                }
+              : l,
           ),
         })),
       remove: (productId) =>

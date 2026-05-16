@@ -4,6 +4,7 @@ import { Info, Loader2, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { Button } from '@/components/ui/button';
 import { placeOrderFromBrowser } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api-client';
@@ -76,12 +77,12 @@ export function CartDrawer({
           ) : (
             <ul className="space-y-3">
               {cart.lines.map((line) => (
-                <li key={line.productId} className="rounded-md border p-3">
+                <li key={line.productId} className="space-y-2 rounded-md border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{line.name}</p>
                       <p className="text-muted-foreground text-xs">
-                        {line.qty} × {formatINR(line.unitPricePaise)} · GST {line.gstRate}%
+                        {formatINR(line.unitPricePaise)} each · GST {line.gstRate}%
                       </p>
                     </div>
                     <Button
@@ -93,6 +94,11 @@ export function CartDrawer({
                       <Trash2 className="text-muted-foreground h-4 w-4" />
                     </Button>
                   </div>
+                  <CartQuantityInput
+                    qty={line.qty}
+                    maxQty={line.maxQty || line.qty}
+                    onQtyChange={(next) => cart.setQty(line.productId, next)}
+                  />
                 </li>
               ))}
             </ul>
