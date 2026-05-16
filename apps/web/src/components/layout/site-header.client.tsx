@@ -116,7 +116,9 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
               {session ? (
                 <>
                   <Button asChild size="sm">
-                    <Link href={dashboardHref}>{isAdmin ? 'Admin' : 'Dashboard'}</Link>
+                    <Link href={dashboardHref} onClick={() => setOpen(false)}>
+                      {isAdmin ? 'Admin' : 'Dashboard'}
+                    </Link>
                   </Button>
                   <Button onClick={onLogout} size="sm" variant="outline">
                     Sign out
@@ -125,10 +127,14 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
               ) : (
                 <>
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/auth/sign-in">Sign in</Link>
+                    <Link href="/auth/sign-in" onClick={() => setOpen(false)}>
+                      Sign in
+                    </Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href="/auth/register">Request B2B Access</Link>
+                    <Link href="/auth/register" onClick={() => setOpen(false)}>
+                      Request B2B Access
+                    </Link>
                   </Button>
                 </>
               )}
