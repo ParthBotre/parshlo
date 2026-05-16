@@ -60,7 +60,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
             {order.orderNumber}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -85,26 +85,30 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
               This order was {order.status.toLowerCase()}.
             </div>
           ) : (
-            <ol className="mt-4 grid grid-cols-7 gap-2 text-[10px]">
-              {STAGES.map((stage, idx) => {
-                const done = idx <= stageIdx;
-                const active = idx === stageIdx;
-                return (
-                  <li key={stage} className="flex flex-col items-center text-center">
-                    {done ? (
-                      <CheckCircle2
-                        className={`h-5 w-5 ${active ? 'text-primary' : 'text-emerald-600'}`}
-                      />
-                    ) : (
-                      <Circle className="text-muted-foreground/40 h-5 w-5" />
-                    )}
-                    <span className={`mt-1 ${done ? 'font-medium' : 'text-muted-foreground'}`}>
-                      {stage.replace(/_/g, ' ')}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
+            <div className="mt-4 overflow-x-auto pb-1">
+              <ol className="flex min-w-max gap-6 px-1">
+                {STAGES.map((stage, idx) => {
+                  const done = idx <= stageIdx;
+                  const active = idx === stageIdx;
+                  return (
+                    <li key={stage} className="flex flex-col items-center text-center">
+                      {done ? (
+                        <CheckCircle2
+                          className={`h-5 w-5 ${active ? 'text-primary' : 'text-emerald-600'}`}
+                        />
+                      ) : (
+                        <Circle className="text-muted-foreground/40 h-5 w-5" />
+                      )}
+                      <span
+                        className={`mt-1 whitespace-nowrap text-[10px] ${done ? 'font-medium' : 'text-muted-foreground'}`}
+                      >
+                        {stage.replace(/_/g, ' ')}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -125,34 +129,44 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3">Product</th>
-                <th className="px-5 py-3 text-right">Qty</th>
-                <th className="px-5 py-3 text-right">Unit</th>
-                <th className="px-5 py-3 text-right">GST</th>
-                <th className="px-5 py-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((line) => (
-                <tr key={line.productId} className="border-t">
-                  <td className="px-5 py-3">{line.productName}</td>
-                  <td className="px-5 py-3 text-right font-mono">{line.quantity}</td>
-                  <td className="px-5 py-3 text-right font-mono">
-                    {formatINR(line.unitPricePaise)}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 text-right font-mono">
-                    {formatINR(line.lineGstPaise)}
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono">
-                    {formatINR(line.lineTotalPaise)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="whitespace-nowrap px-4 py-3 sm:px-5">Product</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right sm:px-5">Qty</th>
+                  <th className="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell sm:px-5">
+                    Unit
+                  </th>
+                  <th className="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell sm:px-5">
+                    GST
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right sm:px-5">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {order.items.map((line) => (
+                  <tr key={line.productId} className="border-t">
+                    <td className="max-w-[160px] truncate px-4 py-3 sm:max-w-none sm:px-5">
+                      {line.productName}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
+                      {line.quantity}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-right font-mono sm:table-cell sm:px-5">
+                      {formatINR(line.unitPricePaise)}
+                    </td>
+                    <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 text-right font-mono sm:table-cell sm:px-5">
+                      {formatINR(line.lineGstPaise)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
+                      {formatINR(line.lineTotalPaise)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

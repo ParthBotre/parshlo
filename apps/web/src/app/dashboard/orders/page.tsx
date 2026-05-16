@@ -44,7 +44,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">Orders</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">Orders</h1>
 
       <Card>
         <CardContent className="p-0">
@@ -57,41 +57,51 @@ export default async function OrdersPage(): Promise<JSX.Element> {
               .
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3">Order #</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Items</th>
-                  <th className="px-5 py-3">Placed</th>
-                  <th className="px-5 py-3 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-accent/40 border-t">
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/dashboard/orders/${o.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {o.orderNumber}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge variant={STATUS_VARIANT[o.status] ?? 'secondary'}>
-                        {o.status.replace(/_/g, ' ')}
-                      </Badge>
-                    </td>
-                    <td className="text-muted-foreground px-5 py-3">{o.items.length}</td>
-                    <td className="text-muted-foreground px-5 py-3">
-                      {new Date(o.placedAt).toLocaleString('en-IN')}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono">{formatINR(o.totalPaise)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="whitespace-nowrap px-4 py-3 sm:px-5">Order #</th>
+                    <th className="whitespace-nowrap px-4 py-3 sm:px-5">Status</th>
+                    <th className="hidden whitespace-nowrap px-4 py-3 sm:table-cell sm:px-5">
+                      Items
+                    </th>
+                    <th className="hidden whitespace-nowrap px-4 py-3 sm:table-cell sm:px-5">
+                      Placed
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right sm:px-5">Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={o.id} className="hover:bg-accent/40 border-t">
+                      <td className="whitespace-nowrap px-4 py-3 sm:px-5">
+                        <Link
+                          href={`/dashboard/orders/${o.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {o.orderNumber}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 sm:px-5">
+                        <Badge variant={STATUS_VARIANT[o.status] ?? 'secondary'}>
+                          {o.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </td>
+                      <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 sm:table-cell sm:px-5">
+                        {o.items.length}
+                      </td>
+                      <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 sm:table-cell sm:px-5">
+                        {new Date(o.placedAt).toLocaleString('en-IN')}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
+                        {formatINR(o.totalPaise)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
