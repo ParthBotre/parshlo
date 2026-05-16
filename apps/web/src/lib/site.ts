@@ -1,5 +1,5 @@
 export const site = {
-  name: 'Parshlo Pharma',
+  name: 'Parshlo',
   shortName: 'Parshlo',
   tagline: 'Enterprise pharmaceutical wholesale for verified B2B partners',
   description:

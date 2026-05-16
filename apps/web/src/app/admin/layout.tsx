@@ -9,6 +9,7 @@ const NAV: readonly NavItem[] = [
   { href: '/admin', label: 'Analytics', icon: 'dashboard' },
   { href: '/admin/kyc', label: 'KYC Queue', icon: 'kyc' },
   { href: '/admin/orders', label: 'Orders', icon: 'orders' },
+  { href: '/admin/place-order', label: 'Place order', icon: 'place-order' },
   { href: '/admin/buyers', label: 'Buyers', icon: 'buyers' },
   { href: '/admin/products', label: 'Products', icon: 'products' },
 ];

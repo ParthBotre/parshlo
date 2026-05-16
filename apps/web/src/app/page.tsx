@@ -80,7 +80,7 @@ export default function HomePage(): JSX.Element {
             <h1 className="tracking-display-tight font-display text-balance text-5xl font-bold leading-[1.05] md:text-7xl">
               The wholesale platform for{' '}
               <span className="from-primary via-primary to-brand-300 bg-gradient-to-br bg-clip-text text-transparent">
-                verified pharmacies.
+                pharmaceutical distributors.
               </span>
             </h1>
             <p className="text-muted-foreground max-w-xl text-balance text-lg leading-relaxed md:text-xl">

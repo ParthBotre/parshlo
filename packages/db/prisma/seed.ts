@@ -44,6 +44,9 @@ const PRICE = {
   PROTEIN_DM: { wholesale: 75000n, mrp: 120000n },
 } as const;
 
+/** Default manufacturer label on seeded catalog SKUs. */
+const MANUFACTURER = 'Parshlo';
+
 interface ProductSeed {
   slug: string;
   name: string;
@@ -179,7 +182,7 @@ async function main(): Promise<void> {
       packaging: '15 tablets/strip · 10 strips/box',
       description:
         'Calcium and Vitamin D3 supplement for bone health. Supports skeletal strength and prevents calcium deficiency.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.ESSENTIAL.wholesale,
@@ -198,7 +201,7 @@ async function main(): Promise<void> {
       packaging: '10 capsules/strip · 10 strips/box',
       description:
         'Advanced calcium supplement with K2-7 for better calcium absorption and bone mineralization.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -217,7 +220,7 @@ async function main(): Promise<void> {
       packaging: '15 tablets/strip · 10 strips/box',
       description:
         'Extended calcium formulation with magnesium and zinc for women, post-menopausal bone support and prenatal use.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -236,7 +239,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Joint cartilage support formulation with collagen peptides, glucosamine and MSM for osteoarthritis management.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -255,7 +258,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Cartilage-protective combination for symptomatic relief of osteoarthritis of the knee and hip.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -274,7 +277,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Active Vitamin D3 (Calcitriol) with calcium and zinc for fracture recovery and metabolic bone disease.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -294,7 +297,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Comprehensive bone recovery formulation with active Vitamin D3, K2-7 and trace minerals.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -313,7 +316,7 @@ async function main(): Promise<void> {
       packaging: '10 capsules/strip · 10 strips/box',
       description:
         'MSM + Glucosamine + Diacerein combination capsule for chronic joint pain and inflammation.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -332,7 +335,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'MSM + Glucosamine + Diacerein combination tablet for chronic joint pain and inflammation.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -351,7 +354,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Vegetarian joint health support with MSM, Vitamin C and undenatured Type II collagen.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'bone-joint',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -372,7 +375,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Selective COX-2 inhibitor for osteoarthritis, rheumatoid arthritis and acute pain.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'analgesics',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -391,7 +394,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'High-strength selective COX-2 inhibitor for acute gouty arthritis and severe inflammatory pain.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'analgesics',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -410,7 +413,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'NSAID + muscle relaxant combination for acute musculoskeletal pain and lower back spasm.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'analgesics',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -429,7 +432,7 @@ async function main(): Promise<void> {
       packaging: '30g tube',
       description:
         'Topical analgesic gel for localised joint pain, sprains, strains and soft-tissue injuries.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'analgesics',
       wholesalePricePaise: PRICE.TOPICAL.wholesale,
@@ -448,7 +451,7 @@ async function main(): Promise<void> {
       packaging: '50ml spray bottle',
       description:
         'Topical analgesic spray for instant relief from muscle aches, sprains and joint pain.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'analgesics',
       wholesalePricePaise: PRICE.TOPICAL.wholesale,
@@ -468,7 +471,7 @@ async function main(): Promise<void> {
       form: ProductForm.TABLET,
       packaging: '10 tablets/strip · 10 strips/box',
       description: 'Beta-blocker + ARB fixed-dose combination for hypertension management.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'cardiovascular',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -486,7 +489,7 @@ async function main(): Promise<void> {
       form: ProductForm.TABLET,
       packaging: '10 tablets/strip · 10 strips/box',
       description: 'Cardioselective beta-blocker (SR) for hypertension, angina and heart failure.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'cardiovascular',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -507,7 +510,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Macrolide antibiotic in dispersible tablet form (paediatric-friendly) for respiratory and ENT infections.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30041020',
       categorySlug: 'antibiotics',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -528,7 +531,7 @@ async function main(): Promise<void> {
       packaging: '10 capsules/strip · 10 strips/box',
       description:
         'Broad-spectrum triazole antifungal for systemic mycoses, onychomycosis and dermatophytoses.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'antifungal',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -549,7 +552,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Antiemetic and sedative antihistamine for nausea and vomiting, including in pregnancy.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'antiemetic',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -568,7 +571,7 @@ async function main(): Promise<void> {
       packaging: '10 capsules/strip · 10 strips/box',
       description:
         'Doxylamine + Pyridoxine delayed-release combination, first-line for nausea and vomiting of pregnancy.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'antiemetic',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -588,7 +591,7 @@ async function main(): Promise<void> {
       form: ProductForm.TABLET,
       packaging: '10 tablets/strip · 10 strips/box',
       description: 'Oral corticosteroid (calcium-sparing) for inflammatory and immune disorders.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'corticosteroid',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -609,7 +612,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Centrally acting muscle relaxant for spasticity following stroke and musculoskeletal disorders.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'muscle-relaxant',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -630,7 +633,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Proteolytic enzyme combination for reducing inflammation, oedema and accelerating wound healing.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'wound-care',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -649,7 +652,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Double-strength proteolytic enzymes for severe post-surgical inflammation and complex wounds.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'wound-care',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -668,7 +671,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Triple-action enzyme + NSAID + paracetamol combination for post-operative pain, swelling and tissue repair.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'wound-care',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -689,7 +692,7 @@ async function main(): Promise<void> {
       packaging: '10 capsules/strip · 10 strips/box',
       description:
         'High-potency turmeric extract with piperine for enhanced absorption. Natural anti-inflammatory and antioxidant support.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'nutraceuticals',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -707,7 +710,7 @@ async function main(): Promise<void> {
       form: ProductForm.CAPSULE,
       packaging: '4 capsules/strip',
       description: 'Weekly high-dose Vitamin D3 for correction of severe Vitamin D deficiency.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'nutraceuticals',
       wholesalePricePaise: PRICE.ESSENTIAL.wholesale,
@@ -726,7 +729,7 @@ async function main(): Promise<void> {
       packaging: '5ml shot · 4 shots/pack',
       description:
         'Rapid-absorption nano-emulsion of Vitamin D3 in single-dose oral shots for faster onset and improved bioavailability.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'nutraceuticals',
       wholesalePricePaise: PRICE.VITD_SHOT.wholesale,
@@ -745,7 +748,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Iron + folate supplement for iron-deficiency anaemia, including during pregnancy.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'nutraceuticals',
       wholesalePricePaise: PRICE.ESSENTIAL.wholesale,
@@ -765,7 +768,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Active forms of folate, B12 and B6 for hyperhomocysteinaemia, neuropathy and preconception care.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '30049099',
       categorySlug: 'nutraceuticals',
       wholesalePricePaise: PRICE.MID.wholesale,
@@ -787,7 +790,7 @@ async function main(): Promise<void> {
       packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Inositol-based combination for PCOS / PCOD management, ovarian function and metabolic support.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'women-health',
       wholesalePricePaise: PRICE.PREMIUM.wholesale,
@@ -809,7 +812,7 @@ async function main(): Promise<void> {
       packaging: '400g tin',
       description:
         'Specialised oral nutrition supplement for people with diabetes. Slow-release energy, no added sugar.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN_DM.wholesale,
@@ -828,7 +831,7 @@ async function main(): Promise<void> {
       packaging: '500g tin',
       description:
         'Daily nutritional protein powder with chocolate flavour. Supports adult nutrition, recovery and muscle maintenance.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN.wholesale,
@@ -847,7 +850,7 @@ async function main(): Promise<void> {
       packaging: '500g tin',
       description:
         'Daily nutritional protein powder with vanilla flavour. Supports adult nutrition, recovery and muscle maintenance.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN.wholesale,
@@ -866,7 +869,7 @@ async function main(): Promise<void> {
       packaging: '500g tin',
       description:
         'Sugar-free, unflavoured protein powder for adults preferring a neutral taste. Ideal for diabetics and calorie-conscious users.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN.wholesale,
@@ -885,7 +888,7 @@ async function main(): Promise<void> {
       packaging: '500g tin',
       description:
         'Sugar-free protein powder with rich chocolate flavour. Diabetic-friendly daily nutrition.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN.wholesale,
@@ -905,7 +908,7 @@ async function main(): Promise<void> {
       packaging: '500g tin',
       description:
         'Sugar-free protein powder with traditional kesar flavour. Diabetic-friendly Indian taste profile.',
-      manufacturer: 'Parshlo Pharma',
+      manufacturer: MANUFACTURER,
       hsnCode: '21069099',
       categorySlug: 'protein-supplement',
       wholesalePricePaise: PRICE.PROTEIN.wholesale,

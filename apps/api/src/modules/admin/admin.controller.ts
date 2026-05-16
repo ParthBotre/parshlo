@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -13,13 +14,20 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
   CourierReceiptUploadRequest,
+  type AuthPrincipal,
   type OrderStatus,
   type OrderView,
+  PlaceOrderOnBehalfInput,
 } from '@parshlo/types';
 
+import { Audit } from '../../common/decorators/audit.decorator.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireRoles } from '../../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
-import { THROTTLE_MUTATION } from '../../common/throttling/throttle.constants.js';
+import {
+  THROTTLE_MUTATION,
+  THROTTLE_ORDER_PLACE,
+} from '../../common/throttling/throttle.constants.js';
 import { OrderService } from '../order/order.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -51,6 +59,22 @@ export class AdminController {
   @Get('analytics/sales-by-city')
   salesByCity(): ReturnType<AdminService['grossSalesByCity']> {
     return this.admin.grossSalesByCity();
+  }
+
+  @Post('orders')
+  @HttpCode(201)
+  @Throttle(THROTTLE_ORDER_PLACE)
+  @Audit({
+    action: 'order.place_on_behalf',
+    resource: 'Order',
+    resolveResourceId: (_req, result) => (result as OrderView).id,
+    metadata: (_req, result) => ({ buyerId: (result as OrderView).buyerId }),
+  })
+  placeOrder(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(PlaceOrderOnBehalfInput)) body: PlaceOrderOnBehalfInput,
+  ): Promise<OrderView> {
+    return this.orderService.placeOrderOnBehalf(user.userId, body);
   }
 
   @ApiQuery({ name: 'status', required: false })

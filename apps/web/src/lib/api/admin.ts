@@ -1,7 +1,7 @@
-import { OrderView } from '@parshlo/types';
+import { ApiErrorResponse, OrderView, type PlaceOrderOnBehalfInput } from '@parshlo/types';
 import { z } from 'zod';
 
-import { apiCall, type ApiCallOptions } from '../api-client';
+import { apiCall, ApiError, type ApiCallOptions } from '../api-client';
 
 const PendingKycAddress = z.object({
   line1: z.string(),
@@ -165,4 +165,66 @@ export function listAllBuyers(
     accessToken,
     ...options,
   });
+}
+
+export type AdminBuyer = z.infer<typeof AdminBuyerRow>;
+
+export function placeOrderOnBehalf(
+  accessToken: string,
+  input: PlaceOrderOnBehalfInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof OrderView>> {
+  return apiCall('/v1/admin/orders', OrderView, {
+    method: 'POST',
+    accessToken,
+    body: input,
+    idempotencyKey: input.idempotencyKey,
+    ...options,
+  });
+}
+
+/** Browser checkout for staff placing an order on behalf of a buyer. */
+export async function placeOrderOnBehalfFromBrowser(
+  input: Omit<PlaceOrderOnBehalfInput, 'idempotencyKey'> & { idempotencyKey?: string },
+): Promise<z.infer<typeof OrderView>> {
+  const body: PlaceOrderOnBehalfInput = {
+    ...input,
+    idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+  };
+
+  const res = await fetch('/api/admin/orders', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as unknown;
+    const parsed = ApiErrorResponse.safeParse(json);
+    const fallbackDetail =
+      json &&
+      typeof json === 'object' &&
+      'detail' in json &&
+      typeof (json as { detail?: unknown }).detail === 'string'
+        ? (json as { detail: string }).detail
+        : res.status === 502
+          ? 'The Parshlo API is not running. Restart `make dev`.'
+          : res.statusText;
+    const problem: z.infer<typeof ApiErrorResponse> = parsed.success
+      ? parsed.data
+      : {
+          type: 'about:blank',
+          title: res.statusText,
+          status: res.status,
+          code: 'UNKNOWN_ERROR',
+          detail: fallbackDetail,
+        };
+    throw new ApiError(res.status, problem);
+  }
+
+  const json: unknown = await res.json();
+  return OrderView.parse(json);
 }

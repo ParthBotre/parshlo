@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 import { ProductService } from './product.service.js';
 
+const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
+
 @ApiTags('products')
 @Controller('products')
 export class ProductController {
@@ -37,6 +39,9 @@ export class ProductController {
   @ApiBearerAuth('AccessToken')
   @Get('catalog')
   async listForBuyer(@CurrentUser() user: AuthPrincipal): Promise<BuyerProductView[]> {
+    if (user.roles.some((role) => STAFF_ROLES.has(role))) {
+      return this.products.listForBuyer();
+    }
     const dbUser = await this.prisma.user.findUnique({ where: { id: user.userId } });
     if (!dbUser || dbUser.accountStatus !== 'APPROVED') {
       throw new ForbiddenException({

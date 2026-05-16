@@ -18,6 +18,7 @@ import {
   type OrderStatus,
   type OrderView,
   type PlaceOrderInput,
+  type PlaceOrderOnBehalfInput,
   type UpdateOrderStatusInput,
 } from '@parshlo/types';
 
@@ -57,7 +58,26 @@ export class OrderService {
    *   5. Reserve inventory atomically.
    *   6. Honor Idempotency-Key — return prior order on retry.
    */
-  async placeOrder(buyerId: string, input: PlaceOrderInput): Promise<OrderView> {
+  /** Staff-only: place an order attributed to an approved buyer account. */
+  async placeOrderOnBehalf(actorId: string, input: PlaceOrderOnBehalfInput): Promise<OrderView> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: input.buyerId, deletedAt: null },
+    });
+    if (!target?.roles.includes('BUYER')) {
+      throw new BadRequestException({
+        code: 'INVALID_BUYER',
+        message: 'Selected account is not a buyer.',
+      });
+    }
+    const { buyerId, ...orderInput } = input;
+    return this.placeOrder(buyerId, orderInput, { actorId });
+  }
+
+  async placeOrder(
+    buyerId: string,
+    input: PlaceOrderInput,
+    options?: { actorId?: string },
+  ): Promise<OrderView> {
     // Idempotency check before doing any work
     const prior = await this.prisma.order.findUnique({
       where: { buyerId_idempotencyKey: { buyerId, idempotencyKey: input.idempotencyKey } },
@@ -158,7 +178,7 @@ export class OrderService {
             totalPaise: subtotal + gstTotal,
             idempotencyKey: input.idempotencyKey,
             items: { createMany: { data: itemData } },
-            statusEvents: { create: { status: 'RECEIVED', actorId: buyerId } },
+            statusEvents: { create: { status: 'RECEIVED', actorId: options?.actorId ?? buyerId } },
           },
           include: { items: true },
         });

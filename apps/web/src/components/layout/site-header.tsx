@@ -6,10 +6,10 @@ import { BrandMark } from '@/components/brand/brand-mark';
 import { getSession } from '@/lib/auth/session';
 import { site } from '@/lib/site';
 
-
 const NAV = [
   { href: '/products', label: 'Products' },
   { href: '/about', label: 'About' },
+  { href: '/people', label: 'People' },
   { href: '/certifications', label: 'Certifications' },
   { href: '/contact', label: 'Contact' },
 ] as const;
@@ -31,7 +31,7 @@ export async function SiteHeader(): Promise<JSX.Element> {
             className="transition-transform group-hover:scale-105"
           />
           <span className="font-display text-base font-bold uppercase leading-none tracking-wide md:text-lg">
-            Parshlo <span className="text-primary">Pharma</span>
+            Parshlo
           </span>
         </Link>
 

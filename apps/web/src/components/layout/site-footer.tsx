@@ -12,7 +12,7 @@ export function SiteFooter(): JSX.Element {
           <div className="flex items-center gap-2.5">
             <BrandMark size={40} alt="" />
             <span className="font-display text-lg font-bold uppercase leading-none tracking-wide">
-              Parshlo <span className="text-primary">Pharma</span>
+              Parshlo
             </span>
           </div>
           <p className="text-muted-foreground text-sm">{site.description}</p>
@@ -36,6 +36,11 @@ export function SiteFooter(): JSX.Element {
             <li>
               <Link className="hover:text-foreground" href="/about">
                 About
+              </Link>
+            </li>
+            <li>
+              <Link className="hover:text-foreground" href="/people">
+                People
               </Link>
             </li>
           </ul>

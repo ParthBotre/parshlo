@@ -12,7 +12,12 @@ interface Rendered {
   text: string;
 }
 
-function shell(opts: { title: string; preheader: string; body: string; cta?: { href: string; label: string } }): string {
+function shell(opts: {
+  title: string;
+  preheader: string;
+  body: string;
+  cta?: { href: string; label: string };
+}): string {
   const cta = opts.cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px"><tr><td style="border-radius:8px;background:#0e4733"><a href="${opts.cta.href}" style="display:inline-block;padding:12px 20px;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${opts.cta.label}</a></td></tr></table>`
     : '';
@@ -35,7 +40,7 @@ function shell(opts: { title: string; preheader: string; body: string; cta?: { h
           ${cta}
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #eef0f3;font-size:11px;color:#6b7480">
-          Parshlo Pharma · B2B Ordering Platform · This is a transactional message.
+          Parshlo · B2B Ordering Platform · This is a transactional message.
         </td></tr>
       </table>
     </td></tr>
@@ -54,7 +59,7 @@ function itemRow(i: { productName: string; quantity: number; lineTotalPaise: num
 export interface OrderPlacedBuyerData {
   buyerName: string;
   orderNumber: string;
-  items: Array<{ productName: string; quantity: number; lineTotalPaise: number }>;
+  items: { productName: string; quantity: number; lineTotalPaise: number }[];
   subtotalPaise: number;
   gstPaise: number;
   totalPaise: number;

@@ -44,6 +44,12 @@ export const PlaceOrderInput = z.object({
 });
 export type PlaceOrderInput = z.infer<typeof PlaceOrderInput>;
 
+/** Staff place an order for a verified buyer (admin console). */
+export const PlaceOrderOnBehalfInput = PlaceOrderInput.extend({
+  buyerId: EntityId,
+});
+export type PlaceOrderOnBehalfInput = z.infer<typeof PlaceOrderOnBehalfInput>;
+
 export const OrderItemView = z.object({
   productId: EntityId,
   productName: z.string(),
