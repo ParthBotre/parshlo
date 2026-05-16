@@ -7,7 +7,7 @@ const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
 
 const NAV: readonly NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: 'dashboard' },
-  { href: '/dashboard/catalog', label: 'Catalog', icon: 'catalog' },
+  { href: '/dashboard/catalog', label: 'Products', icon: 'catalog' },
   { href: '/dashboard/orders', label: 'Orders', icon: 'orders' },
 ];
 

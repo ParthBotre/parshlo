@@ -56,7 +56,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
         href="/products"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to catalog
+        <ArrowLeft className="h-4 w-4" /> Back to products
       </Link>
 
       <div className="mt-8 grid gap-10 md:grid-cols-2">

@@ -34,7 +34,7 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Products</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {products.length} SKUs in the catalog. Editing UI ships in v2.1.
+          {products.length} SKUs listed. Editing UI ships in v2.1.
         </p>
       </div>
 
@@ -48,7 +48,7 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
         <Card>
           <CardContent className="text-muted-foreground flex flex-col items-center gap-3 p-12 text-center">
             <Package className="h-10 w-10 opacity-60" />
-            <p className="text-sm">No products in the catalog yet.</p>
+            <p className="text-sm">No products yet.</p>
             <p className="text-xs opacity-80">
               Run <code className="font-mono">make db-seed</code> if this is a fresh database.
             </p>

@@ -52,7 +52,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
             <div className="text-muted-foreground p-10 text-center text-sm">
               No orders yet. Start in the{' '}
               <Link href="/dashboard/catalog" className="text-primary hover:underline">
-                catalog
+                products
               </Link>
               .
             </div>

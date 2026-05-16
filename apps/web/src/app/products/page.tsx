@@ -8,9 +8,9 @@ import { listPublicProducts } from '@/lib/api/products';
 import { ApiError } from '@/lib/api-client';
 
 export const metadata: Metadata = {
-  title: 'Product Catalog',
+  title: 'Products',
   description:
-    'Browse the Parshlo therapeutic catalog. Wholesale pricing is reserved for verified B2B partners.',
+    'Browse Parshlo therapeutic products. Wholesale pricing is reserved for verified B2B partners.',
 };
 
 // ISR every 5 minutes — public catalog changes rarely; static for speed, fresh on push.
@@ -32,7 +32,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
     <div className="container py-16 md:py-20">
       <div className="mx-auto max-w-2xl text-center">
         <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary mb-4">
-          Public Catalog
+          Products
         </Badge>
         <h1 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
           Therapeutic Portfolio
@@ -44,7 +44,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
 
       {products.length === 0 ? (
         <div className="bg-secondary/40 text-muted-foreground mt-14 rounded-xl border p-8 text-center">
-          The catalog is being updated. Please check back shortly.
+          Products are being updated. Please check back shortly.
         </div>
       ) : (
         <PublicCatalogGrid products={products} />
@@ -53,7 +53,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
       <div className="bg-secondary/40 mt-14 rounded-xl border p-6 text-center md:p-10">
         <h2 className="font-display text-xl font-semibold">Looking for wholesale pricing?</h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          Get approved as a B2B partner to unlock pricing, MOQ, and live stock for the full catalog.
+          Get approved as a B2B partner to unlock pricing, MOQ, and live stock for all products.
         </p>
         <Button asChild className="mt-6">
           <Link href="/auth/register">Request B2B Access</Link>

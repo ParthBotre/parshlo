@@ -18,9 +18,9 @@ test.describe('Buyer happy path', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible();
 
-    await page.getByRole('link', { name: /catalog/i }).click();
+    await page.getByRole('link', { name: /products/i }).click();
     await expect(page).toHaveURL(/\/dashboard\/catalog$/);
-    await expect(page.getByRole('heading', { name: /catalog/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /products/i })).toBeVisible();
 
     const firstAddButton = page.getByRole('button', { name: /add to cart/i }).first();
     await firstAddButton.click();

@@ -58,10 +58,10 @@ const FEATURES = [
 ] as const;
 
 const STATS = [
-  { value: '25+', label: 'Years in Pharma Industry' },
-  { value: '850+', label: 'Verified B2B partners' },
+  { value: '23', label: 'Years in Pharma Industry' },
+  { value: '100', label: 'Verified B2B partners' },
   { value: '28', label: 'States served' },
-  { value: '99.7%', label: 'On-time dispatch rate' },
+  { value: '100%', label: 'On-time dispatch rate' },
 ] as const;
 
 export default function HomePage(): JSX.Element {
@@ -78,21 +78,21 @@ export default function HomePage(): JSX.Element {
               <ShieldCheck className="h-3.5 w-3.5" /> Strictly B2B · Not for retail sale
             </Badge>
             <h1 className="tracking-display-tight font-display text-balance text-5xl font-bold leading-[1.05] md:text-7xl">
-              The wholesale platform for{' '}
+              The ultimate platform for{' '}
               <span className="from-primary via-primary to-brand-300 bg-gradient-to-br bg-clip-text text-transparent">
-                pharmaceutical distributors.
+                Pharmaceutical Supply Chain.
               </span>
             </h1>
             <p className="text-muted-foreground max-w-xl text-balance text-lg leading-relaxed md:text-xl">
-              Parshlo manufactures WHO-GMP certified formulations and supplies authorized partners
-              across India through a secure, audit-trailed ordering platform.
+              Parshlo supplies FSSAI and CDSCO certified formulations and supplies authorized
+              partners across India through a secure, audit-trailed ordering platform.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Button asChild size="xl">
-                <Link href="/auth/register">Request B2B Access</Link>
+                <Link href="/products">View Products</Link>
               </Button>
               <Button asChild size="xl" variant="outline">
-                <Link href="/products">View Catalog</Link>
+                <Link href="/auth/register">Request B2B Access</Link>
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">

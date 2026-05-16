@@ -50,7 +50,7 @@ export default async function DashboardOverview(): Promise<JSX.Element> {
         </div>
         <Button asChild>
           <Link href="/dashboard/catalog">
-            Browse catalog <ArrowRight className="ml-1 h-4 w-4" />
+            Browse products <ArrowRight className="ml-1 h-4 w-4" />
           </Link>
         </Button>
       </div>
@@ -81,7 +81,7 @@ export default async function DashboardOverview(): Promise<JSX.Element> {
             <div className="text-muted-foreground border-t p-10 text-center text-sm">
               No orders yet — head to the{' '}
               <Link href="/dashboard/catalog" className="text-primary hover:underline">
-                catalog
+                products
               </Link>{' '}
               to place your first one.
             </div>

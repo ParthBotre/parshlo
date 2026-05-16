@@ -75,7 +75,7 @@ export function AdminPlaceOrderPanel({
             <h2 className="font-display text-lg font-semibold">Place order for buyer</h2>
             <p className="text-muted-foreground mt-1 text-sm">
               Choose the buyer account this order will be billed to, then add products from the
-              catalog below.
+              products below.
             </p>
           </div>
           <label className="block space-y-1.5">
