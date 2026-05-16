@@ -28,8 +28,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="container py-8 md:py-12">
-      <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+    <div className="container px-4 py-6 sm:px-6 md:py-12">
+      <div className="grid gap-6 md:grid-cols-[220px_1fr] md:gap-8">
         <aside className="md:sticky md:top-24 md:self-start">
           <div className="bg-primary/5 mb-4 rounded-lg border p-3">
             <p className="text-primary text-xs uppercase tracking-wider">Admin Console</p>

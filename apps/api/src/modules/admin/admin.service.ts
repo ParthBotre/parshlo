@@ -83,6 +83,11 @@ export class AdminService {
       accountStatus: u.accountStatus,
       businessName: u.businessProfile?.businessName ?? null,
       gstin: u.businessProfile?.gstin ?? null,
+      mobile: u.businessProfile?.mobile ?? null,
+      businessType: u.businessProfile?.businessType ?? null,
+      drugLicenseNumber: u.businessProfile?.drugLicenseNumber ?? null,
+      city: u.businessProfile?.city ?? null,
+      state: u.businessProfile?.state ?? null,
       createdAt: u.createdAt.toISOString(),
     }));
   }

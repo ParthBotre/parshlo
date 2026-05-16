@@ -81,6 +81,11 @@ const AdminBuyerRow = z.object({
   accountStatus: z.string(),
   businessName: z.string().nullable(),
   gstin: z.string().nullable(),
+  mobile: z.string().nullable(),
+  businessType: z.string().nullable(),
+  drugLicenseNumber: z.string().nullable(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
   createdAt: z.string(),
 });
 const AdminBuyerList = z.array(AdminBuyerRow);
@@ -138,7 +143,7 @@ export function listAllOrders(
   accessToken: string,
   filters: { status?: string } = {},
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
-): Promise<z.infer<typeof AdminOrderList>> {
+) {
   const search = filters.status ? `?status=${encodeURIComponent(filters.status)}` : '';
   return apiCall(`/v1/admin/orders${search}`, AdminOrderList, {
     method: 'GET',
@@ -151,7 +156,7 @@ export function getAdminOrder(
   accessToken: string,
   id: string,
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
-): Promise<z.infer<typeof OrderView>> {
+) {
   return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, OrderView, {
     method: 'GET',
     accessToken,
@@ -176,7 +181,7 @@ export function placeOrderOnBehalf(
   accessToken: string,
   input: PlaceOrderOnBehalfInput,
   options: Pick<ApiCallOptions, 'baseUrl'> = {},
-): Promise<z.infer<typeof OrderView>> {
+) {
   return apiCall('/v1/admin/orders', OrderView, {
     method: 'POST',
     accessToken,

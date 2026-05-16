@@ -86,7 +86,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
             </div>
           ) : (
             <div className="mt-4 overflow-x-auto pb-1">
-              <ol className="flex min-w-max gap-6 px-1">
+              <ol className="flex w-full justify-between gap-6 px-1">
                 {STAGES.map((stage, idx) => {
                   const done = idx <= stageIdx;
                   const active = idx === stageIdx;

@@ -51,7 +51,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Orders</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">Orders</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Operations view across every buyer. Click an order to drill in.
         </p>
@@ -81,48 +81,57 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
           {orders.length === 0 ? (
             <p className="text-muted-foreground p-10 text-center text-sm">No orders match.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-3">Order #</th>
-                  <th className="px-5 py-3">Buyer</th>
-                  <th className="px-5 py-3">GSTIN</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Placed</th>
-                  <th className="px-5 py-3 text-right">Total</th>
-                  <th className="px-5 py-3">Shipment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-accent/40 border-t">
-                    <td className="px-5 py-3">
-                      <Link href={`/admin/orders/${o.id}`} className="font-medium hover:underline">
-                        {o.orderNumber}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3">{o.buyerBusinessName}</td>
-                    <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
-                      {o.buyerGstin}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge variant="secondary">{orderStatusLabel(o.status as OrderStatus)}</Badge>
-                    </td>
-                    <td className="text-muted-foreground px-5 py-3">
-                      {new Date(o.placedAt).toLocaleDateString('en-IN')}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono">{formatINR(o.totalPaise)}</td>
-                    <td className="px-5 py-3">
-                      <CourierTrackingCell
-                        courierService={o.courierService ?? null}
-                        courierDocketNumber={o.courierDocketNumber ?? null}
-                        courierTrackingUpdatedAt={o.courierTrackingUpdatedAt ?? null}
-                      />
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="whitespace-nowrap px-4 py-3">Order #</th>
+                    <th className="whitespace-nowrap px-4 py-3">Buyer</th>
+                    <th className="whitespace-nowrap px-4 py-3">GSTIN</th>
+                    <th className="whitespace-nowrap px-4 py-3">Status</th>
+                    <th className="whitespace-nowrap px-4 py-3">Placed</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right">Total</th>
+                    <th className="whitespace-nowrap px-4 py-3">Shipment</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={o.id} className="hover:bg-accent/40 border-t">
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Link
+                          href={`/admin/orders/${o.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {o.orderNumber}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">{o.buyerBusinessName}</td>
+                      <td className="text-muted-foreground whitespace-nowrap px-4 py-3 font-mono text-xs">
+                        {o.buyerGstin}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Badge variant="secondary">
+                          {orderStatusLabel(o.status as OrderStatus)}
+                        </Badge>
+                      </td>
+                      <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
+                        {new Date(o.placedAt).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
+                        {formatINR(o.totalPaise)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <CourierTrackingCell
+                          courierService={o.courierService ?? null}
+                          courierDocketNumber={o.courierDocketNumber ?? null}
+                          courierTrackingUpdatedAt={o.courierTrackingUpdatedAt ?? null}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

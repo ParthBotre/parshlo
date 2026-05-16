@@ -195,34 +195,36 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3">Product</th>
-                <th className="px-5 py-3 text-right">Qty</th>
-                <th className="px-5 py-3 text-right">Unit</th>
-                <th className="px-5 py-3 text-right">GST</th>
-                <th className="px-5 py-3 text-right">Line total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((line) => (
-                <tr key={line.productId} className="border-t">
-                  <td className="px-5 py-3">{line.productName}</td>
-                  <td className="px-5 py-3 text-right font-mono">{line.quantity}</td>
-                  <td className="px-5 py-3 text-right font-mono">
-                    {formatINR(line.unitPricePaise)}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 text-right font-mono">
-                    {formatINR(line.lineGstPaise)}
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono">
-                    {formatINR(line.lineTotalPaise)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3">Product</th>
+                  <th className="px-5 py-3 text-right">Qty</th>
+                  <th className="px-5 py-3 text-right">Unit</th>
+                  <th className="px-5 py-3 text-right">GST</th>
+                  <th className="px-5 py-3 text-right">Line total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {order.items.map((line) => (
+                  <tr key={line.productId} className="border-t">
+                    <td className="px-5 py-3">{line.productName}</td>
+                    <td className="px-5 py-3 text-right font-mono">{line.quantity}</td>
+                    <td className="px-5 py-3 text-right font-mono">
+                      {formatINR(line.unitPricePaise)}
+                    </td>
+                    <td className="text-muted-foreground px-5 py-3 text-right font-mono">
+                      {formatINR(line.lineGstPaise)}
+                    </td>
+                    <td className="px-5 py-3 text-right font-mono">
+                      {formatINR(line.lineTotalPaise)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>
