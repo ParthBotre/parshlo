@@ -68,6 +68,9 @@ export type CourierService = z.infer<typeof CourierService>;
 export const UpdateCourierTrackingInput = z.object({
   courierService: CourierService,
   docketNumber: z.string().trim().min(1).max(80),
+  freightAmountPaise: z.number().int().nonnegative(),
+  weightKg: z.number().positive().optional(),
+  boxCount: z.number().int().positive().default(1),
 });
 export type UpdateCourierTrackingInput = z.infer<typeof UpdateCourierTrackingInput>;
 

@@ -1,5 +1,5 @@
 import { ApiErrorResponse } from '@parshlo/types';
-import { z, type ZodSchema } from 'zod';
+import { z, type ZodType, type ZodTypeAny } from 'zod';
 
 /**
  * Typed API client for the Parshlo NestJS backend.
@@ -40,11 +40,11 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiCall<T>(
+export async function apiCall<TOutput, TDef extends z.ZodTypeDef, TInput>(
   path: string,
-  schema: ZodSchema<T>,
+  schema: ZodType<TOutput, TDef, TInput>,
   options: ApiCallOptions = {},
-): Promise<T> {
+): Promise<TOutput> {
   const url = new URL(path, options.baseUrl ?? DEFAULT_BASE).toString();
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -106,7 +106,7 @@ export async function apiCall<T>(
     if (empty.success) {
       return empty.data;
     }
-    return undefined as T;
+    return undefined as TOutput;
   }
 
   const json: unknown = await res.json();
@@ -118,7 +118,7 @@ export async function apiCall<T>(
 }
 
 /** Helper for endpoints that return a paginated envelope. */
-export function PaginatedOf<T extends ZodSchema>(item: T) {
+export function PaginatedOf<T extends ZodTypeAny>(item: T) {
   return z.object({
     data: z.array(item),
     meta: z.object({

@@ -13,7 +13,7 @@ const Schema = z.object({
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),
-  S3_BUCKET_INVOICES: z.string().default('parshlo-invoices'),
+  S3_BUCKET_INVOICES: z.string().default('parshlo-invoices-dev'),
   WORKER_CONCURRENCY_EMAIL: z.coerce.number().int().min(1).default(10),
   WORKER_CONCURRENCY_INVOICE: z.coerce.number().int().min(1).default(4),
   WORKER_CONCURRENCY_KYC: z.coerce.number().int().min(1).default(4),

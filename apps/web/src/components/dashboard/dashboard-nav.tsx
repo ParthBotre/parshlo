@@ -8,6 +8,7 @@ import {
   PackageSearch,
   ScrollText,
   ShoppingCart,
+  Truck,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -26,6 +27,7 @@ const ICONS = {
   products: Package,
   catalog: PackageSearch,
   'place-order': ShoppingCart,
+  logistics: Truck,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconKey = keyof typeof ICONS;

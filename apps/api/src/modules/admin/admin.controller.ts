@@ -13,9 +13,11 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
+  AdminCreateBuyerInputSchema,
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
   UpdateCourierTrackingInput,
+  type AdminCreateBuyerInput,
   type AuthPrincipal,
   type OrderStatus,
   type OrderView,
@@ -153,11 +155,32 @@ export class AdminController {
     return this.orderService.updateCourierTracking(orderId, {
       courierService: body.courierService,
       docketNumber: body.docketNumber,
+      freightAmountPaise: body.freightAmountPaise,
+      weightKg: body.weightKg,
+      boxCount: body.boxCount,
     });
   }
 
   @Get('buyers')
   buyers(): ReturnType<AdminService['listBuyers']> {
     return this.admin.listBuyers();
+  }
+
+  @Post('buyers')
+  @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'buyer.create',
+    resource: 'User',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+    metadata: (_req, result) => ({ email: (result as { email?: string }).email }),
+  })
+  createBuyer(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(AdminCreateBuyerInputSchema))
+    body: AdminCreateBuyerInput,
+  ): ReturnType<AdminService['createBuyer']> {
+    return this.admin.createBuyer(body, user.userId);
   }
 }

@@ -125,7 +125,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
                 Shipment tracking
               </h2>
-              <CourierTrackingForm orderId={order.id} existing={order.courierTracking} />
+              <CourierTrackingForm orderId={order.id} existing={order.courierTracking ?? null} />
             </CardContent>
           </Card>
           {/* Courier receipt upload (disabled — kept for possible re-enable)
@@ -199,25 +199,29 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
             <table className="w-full text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
-                  <th className="px-5 py-3">Product</th>
-                  <th className="px-5 py-3 text-right">Qty</th>
-                  <th className="px-5 py-3 text-right">Unit</th>
-                  <th className="px-5 py-3 text-right">GST</th>
-                  <th className="px-5 py-3 text-right">Line total</th>
+                  <th className="whitespace-nowrap px-5 py-3">Product</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Qty</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Unit</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">GST</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Line total</th>
                 </tr>
               </thead>
               <tbody>
                 {order.items.map((line) => (
                   <tr key={line.productId} className="border-t">
-                    <td className="px-5 py-3">{line.productName}</td>
-                    <td className="px-5 py-3 text-right font-mono">{line.quantity}</td>
-                    <td className="px-5 py-3 text-right font-mono">
+                    <td className="max-w-[160px] truncate px-5 py-3 sm:max-w-none">
+                      {line.productName}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
+                      {line.quantity}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.unitPricePaise)}
                     </td>
-                    <td className="text-muted-foreground px-5 py-3 text-right font-mono">
+                    <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.lineGstPaise)}
                     </td>
-                    <td className="px-5 py-3 text-right font-mono">
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.lineTotalPaise)}
                     </td>
                   </tr>

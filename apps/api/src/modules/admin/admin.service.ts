@@ -1,11 +1,56 @@
-import { Injectable } from '@nestjs/common';
-import { type OrderStatus } from '@parshlo/types';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { type AdminCreateBuyerInput, type OrderStatus } from '@parshlo/types';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toBuyerRow(user: {
+    id: string;
+    email: string;
+    fullName: string;
+    accountStatus: string;
+    createdAt: Date;
+    businessProfile: {
+      businessName: string;
+      gstin: string;
+      mobile: string;
+      businessType: string;
+      drugLicenseNumber: string;
+      city: string;
+      state: string;
+    } | null;
+  }): {
+    id: string;
+    email: string;
+    fullName: string;
+    accountStatus: string;
+    businessName: string | null;
+    gstin: string | null;
+    mobile: string | null;
+    businessType: string | null;
+    drugLicenseNumber: string | null;
+    city: string | null;
+    state: string | null;
+    createdAt: string;
+  } {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      accountStatus: user.accountStatus,
+      businessName: user.businessProfile?.businessName ?? null,
+      gstin: user.businessProfile?.gstin ?? null,
+      mobile: user.businessProfile?.mobile ?? null,
+      businessType: user.businessProfile?.businessType ?? null,
+      drugLicenseNumber: user.businessProfile?.drugLicenseNumber ?? null,
+      city: user.businessProfile?.city ?? null,
+      state: user.businessProfile?.state ?? null,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
 
   async listAllOrders(filters: { status?: OrderStatus; take?: number }): Promise<
     {
@@ -76,20 +121,81 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      fullName: u.fullName,
-      accountStatus: u.accountStatus,
-      businessName: u.businessProfile?.businessName ?? null,
-      gstin: u.businessProfile?.gstin ?? null,
-      mobile: u.businessProfile?.mobile ?? null,
-      businessType: u.businessProfile?.businessType ?? null,
-      drugLicenseNumber: u.businessProfile?.drugLicenseNumber ?? null,
-      city: u.businessProfile?.city ?? null,
-      state: u.businessProfile?.state ?? null,
-      createdAt: u.createdAt.toISOString(),
-    }));
+    return users.map((u) => this.toBuyerRow(u));
+  }
+
+  async createBuyer(
+    input: AdminCreateBuyerInput,
+    actorId: string,
+  ): Promise<Awaited<ReturnType<AdminService['listBuyers']>>[number]> {
+    const email = input.businessEmail.trim().toLowerCase();
+    const gstin = input.gstin.trim().toUpperCase();
+
+    const [existingUser, existingProfile] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email } }),
+      this.prisma.businessProfile.findUnique({ where: { gstin } }),
+    ]);
+
+    if (existingUser && !existingUser.deletedAt) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message: 'A user with this email already exists.',
+      });
+    }
+
+    if (existingProfile) {
+      throw new ConflictException({
+        code: 'GSTIN_ALREADY_REGISTERED',
+        message: 'A business with this GSTIN has already registered.',
+      });
+    }
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          auth0Id: `pending|${email}`,
+          email,
+          fullName: input.ownerName,
+          roles: ['BUYER'],
+          accountStatus: input.accountStatus,
+          businessProfile: {
+            create: {
+              businessName: input.businessName,
+              businessType: input.businessType,
+              gstin,
+              pan: input.pan?.trim() ? input.pan.trim().toUpperCase() : null,
+              drugLicenseNumber: input.drugLicenseNumber,
+              pharmacyRegistrationNumber: input.pharmacyRegistrationNumber ?? null,
+              mobile: input.mobile,
+              businessEmail: email,
+              addressLine1: input.address.line1,
+              addressLine2: input.address.line2 ?? null,
+              city: input.address.city,
+              state: input.address.state,
+              pin: input.address.pin,
+              country: input.address.country,
+            },
+          },
+        },
+        include: { businessProfile: true },
+      });
+
+      if (input.accountStatus === 'APPROVED') {
+        await tx.kycApplication.create({
+          data: {
+            userId: created.id,
+            status: 'APPROVED',
+            reviewedAt: new Date(),
+            reviewedById: actorId,
+            reviewerNote: 'Created and approved by admin.',
+          },
+        });
+      }
+
+      return created;
+    });
+
+    return this.toBuyerRow(user);
   }
 
   async listPendingKyc(): Promise<

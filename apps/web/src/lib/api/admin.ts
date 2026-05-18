@@ -1,4 +1,9 @@
-import { ApiErrorResponse, OrderView, type PlaceOrderOnBehalfInput } from '@parshlo/types';
+import {
+  ApiErrorResponse,
+  OrderView,
+  type AdminCreateBuyerInput,
+  type PlaceOrderOnBehalfInput,
+} from '@parshlo/types';
 import { z } from 'zod';
 
 import { apiCall, ApiError, type ApiCallOptions } from '../api-client';
@@ -177,6 +182,19 @@ export function listAllBuyers(
 
 export type AdminBuyer = z.infer<typeof AdminBuyerRow>;
 
+export function createBuyer(
+  accessToken: string,
+  input: AdminCreateBuyerInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminBuyer> {
+  return apiCall('/v1/admin/buyers', AdminBuyerRow, {
+    method: 'POST',
+    accessToken,
+    body: input,
+    ...options,
+  });
+}
+
 export function placeOrderOnBehalf(
   accessToken: string,
   input: PlaceOrderOnBehalfInput,
@@ -235,4 +253,82 @@ export async function placeOrderOnBehalfFromBrowser(
 
   const json: unknown = await res.json();
   return OrderView.parse(json);
+}
+
+// ─── Logistics Finance API ────────────────────────────────────────────────────
+
+const CourierPartnerRow = z.object({
+  id: z.string(),
+  name: z.string(),
+  isActive: z.boolean(),
+});
+export const CourierPartnerList = z.array(CourierPartnerRow);
+export type CourierPartner = z.infer<typeof CourierPartnerRow>;
+
+export const ConsignmentRow = z.object({
+  id: z.string(),
+  courierId: z.string(),
+  courier: z.object({ name: z.string() }),
+  type: z.string(),
+  docketNumber: z.string(),
+  consignmentDate: z.string(),
+  amountPaise: z.union([z.string(), z.number()]),
+  weightKg: z.number().nullable(),
+  boxCount: z.number(),
+  status: z.string(),
+  statementId: z.string().nullable(),
+  statement: z.object({ status: z.string() }).nullable().optional(),
+  associatedOrderNumber: z.string().nullable(),
+  associatedPoNumber: z.string().nullable(),
+});
+export const ConsignmentList = z.array(ConsignmentRow);
+export type Consignment = z.infer<typeof ConsignmentRow>;
+
+export const StatementRow = z.object({
+  id: z.string(),
+  courierId: z.string(),
+  courier: z.object({ name: z.string() }),
+  statementInvoiceNumber: z.string(),
+  billingPeriodStart: z.string(),
+  billingPeriodEnd: z.string(),
+  courierChargedTotalPaise: z.union([z.string(), z.number()]),
+  systemCalculatedTotalPaise: z.union([z.string(), z.number()]),
+  status: z.string(),
+  note: z.string().nullable(),
+  _count: z.object({ consignments: z.number() }),
+});
+export const StatementList = z.array(StatementRow);
+export type LogisticsStatement = z.infer<typeof StatementRow>;
+
+export function listCourierPartners(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<CourierPartner[]> {
+  return apiCall('/v1/admin/finance/logistics/couriers', CourierPartnerList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function listLogisticsConsignments(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<Consignment[]> {
+  return apiCall('/v1/admin/finance/logistics/consignments', ConsignmentList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function listLogisticsStatements(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<LogisticsStatement[]> {
+  return apiCall('/v1/admin/finance/logistics/statements', StatementList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
 }

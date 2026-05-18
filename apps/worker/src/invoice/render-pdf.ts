@@ -1,6 +1,6 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-
 import { createHash } from 'node:crypto';
+
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 interface InvoiceItem {
   productName: string;
@@ -41,7 +41,9 @@ export interface InvoiceData {
  * The format is intentionally minimal — single column, mono-priced — so it's
  * Outlook-safe and easy to verify against state GST portal data.
  */
-export async function renderInvoicePdf(data: InvoiceData): Promise<{ bytes: Uint8Array; sha256: string }> {
+export async function renderInvoicePdf(
+  data: InvoiceData,
+): Promise<{ bytes: Uint8Array; sha256: string }> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
   const helv = await doc.embedFont(StandardFonts.Helvetica);
@@ -54,7 +56,10 @@ export async function renderInvoicePdf(data: InvoiceData): Promise<{ bytes: Uint
 
   const margin = 40;
   let y = 800;
-  const draw = (text: string, opts: { x?: number; size?: number; font?: typeof helv; color?: typeof black } = {}) => {
+  const draw = (
+    text: string,
+    opts: { x?: number; size?: number; font?: typeof helv; color?: typeof black } = {},
+  ) => {
     page.drawText(text, {
       x: opts.x ?? margin,
       y,
@@ -96,17 +101,46 @@ export async function renderInvoicePdf(data: InvoiceData): Promise<{ bytes: Uint
   y -= 22;
 
   for (const item of data.items) {
-    page.drawText(item.productName.slice(0, 44), { x: margin + 6, y, size: 9, font: helv, color: black });
+    page.drawText(item.productName.slice(0, 44), {
+      x: margin + 6,
+      y,
+      size: 9,
+      font: helv,
+      color: black,
+    });
     page.drawText(String(item.quantity), { x: margin + 290, y, size: 9, font: mono, color: black });
-    page.drawText(rupees(item.unitPricePaise), { x: margin + 330, y, size: 9, font: mono, color: black });
-    page.drawText(`${item.gstRate}% ${rupees(item.lineGstPaise)}`, { x: margin + 400, y, size: 8, font: mono, color: grey });
-    page.drawText(rupees(item.lineTotalPaise), { x: margin + 460, y, size: 9, font: mono, color: black });
+    page.drawText(rupees(item.unitPricePaise), {
+      x: margin + 330,
+      y,
+      size: 9,
+      font: mono,
+      color: black,
+    });
+    page.drawText(`${item.gstRate}% ${rupees(item.lineGstPaise)}`, {
+      x: margin + 400,
+      y,
+      size: 8,
+      font: mono,
+      color: grey,
+    });
+    page.drawText(rupees(item.lineTotalPaise), {
+      x: margin + 460,
+      y,
+      size: 9,
+      font: mono,
+      color: black,
+    });
     y -= 16;
   }
 
   // ---- Totals ----
   y -= 8;
-  page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: 555.28, y: y + 4 }, color: grey, thickness: 0.5 });
+  page.drawLine({
+    start: { x: margin, y: y + 4 },
+    end: { x: 555.28, y: y + 4 },
+    color: grey,
+    thickness: 0.5,
+  });
   y -= 14;
   drawRight(page, 'Subtotal', rupees(data.subtotalPaise), margin, y, mono, helv);
   y -= 14;
@@ -135,12 +169,24 @@ function drawBlock(
   x: number,
   y: number,
   label: string,
-  block: { name?: string; businessName?: string; gstin: string; addressLines: string[]; state: string },
+  block: {
+    name?: string;
+    businessName?: string;
+    gstin: string;
+    addressLines: string[];
+    state: string;
+  },
   black: ReturnType<typeof rgb>,
   grey: ReturnType<typeof rgb>,
 ): void {
   page.drawText(label, { x, y, size: 8, font: helvBold, color: grey });
-  page.drawText(block.name ?? block.businessName ?? '', { x, y: y - 14, size: 11, font: helvBold, color: black });
+  page.drawText(block.name ?? block.businessName ?? '', {
+    x,
+    y: y - 14,
+    size: 11,
+    font: helvBold,
+    color: black,
+  });
   let cy = y - 28;
   for (const line of block.addressLines) {
     page.drawText(line, { x, y: cy, size: 9, font: helv, color: black });

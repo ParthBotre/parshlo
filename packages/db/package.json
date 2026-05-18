@@ -39,7 +39,7 @@
   "devDependencies": {
     "@parshlo/config": "workspace:*",
     "@types/node": "22.10.5",
-    "dotenv-cli": "8.0.0",
+    "dotenv-cli": "7.4.4",
     "prisma": "5.22.0",
     "tsup": "8.5.1",
     "tsx": "4.22.0",

@@ -1,5 +1,6 @@
 import { type Metadata } from 'next';
 
+import { AdminBuyerCreateForm } from '@/components/admin/admin-buyer-create-form';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { listAllBuyers } from '@/lib/api/admin';
@@ -32,9 +33,19 @@ export default async function BuyersPage(): Promise<JSX.Element> {
       throw err;
     }
   }
+  const canCreateBuyer = session.user.roles.some(
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
+  );
+
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">Buyers</h1>
+      <div>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Buyers</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Register verified buyer accounts and manage approved B2B customers.
+        </p>
+      </div>
+      {canCreateBuyer ? <AdminBuyerCreateForm /> : null}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

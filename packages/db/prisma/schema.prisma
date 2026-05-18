@@ -473,3 +473,89 @@ model IdempotencyKey {
 
   @@index([expiresAt])
 }
+
+// -----------------------------------------------------------------------------
+// DECOUPLED LOGISTICS FINANCIAL AUDIT MODULE (ADMIN ONLY)
+// -----------------------------------------------------------------------------
+
+enum AdminLogisticsType {
+  INCOMING
+  OUTGOING
+}
+
+enum AuditMatchStatus {
+  UNBILLED
+  MATCHED
+  DISCREPANCY
+  MANUALLY_RESOLVED
+}
+
+enum AdminStatementStatus {
+  UNRECONCILED
+  RECONCILED
+  FLAGGED
+  PAID
+}
+
+model CourierPartner {
+  id       String  @id @default(cuid())
+  name     String
+  isActive Boolean @default(true)
+
+  consignments AdminConsignmentLog[]
+  statements   CourierLedgerStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminConsignmentLog {
+  id              String             @id @default(cuid())
+  courierId       String
+  courier         CourierPartner     @relation(fields: [courierId], references: [id], onDelete: Restrict)
+
+  type            AdminLogisticsType
+  docketNumber    String
+  consignmentDate DateTime
+
+  amountPaise BigInt
+  weightKg    Float?
+  boxCount    Int    @default(1)
+
+  status      AuditMatchStatus        @default(UNBILLED)
+  statementId String?
+  statement   CourierLedgerStatement? @relation(fields: [statementId], references: [id], onDelete: SetNull)
+
+  associatedPoNumber    String?
+  associatedOrderNumber String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courierId, docketNumber])
+  @@index([status])
+  @@index([docketNumber])
+}
+
+model CourierLedgerStatement {
+  id        String         @id @default(cuid())
+  courierId String
+  courier   CourierPartner @relation(fields: [courierId], references: [id], onDelete: Restrict)
+
+  statementInvoiceNumber     String
+  billingPeriodStart         DateTime
+  billingPeriodEnd           DateTime
+  courierChargedTotalPaise   BigInt
+  systemCalculatedTotalPaise BigInt
+
+  status AdminStatementStatus @default(UNRECONCILED)
+  note   String?
+
+  consignments AdminConsignmentLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courierId, statementInvoiceNumber])
+  @@index([status])
+}

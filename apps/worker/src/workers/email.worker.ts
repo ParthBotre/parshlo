@@ -5,13 +5,16 @@ import { Worker } from 'bullmq';
 import { type Redis } from 'ioredis';
 
 import { config } from '../config.js';
-import { createEmailTransport, type EmailTransport } from '../email/transport.js';
 import {
+  type KycDecisionData,
+  type OrderPlacedAdminData,
+  type OrderPlacedBuyerData,
   renderKycApproved,
   renderKycRejected,
   renderOrderPlacedAdmin,
   renderOrderPlacedBuyer,
 } from '../email/templates.js';
+import { createEmailTransport, type EmailTransport } from '../email/transport.js';
 
 export function createEmailWorker({
   connection,
@@ -33,13 +36,13 @@ export function createEmailWorker({
       const rendered = (() => {
         switch (data.kind) {
           case 'ORDER_PLACED_BUYER':
-            return renderOrderPlacedBuyer(data.data as Parameters<typeof renderOrderPlacedBuyer>[0]);
+            return renderOrderPlacedBuyer(data.data as unknown as OrderPlacedBuyerData);
           case 'ORDER_PLACED_ADMIN':
-            return renderOrderPlacedAdmin(data.data as Parameters<typeof renderOrderPlacedAdmin>[0]);
+            return renderOrderPlacedAdmin(data.data as unknown as OrderPlacedAdminData);
           case 'KYC_APPROVED':
-            return renderKycApproved(data.data as Parameters<typeof renderKycApproved>[0]);
+            return renderKycApproved(data.data as unknown as KycDecisionData);
           case 'KYC_REJECTED':
-            return renderKycRejected(data.data as Parameters<typeof renderKycRejected>[0]);
+            return renderKycRejected(data.data as unknown as KycDecisionData);
           case 'ORDER_STATUS_CHANGED':
             return {
               subject: data.subjectOverride ?? 'Order status updated',

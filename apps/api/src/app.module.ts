@@ -14,6 +14,7 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
+import { FinanceLogisticsModule } from './modules/finance-logistics/finance-logistics.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { InquiryModule } from './modules/inquiry/inquiry.module.js';
 import { KycModule } from './modules/kyc/kyc.module.js';
@@ -78,6 +79,7 @@ import { UserModule } from './modules/user/user.module.js';
     ProductModule,
     OrderModule,
     AdminModule,
+    FinanceLogisticsModule,
     InquiryModule,
   ],
   providers: [

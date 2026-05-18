@@ -17,6 +17,27 @@ import {
 } from '@/lib/courier-services';
 import { courierTrackingDateLabel } from '@/lib/courier-tracking-dates';
 
+function rupeesToPaise(input: string): number | null {
+  const trimmed = input.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    return null;
+  }
+
+  const [rupees = '0', paise = ''] = trimmed.split('.');
+  const value = Number(rupees) * 100 + Number(`${paise}00`.slice(0, 2));
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+function parsePositiveDecimal(input: string): number | null {
+  const trimmed = input.trim();
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
+    return null;
+  }
+
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export function CourierTrackingForm({
   orderId,
   existing,
@@ -27,6 +48,9 @@ export function CourierTrackingForm({
   const router = useRouter();
   const [service, setService] = useState<CourierService>(existing?.service ?? 'PROFESSIONAL');
   const [docket, setDocket] = useState(existing?.docketNumber ?? '');
+  const [freightAmount, setFreightAmount] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [boxCount, setBoxCount] = useState('1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +65,25 @@ export function CourierTrackingForm({
       setError('Enter a docket number.');
       return;
     }
+    const freightAmountPaise = rupeesToPaise(freightAmount);
+    if (freightAmountPaise == null) {
+      setError('Enter a valid cost/price with up to two decimal places.');
+      return;
+    }
+    const parsedWeightKg = weightKg.trim() ? parsePositiveDecimal(weightKg) : undefined;
+    if (parsedWeightKg === null) {
+      setError('Enter a valid shipment weight.');
+      return;
+    }
+    if (!/^\d+$/.test(boxCount.trim())) {
+      setError('Enter a valid box count.');
+      return;
+    }
+    const parsedBoxCount = Number.parseInt(boxCount, 10);
+    if (!Number.isFinite(parsedBoxCount) || parsedBoxCount <= 0) {
+      setError('Enter a valid box count.');
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -51,7 +94,13 @@ export function CourierTrackingForm({
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ courierService: service, docketNumber: trimmed }),
+        body: JSON.stringify({
+          courierService: service,
+          docketNumber: trimmed,
+          freightAmountPaise,
+          weightKg: parsedWeightKg,
+          boxCount: parsedBoxCount,
+        }),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => null)) as {
@@ -140,6 +189,41 @@ export function CourierTrackingForm({
           disabled={busy}
           onChange={(e) => setDocket(e.target.value)}
         />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-2">
+          <Label htmlFor="courier-freight">Cost/Price</Label>
+          <Input
+            id="courier-freight"
+            inputMode="decimal"
+            placeholder="100.49"
+            value={freightAmount}
+            disabled={busy}
+            onChange={(e) => setFreightAmount(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="courier-weight">Weight kg</Label>
+          <Input
+            id="courier-weight"
+            inputMode="decimal"
+            placeholder="Optional"
+            value={weightKg}
+            disabled={busy}
+            onChange={(e) => setWeightKg(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="courier-box-count">Boxes</Label>
+          <Input
+            id="courier-box-count"
+            inputMode="numeric"
+            value={boxCount}
+            disabled={busy}
+            onChange={(e) => setBoxCount(e.target.value)}
+          />
+        </div>
       </div>
 
       {error ? (

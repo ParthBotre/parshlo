@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { EntityId, Gstin, IndianMobile, IndianPin, IsoDateString, Pan } from './common.js';
-import { BusinessType } from './user.js';
+import { AccountStatus, BusinessType } from './user.js';
 
 /** Indian states & UTs (ISO-3166-2:IN codes). */
 export const IndianStateCode = z.enum([
@@ -85,6 +85,16 @@ export type RegisterBusinessInput = z.infer<typeof RegisterBusinessInput>;
  */
 export const B2BApplicationInputSchema = RegisterBusinessInput.omit({ documents: true });
 export type B2BApplicationInput = z.infer<typeof B2BApplicationInputSchema>;
+
+/** Admin-created buyer account. Staff can approve immediately or leave pending. */
+export const AdminCreateBuyerInputSchema = B2BApplicationInputSchema.extend({
+  accountStatus: AccountStatus.extract([
+    'PENDING_VERIFICATION',
+    'UNDER_REVIEW',
+    'APPROVED',
+  ]).default('APPROVED'),
+});
+export type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
 
 /** KYC document types we accept. */
 export const KycDocumentType = z.enum([

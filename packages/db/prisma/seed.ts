@@ -75,7 +75,29 @@ async function main(): Promise<void> {
   await prisma.orderStatusEvent.deleteMany({});
   await prisma.order.deleteMany({});
   await prisma.product.deleteMany({});
+
+  // additional Delivery  and Consignment and Ledger Updates
+  await prisma.adminConsignmentLog.deleteMany({});
+  await prisma.courierLedgerStatement.deleteMany({});
+  await prisma.courierPartner.deleteMany({});
+
   console.log('  ✓ Cleared existing products/orders/invoices');
+
+  // courier providers
+  const couriers = [
+    { id: 'cld001profess00000000001', name: 'Professional Couriers' },
+    { id: 'cld002tej0000000000000002', name: 'Tej Couriers' },
+    { id: 'cld003mark0000000000000003', name: 'Mark Couriers' },
+  ];
+
+  for (const c of couriers) {
+    await prisma.courierPartner.upsert({
+      where: { id: c.id },
+      update: { name: c.name, isActive: true },
+      create: { id: c.id, name: c.name, isActive: true },
+    });
+  }
+  console.log('  ✓ Seeded baseline logistics operational courier providers');
 
   // ----- Admin user -----
   const admin = await prisma.user.upsert({

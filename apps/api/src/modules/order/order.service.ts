@@ -39,6 +39,12 @@ const GST_RATE_BASIS: Record<PrismaGstRate, bigint> = {
   TWENTYEIGHT: 2800n,
 };
 
+const COURIER_PARTNER_NAMES: Record<'PROFESSIONAL' | 'MARK' | 'TEJ', string> = {
+  PROFESSIONAL: 'Professional Couriers',
+  MARK: 'Mark Couriers',
+  TEJ: 'Tej Couriers',
+};
+
 @Injectable()
 export class OrderService {
   private readonly log = new Logger(OrderService.name);
@@ -303,26 +309,97 @@ export class OrderService {
 
   async updateCourierTracking(
     orderId: string,
-    input: { courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ'; docketNumber: string },
+    input: {
+      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ';
+      docketNumber: string;
+      freightAmountPaise: number;
+      weightKg?: number;
+      boxCount: number;
+    },
   ): Promise<OrderView> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-    if (!order) {
-      throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
-    }
-
     const now = new Date();
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        courierService: input.courierService,
-        courierDocketNumber: input.docketNumber,
-        courierTrackingUpdatedAt: now,
-        ...(order.courierTrackingSetAt == null ? { courierTrackingSetAt: now } : {}),
-      },
-      include: { items: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!order) {
+        throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
+      }
+
+      const courierName = COURIER_PARTNER_NAMES[input.courierService];
+      const courier =
+        (await tx.courierPartner.findFirst({ where: { name: courierName, isActive: true } })) ??
+        (await tx.courierPartner.create({ data: { name: courierName } }));
+
+      const existingForOrder = await tx.adminConsignmentLog.findFirst({
+        where: { type: 'OUTGOING', associatedOrderNumber: order.orderNumber },
+      });
+      if (existingForOrder?.statementId) {
+        throw new BadRequestException({
+          code: 'CONSIGNMENT_ALREADY_RECONCILED',
+          message:
+            'This shipment is already tied to a logistics statement. Resolve finance reconciliation before editing courier details.',
+        });
+      }
+
+      const docketOwner = await tx.adminConsignmentLog.findUnique({
+        where: {
+          courierId_docketNumber: {
+            courierId: courier.id,
+            docketNumber: input.docketNumber,
+          },
+        },
+      });
+      if (docketOwner && docketOwner.id !== existingForOrder?.id) {
+        throw new ConflictException({
+          code: 'DOCKET_ALREADY_EXISTS',
+          message: 'This courier docket is already logged in logistics.',
+        });
+      }
+
+      const trackingSetAt = order.courierTrackingSetAt ?? now;
+      const consignmentDate = order.dispatchedAt ?? trackingSetAt;
+
+      if (existingForOrder) {
+        await tx.adminConsignmentLog.update({
+          where: { id: existingForOrder.id },
+          data: {
+            courierId: courier.id,
+            docketNumber: input.docketNumber,
+            consignmentDate,
+            amountPaise: BigInt(input.freightAmountPaise),
+            weightKg: input.weightKg,
+            boxCount: input.boxCount,
+            associatedPoNumber: order.purchaseOrderNumber,
+          },
+        });
+      } else {
+        await tx.adminConsignmentLog.create({
+          data: {
+            courierId: courier.id,
+            type: 'OUTGOING',
+            docketNumber: input.docketNumber,
+            consignmentDate,
+            amountPaise: BigInt(input.freightAmountPaise),
+            weightKg: input.weightKg,
+            boxCount: input.boxCount,
+            associatedOrderNumber: order.orderNumber,
+            associatedPoNumber: order.purchaseOrderNumber,
+          },
+        });
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          courierService: input.courierService,
+          courierDocketNumber: input.docketNumber,
+          courierTrackingUpdatedAt: now,
+          ...(order.courierTrackingSetAt == null ? { courierTrackingSetAt: now } : {}),
+        },
+        include: { items: true },
+      });
     });
 
     return this.toView(updated, updated.items);

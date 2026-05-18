@@ -470,8 +470,8 @@ importers:
         specifier: 22.10.5
         version: 22.10.5
       dotenv-cli:
-        specifier: 8.0.0
-        version: 8.0.0
+        specifier: 7.4.4
+        version: 7.4.4
       prisma:
         specifier: 5.22.0
         version: 5.22.0
@@ -4655,8 +4655,8 @@ packages:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
     engines: {node: '>=8'}
 
-  dotenv-cli@8.0.0:
-    resolution: {integrity: sha512-aLqYbK7xKOiTMIRf1lDPbI+Y+Ip/wo5k3eyp6ePysVaSqbyxjyK3dK35BTxG+rmd7djf5q2UPs4noPNH+cj0Qw==}
+  dotenv-cli@7.4.4:
+    resolution: {integrity: sha512-XkBYCG0tPIes+YZr4SpfFv76SQrV/LeCE8CI7JSEMi3VR9MvTihCGTOtbIexD6i2mXF+6px7trb1imVCXSNMDw==}
     hasBin: true
 
   dotenv-expand@10.0.0:
@@ -12758,7 +12758,7 @@ snapshots:
     dependencies:
       is-obj: 2.0.0
 
-  dotenv-cli@8.0.0:
+  dotenv-cli@7.4.4:
     dependencies:
       cross-spawn: 7.0.6
       dotenv: 16.4.5
