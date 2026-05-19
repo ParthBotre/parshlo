@@ -244,6 +244,13 @@ export const DEV_PERSONAS = {
     fullName: 'Parshlo Admin',
     roles: ['ADMIN'] as RoleType[],
   },
+  manager: {
+    auth0Id: 'dev|manager',
+    userId: '__dev_manager__',
+    email: 'manager@parshlo.local',
+    fullName: 'Parshlo Sales Manager',
+    roles: ['SALES_MANAGER'] as RoleType[],
+  },
   buyer: {
     auth0Id: 'dev|buyer',
     userId: '__dev_buyer__',

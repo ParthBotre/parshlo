@@ -33,6 +33,7 @@ export class FinanceLogisticsController {
   @Post('couriers')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   createCourier(
     @Body(new ZodValidationPipe(CreateCourierPartnerSchema)) body: CreateCourierPartnerInput,
   ): ReturnType<FinanceLogisticsService['createCourierPartner']> {
@@ -54,6 +55,7 @@ export class FinanceLogisticsController {
   @Post('consignments')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   logConsignment(
     @Body(new ZodValidationPipe(CreateConsignmentSchema)) body: CreateConsignmentInput,
   ): ReturnType<FinanceLogisticsService['logConsignment']> {
@@ -62,6 +64,7 @@ export class FinanceLogisticsController {
 
   @Patch('consignments/:id/resolve')
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   resolveConsignment(
     @Param('id') id: string,
   ): ReturnType<FinanceLogisticsService['updateConsignmentStatus']> {
@@ -81,6 +84,7 @@ export class FinanceLogisticsController {
   @Post('statements/reconcile')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   reconcile(
     @Body(new ZodValidationPipe(CreateMonthlyStatementSchema)) body: CreateMonthlyStatementInput,
   ): ReturnType<FinanceLogisticsService['reconcileStatement']> {
@@ -89,6 +93,7 @@ export class FinanceLogisticsController {
 
   @Patch('statements/:id/mark-paid')
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   markPaid(@Param('id') id: string): ReturnType<FinanceLogisticsService['markStatementPaid']> {
     return this.service.markStatementPaid(id);
   }

@@ -358,7 +358,9 @@ model OrderItem {
 
   productNameSnapshot String  // immutable snapshot for invoice integrity
   quantity            Int
+  schemeFreeQuantity  Int    @default(0)
   unitPricePaise      BigInt
+  discountPaise       BigInt @default(0)
   gstRate             GstRate
   lineSubtotalPaise   BigInt
   lineGstPaise        BigInt

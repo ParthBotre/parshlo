@@ -35,7 +35,12 @@ export function CartDrawer({
     setSubmitting(true);
     try {
       const order = await placeOrderFromBrowser({
-        items: cart.lines.map((l) => ({ productId: l.productId, quantity: l.qty })),
+        items: cart.lines.map((l) => ({
+          productId: l.productId,
+          quantity: l.qty,
+          schemeFreeQuantity: 0,
+          discountPaise: 0,
+        })),
         purchaseOrderNumber: poNumber.trim() || undefined,
         notes: notes.trim() || undefined,
       });

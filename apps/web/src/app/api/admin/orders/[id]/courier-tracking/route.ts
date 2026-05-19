@@ -6,7 +6,7 @@ import { updateCourierTracking } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
-const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
+const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 export async function PATCH(
   req: Request,

@@ -1,5 +1,5 @@
 import { type OrderStatus } from '@parshlo/types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
@@ -88,6 +88,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
   const shipmentRecordedLabel = order.courierTracking
     ? courierTrackingDateLabel(order.courierTracking.bookedAt, order.courierTracking.updatedAt)
     : null;
+  const canApproveOrClose = session.user.roles.some(
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
+  );
+  const canManageShipment = canApproveOrClose;
 
   return (
     <div className="space-y-6">
@@ -107,7 +111,14 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
             Placed {formatDateTimeIst(order.placedAt)}
           </p>
         </div>
-        <Badge variant={statusBadgeVariant(order.status)}>{orderStatusLabel(order.status)}</Badge>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <a href={`/api/admin/orders/${order.id}/csv`}>
+              <Download className="h-4 w-4" /> CSV
+            </a>
+          </Button>
+          <Badge variant={statusBadgeVariant(order.status)}>{orderStatusLabel(order.status)}</Badge>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -117,7 +128,11 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
                 Update status
               </h2>
-              <OrderStatusActions orderId={order.id} status={order.status} />
+              <OrderStatusActions
+                orderId={order.id}
+                status={order.status}
+                canApproveOrClose={canApproveOrClose}
+              />
             </CardContent>
           </Card>
           <Card>
@@ -125,7 +140,11 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
                 Shipment tracking
               </h2>
-              <CourierTrackingForm orderId={order.id} existing={order.courierTracking ?? null} />
+              <CourierTrackingForm
+                orderId={order.id}
+                existing={order.courierTracking ?? null}
+                canEdit={canManageShipment}
+              />
             </CardContent>
           </Card>
           {/* Courier receipt upload (disabled — kept for possible re-enable)
@@ -201,7 +220,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                 <tr>
                   <th className="whitespace-nowrap px-5 py-3">Product</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Qty</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Free</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">Discount</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">GST</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Line total</th>
                 </tr>
@@ -216,7 +237,13 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                       {line.quantity}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
+                      {line.schemeFreeQuantity}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.unitPricePaise)}
+                    </td>
+                    <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
+                      {line.discountPaise > 0 ? `-${formatINR(line.discountPaise)}` : '—'}
                     </td>
                     <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.lineGstPaise)}

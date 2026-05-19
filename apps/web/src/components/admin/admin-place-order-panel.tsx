@@ -177,7 +177,12 @@ export function AdminPlaceOrderPanel({
           }
           const order = await placeOrderOnBehalfFromBrowser({
             buyerId: selectedBuyer.id,
-            items: cart.lines.map((l) => ({ productId: l.productId, quantity: l.qty })),
+            items: cart.lines.map((l) => ({
+              productId: l.productId,
+              quantity: l.qty,
+              schemeFreeQuantity: l.schemeFreeQuantity ?? 0,
+              discountPaise: l.discountPaise ?? 0,
+            })),
             purchaseOrderNumber,
             notes,
           });

@@ -14,6 +14,8 @@ interface AdminCartState {
   lines: CartLine[];
   add: (product: BuyerProductView, qty?: number) => void;
   setQty: (productId: string, qty: number) => void;
+  setFreeQty: (productId: string, qty: number) => void;
+  setDiscountPaise: (productId: string, paise: number) => void;
   remove: (productId: string) => void;
   clear: () => void;
 }
@@ -62,6 +64,35 @@ export const useAdminCart = create<AdminCartState>()(
               ? {
                   ...l,
                   qty: clampCartQuantity(qty, l.maxQty || qty),
+                  schemeFreeQuantity: Math.min(
+                    l.schemeFreeQuantity ?? 0,
+                    Math.max((l.maxQty || qty) - qty, 0),
+                  ),
+                }
+              : l,
+          ),
+        })),
+      setFreeQty: (productId, qty) =>
+        set((state) => ({
+          lines: state.lines.map((l) =>
+            l.productId === productId
+              ? {
+                  ...l,
+                  schemeFreeQuantity: Math.max(
+                    0,
+                    Math.min(Math.trunc(qty), Math.max((l.maxQty || l.qty) - l.qty, 0)),
+                  ),
+                }
+              : l,
+          ),
+        })),
+      setDiscountPaise: (productId, paise) =>
+        set((state) => ({
+          lines: state.lines.map((l) =>
+            l.productId === productId
+              ? {
+                  ...l,
+                  discountPaise: Math.max(0, Math.min(Math.trunc(paise), l.unitPricePaise * l.qty)),
                 }
               : l,
           ),

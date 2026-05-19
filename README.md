@@ -122,7 +122,9 @@ parshlo/
 ├── apps/
 │   ├── api/                  # NestJS + Fastify backend (REST /v1)
 │   ├── web/                  # Next.js 15 site + B2B + admin portals
+│   │                         #   · /admin/analytics/gross sales + product/region analytics
 │   │                         #   · /admin/orders/[id] order inspection
+│   │                         #   · /api/admin/orders/[id]/csv CSV order export
 │   │                         #   · /admin/buyers/[id] buyer analytics
 │   │                         #   · /admin/finance/logistics reconciliation
 │   └── worker/               # BullMQ background processor
@@ -131,7 +133,7 @@ parshlo/
 │                             #   · KYC decision notifications
 ├── packages/
 │   ├── config/               # Shared ESLint, tsconfig, Tailwind preset
-│   ├── db/                   # Prisma schema + migrations + client + seed
+│   ├── db/                   # Prisma schema + migrations + client + seed personas
 │   ├── logger/               # Pino structured logger (PII redaction)
 │   ├── queue/                # Typed BullMQ producers + payload contracts
 │   ├── telemetry/            # OTel + Sentry + Prometheus init
@@ -214,6 +216,8 @@ On the sign-in page choose:
   with a real business profile, GSTIN, and drug license. Buyer dashboard,
   catalog with prices, cart, and order placement all work end-to-end.
 - **Continue as Demo Admin** — analytics, KYC queue, orders, buyers.
+- **Continue as Demo Manager** — staff order placement without admin-only
+  approval, status-transition, logistics, or shipment controls.
 
 Set `AUTH_MODE=auth0` plus the Auth0 vars to switch to a real tenant.
 
@@ -226,7 +230,7 @@ The Prisma schema (`packages/db/prisma/schema.prisma`) encodes the entire busine
 - **User**, **BusinessProfile** — accounts + KYC details (GSTIN unique, account lifecycle: `PENDING_VERIFICATION → UNDER_REVIEW → APPROVED|REJECTED|SUSPENDED`).
 - **KycApplication**, **KycDocument** — review workflow with reviewer + reason.
 - **Product**, **ProductCategory**, **Inventory**, **ProductBatch** — formulations, MOQ, GST rate, schedule drug class, stock tracking.
-- **Order**, **OrderItem**, **OrderStatusEvent**, **Invoice** — full procurement lifecycle (`RECEIVED → UNDER_REVIEW → APPROVED → PREPARING → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED`, with `CANCELLED` / `REJECTED` terminals).
+- **Order**, **OrderItem**, **OrderStatusEvent**, **Invoice** — full procurement lifecycle (`RECEIVED → UNDER_REVIEW → APPROVED → PREPARING → DISPATCHED`, with `CANCELLED` / `REJECTED` terminals). Manager-created orders require admin or super admin approval, and only admin/super admin roles can transition status, enter shipment tracking, or manage logistics statements.
 - **AuditLog** — immutable trail for every mutating action.
 - **IdempotencyKey** — duplicate-order protection on retries.
 - **ContactInquiry** — public contact form submissions.

@@ -41,9 +41,11 @@ function parsePositiveDecimal(input: string): number | null {
 export function CourierTrackingForm({
   orderId,
   existing,
+  canEdit = true,
 }: {
   orderId: string;
   existing: OrderView['courierTracking'];
+  canEdit?: boolean;
 }): JSX.Element {
   const router = useRouter();
   const [service, setService] = useState<CourierService>(existing?.service ?? 'PROFESSIONAL');
@@ -162,80 +164,90 @@ export function CourierTrackingForm({
         </p>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="courier-service">Courier service</Label>
-        <select
-          id="courier-service"
-          className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-          value={service}
-          disabled={busy}
-          onChange={(e) => setService(e.target.value as CourierService)}
-        >
-          {COURIER_SERVICES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="courier-docket">Docket number</Label>
-        <Input
-          id="courier-docket"
-          className="font-mono"
-          placeholder="e.g. AWB / consignment number"
-          value={docket}
-          disabled={busy}
-          onChange={(e) => setDocket(e.target.value)}
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="courier-freight">Cost/Price</Label>
-          <Input
-            id="courier-freight"
-            inputMode="decimal"
-            placeholder="100.49"
-            value={freightAmount}
-            disabled={busy}
-            onChange={(e) => setFreightAmount(e.target.value)}
-          />
+      {!canEdit ? (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
+          Only admins and super admins can enter or edit shipment tracking details.
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="courier-weight">Weight kg</Label>
-          <Input
-            id="courier-weight"
-            inputMode="decimal"
-            placeholder="Optional"
-            value={weightKg}
-            disabled={busy}
-            onChange={(e) => setWeightKg(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="courier-box-count">Boxes</Label>
-          <Input
-            id="courier-box-count"
-            inputMode="numeric"
-            value={boxCount}
-            disabled={busy}
-            onChange={(e) => setBoxCount(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
       ) : null}
 
-      <Button type="button" size="sm" disabled={busy} onClick={() => void save()}>
-        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-        {existing ? 'Update shipment' : 'Save shipment'}
-      </Button>
+      {canEdit ? (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="courier-service">Courier service</Label>
+            <select
+              id="courier-service"
+              className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+              value={service}
+              disabled={busy}
+              onChange={(e) => setService(e.target.value as CourierService)}
+            >
+              {COURIER_SERVICES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="courier-docket">Docket number</Label>
+            <Input
+              id="courier-docket"
+              className="font-mono"
+              placeholder="e.g. AWB / consignment number"
+              value={docket}
+              disabled={busy}
+              onChange={(e) => setDocket(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="courier-freight">Cost/Price</Label>
+              <Input
+                id="courier-freight"
+                inputMode="decimal"
+                placeholder="100.49"
+                value={freightAmount}
+                disabled={busy}
+                onChange={(e) => setFreightAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="courier-weight">Weight kg</Label>
+              <Input
+                id="courier-weight"
+                inputMode="decimal"
+                placeholder="Optional"
+                value={weightKg}
+                disabled={busy}
+                onChange={(e) => setWeightKg(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="courier-box-count">Boxes</Label>
+              <Input
+                id="courier-box-count"
+                inputMode="numeric"
+                value={boxCount}
+                disabled={busy}
+                onChange={(e) => setBoxCount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <Button type="button" size="sm" disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {existing ? 'Update shipment' : 'Save shipment'}
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }

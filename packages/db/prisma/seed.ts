@@ -131,6 +131,24 @@ async function main(): Promise<void> {
   });
   console.log(`  ✓ Owner user: ${owner.email} (${owner.roles.join(', ')})`);
 
+  // ----- Demo sales manager -----
+  const manager = await prisma.user.upsert({
+    where: { email: 'manager@parshlo.local' },
+    update: {
+      fullName: 'Parshlo Sales Manager',
+      roles: [Role.SALES_MANAGER],
+      accountStatus: 'APPROVED',
+    },
+    create: {
+      auth0Id: 'dev|manager',
+      email: 'manager@parshlo.local',
+      fullName: 'Parshlo Sales Manager',
+      roles: [Role.SALES_MANAGER],
+      accountStatus: 'APPROVED',
+    },
+  });
+  console.log(`  ✓ Sales manager user: ${manager.email} (${manager.roles.join(', ')})`);
+
   // ----- Demo buyer (pre-approved, with business profile for end-to-end demo) -----
   const buyer = await prisma.user.upsert({
     where: { email: 'buyer@parshlo.local' },

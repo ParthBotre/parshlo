@@ -64,6 +64,14 @@ export class AdminController {
     return this.admin.grossSalesByCity();
   }
 
+  @Get('analytics/sales')
+  salesAnalytics(
+    @Query('period') period?: string,
+    @Query('anchor') anchor?: string,
+  ): ReturnType<AdminService['salesAnalytics']> {
+    return this.admin.salesAnalytics({ period, anchor });
+  }
+
   @Post('orders')
   @HttpCode(201)
   @Throttle(THROTTLE_ORDER_PLACE)
@@ -77,7 +85,7 @@ export class AdminController {
     @CurrentUser() user: AuthPrincipal,
     @Body(new ZodValidationPipe(PlaceOrderOnBehalfInput)) body: PlaceOrderOnBehalfInput,
   ): Promise<OrderView> {
-    return this.orderService.placeOrderOnBehalf(user.userId, body);
+    return this.orderService.placeOrderOnBehalf(user.userId, body, user.roles);
   }
 
   @ApiQuery({ name: 'status', required: false })
@@ -143,6 +151,7 @@ export class AdminController {
 
   @Patch('orders/:id/courier-tracking')
   @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   @Audit({
     action: 'order.update_courier_tracking',
     resource: 'Order',

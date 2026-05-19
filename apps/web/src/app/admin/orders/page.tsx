@@ -23,9 +23,8 @@ const STATUS_FILTERS = [
   { label: 'Approved', value: 'APPROVED' },
   { label: 'Preparing', value: 'PREPARING' },
   { label: 'Dispatched', value: 'DISPATCHED' },
-  { label: 'Out for delivery', value: 'OUT_FOR_DELIVERY' },
-  { label: 'Delivered', value: 'DELIVERED' },
   { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Rejected', value: 'REJECTED' },
 ] as const;
 
 interface PageProps {

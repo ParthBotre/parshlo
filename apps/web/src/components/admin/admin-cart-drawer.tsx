@@ -52,6 +52,10 @@ export function AdminCartDrawer({
       setSubmitting(false);
     }
   };
+  const updateDiscountRupees = (productId: string, value: string): void => {
+    const parsed = Number(value);
+    cart.setDiscountPaise(productId, Number.isFinite(parsed) ? Math.round(parsed * 100) : 0);
+  };
 
   if (!open) {
     return null;
@@ -108,6 +112,42 @@ export function AdminCartDrawer({
                     maxQty={line.maxQty || line.qty}
                     onQtyChange={(next) => cart.setQty(line.productId, next)}
                   />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                      Free qty
+                      <input
+                        type="number"
+                        min={0}
+                        max={Math.max((line.maxQty || line.qty) - line.qty, 0)}
+                        value={line.schemeFreeQuantity ?? 0}
+                        onChange={(e) =>
+                          cart.setFreeQty(line.productId, Number(e.currentTarget.value))
+                        }
+                        className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
+                      />
+                    </label>
+                    <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                      Discount (₹)
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        max={(line.unitPricePaise * line.qty) / 100}
+                        value={((line.discountPaise ?? 0) / 100).toString()}
+                        onChange={(e) =>
+                          updateDiscountRupees(line.productId, e.currentTarget.value)
+                        }
+                        className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
+                      />
+                    </label>
+                  </div>
+                  {(line.schemeFreeQuantity ?? 0) > 0 || (line.discountPaise ?? 0) > 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      Staff scheme: {line.schemeFreeQuantity ?? 0} free · Total qty{' '}
+                      {line.qty + (line.schemeFreeQuantity ?? 0)} · Discount{' '}
+                      {formatINR(line.discountPaise ?? 0)}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

@@ -15,6 +15,8 @@ export interface CartLine {
   /** Available units when added; used to cap manual quantity entry. */
   maxQty: number;
   qty: number;
+  schemeFreeQuantity?: number;
+  discountPaise?: number;
 }
 
 interface CartState {
@@ -104,7 +106,8 @@ export function totals(lines: CartLine[]): {
   let subtotal = 0;
   let gst = 0;
   for (const l of lines) {
-    const lineSubtotal = l.unitPricePaise * l.qty;
+    const rawSubtotal = l.unitPricePaise * l.qty;
+    const lineSubtotal = Math.max(rawSubtotal - (l.discountPaise ?? 0), 0);
     const lineGst = Math.round((lineSubtotal * GST_BASIS[l.gstRate]) / 10_000);
     subtotal += lineSubtotal;
     gst += lineGst;

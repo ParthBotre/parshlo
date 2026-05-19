@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, ShieldAlert, ShoppingCart, UserCog } from 'lucide-react';
+import { Loader2, ShieldAlert, ShoppingCart, UserCog, UsersRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 
 export function DevSignInPanel({ redirectTo }: { redirectTo?: string }): JSX.Element {
   const router = useRouter();
-  const [loading, setLoading] = useState<'admin' | 'buyer' | null>(null);
+  const [loading, setLoading] = useState<'admin' | 'manager' | 'buyer' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handle = async (persona: 'admin' | 'buyer'): Promise<void> => {
+  const handle = async (persona: 'admin' | 'manager' | 'buyer'): Promise<void> => {
     setLoading(persona);
     setError(null);
     try {
@@ -76,6 +76,19 @@ export function DevSignInPanel({ redirectTo }: { redirectTo?: string }): JSX.Ele
             Continue as Demo Admin
           </span>
           {loading === 'admin' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        </Button>
+        <Button
+          onClick={() => void handle('manager')}
+          disabled={loading !== null}
+          size="lg"
+          variant="outline"
+          className="w-full justify-between"
+        >
+          <span className="inline-flex items-center gap-2">
+            <UsersRound className="h-4 w-4" />
+            Continue as Demo Manager
+          </span>
+          {loading === 'manager' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         </Button>
       </div>
     </div>

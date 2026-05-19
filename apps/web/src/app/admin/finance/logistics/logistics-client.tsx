@@ -228,6 +228,7 @@ interface Props {
   couriers: CourierPartner[];
   consignments: Consignment[];
   statements: Statement[];
+  canManageLogistics: boolean;
 }
 
 export default function LogisticsPageClient({
@@ -235,6 +236,7 @@ export default function LogisticsPageClient({
   couriers: initCouriers,
   consignments: initConsignments,
   statements: initStatements,
+  canManageLogistics,
 }: Props) {
   const [tab, setTab] = useState<'consignments' | 'statements'>('consignments');
   const [couriers] = useState(initCouriers);
@@ -311,6 +313,10 @@ export default function LogisticsPageClient({
 
   async function submitConsignment(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can log consignments.');
+      return;
+    }
     setError('');
     setSaving(true);
     try {
@@ -387,6 +393,10 @@ export default function LogisticsPageClient({
 
   async function submitReconcile(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can create courier statements.');
+      return;
+    }
     setError('');
     setSaving(true);
     try {
@@ -428,6 +438,10 @@ export default function LogisticsPageClient({
   }
 
   async function markPaid(id: string) {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can update courier statements.');
+      return;
+    }
     try {
       const paid = await apiPatch(
         `/v1/admin/finance/logistics/statements/${id}/mark-paid`,
@@ -445,6 +459,10 @@ export default function LogisticsPageClient({
   }
 
   async function resolveConsignment(id: string) {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can resolve consignments.');
+      return;
+    }
     try {
       await apiPatch(`/v1/admin/finance/logistics/consignments/${id}/resolve`, ConsignmentRow);
       setConsignments((prev) =>
@@ -456,6 +474,10 @@ export default function LogisticsPageClient({
   }
 
   function beginStatementLine(statement: Statement) {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can add statement adjustment lines.');
+      return;
+    }
     setTab('consignments');
     setDashboardCourierId(statement.courierId);
     setConsignmentPeriod('month');
@@ -551,151 +573,159 @@ export default function LogisticsPageClient({
       {tab === 'consignments' && (
         <div className="space-y-6">
           {/* Add consignment form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Log Consignment</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={(e) => void submitConsignment(e)}
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-              >
-                <div>
-                  <label htmlFor="consignment-courier" className={labelCls}>
-                    Courier Partner
-                  </label>
-                  <select
-                    id="consignment-courier"
-                    className={inputCls}
-                    value={form.courierId}
-                    onChange={(e) => setForm((f) => ({ ...f, courierId: e.target.value }))}
-                    required
-                  >
-                    {couriers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="consignment-type" className={labelCls}>
-                    Type
-                  </label>
-                  <select
-                    id="consignment-type"
-                    className={inputCls}
-                    value={form.type}
-                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                  >
-                    <option value="OUTGOING">Outgoing (to retailer)</option>
-                    <option value="INCOMING">Incoming (from CFA)</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="consignment-docket" className={labelCls}>
-                    Docket / Slip Number
-                  </label>
-                  <input
-                    id="consignment-docket"
-                    className={inputCls}
-                    value={form.docketNumber}
-                    onChange={(e) => setForm((f) => ({ ...f, docketNumber: e.target.value }))}
-                    required
-                    minLength={2}
-                    placeholder="e.g. TPC-123456"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-date" className={labelCls}>
-                    Date on Slip
-                  </label>
-                  <input
-                    id="consignment-date"
-                    type="date"
-                    className={inputCls}
-                    value={form.consignmentDate}
-                    onChange={(e) => setForm((f) => ({ ...f, consignmentDate: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-amount" className={labelCls}>
-                    Amount / Adjustment (₹)
-                  </label>
-                  <input
-                    id="consignment-amount"
-                    type="number"
-                    step="0.01"
-                    className={inputCls}
-                    value={form.amountRupees}
-                    onChange={(e) => setForm((f) => ({ ...f, amountRupees: e.target.value }))}
-                    required
-                    placeholder="e.g. 2000 or -2000"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-weight" className={labelCls}>
-                    Weight (kg) — optional
-                  </label>
-                  <input
-                    id="consignment-weight"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    className={inputCls}
-                    value={form.weightKg}
-                    onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value }))}
-                    placeholder="e.g. 2.5"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-boxes" className={labelCls}>
-                    Box Count
-                  </label>
-                  <input
-                    id="consignment-boxes"
-                    type="number"
-                    min="1"
-                    className={inputCls}
-                    value={form.boxCount}
-                    onChange={(e) => setForm((f) => ({ ...f, boxCount: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-order" className={labelCls}>
-                    Order # (optional)
-                  </label>
-                  <input
-                    id="consignment-order"
-                    className={inputCls}
-                    value={form.associatedOrderNumber}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, associatedOrderNumber: e.target.value }))
-                    }
-                    placeholder="ORD-…"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="consignment-po" className={labelCls}>
-                    PO # (optional)
-                  </label>
-                  <input
-                    id="consignment-po"
-                    className={inputCls}
-                    value={form.associatedPoNumber}
-                    onChange={(e) => setForm((f) => ({ ...f, associatedPoNumber: e.target.value }))}
-                    placeholder="PO-…"
-                  />
-                </div>
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Saving…' : 'Log Consignment'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          {canManageLogistics ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Log Consignment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={(e) => void submitConsignment(e)}
+                  className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  <div>
+                    <label htmlFor="consignment-courier" className={labelCls}>
+                      Courier Partner
+                    </label>
+                    <select
+                      id="consignment-courier"
+                      className={inputCls}
+                      value={form.courierId}
+                      onChange={(e) => setForm((f) => ({ ...f, courierId: e.target.value }))}
+                      required
+                    >
+                      {couriers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-type" className={labelCls}>
+                      Type
+                    </label>
+                    <select
+                      id="consignment-type"
+                      className={inputCls}
+                      value={form.type}
+                      onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                    >
+                      <option value="OUTGOING">Outgoing (to retailer)</option>
+                      <option value="INCOMING">Incoming (from CFA)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-docket" className={labelCls}>
+                      Docket / Slip Number
+                    </label>
+                    <input
+                      id="consignment-docket"
+                      className={inputCls}
+                      value={form.docketNumber}
+                      onChange={(e) => setForm((f) => ({ ...f, docketNumber: e.target.value }))}
+                      required
+                      minLength={2}
+                      placeholder="e.g. TPC-123456"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-date" className={labelCls}>
+                      Date on Slip
+                    </label>
+                    <input
+                      id="consignment-date"
+                      type="date"
+                      className={inputCls}
+                      value={form.consignmentDate}
+                      onChange={(e) => setForm((f) => ({ ...f, consignmentDate: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-amount" className={labelCls}>
+                      Amount / Adjustment (₹)
+                    </label>
+                    <input
+                      id="consignment-amount"
+                      type="number"
+                      step="0.01"
+                      className={inputCls}
+                      value={form.amountRupees}
+                      onChange={(e) => setForm((f) => ({ ...f, amountRupees: e.target.value }))}
+                      required
+                      placeholder="e.g. 2000 or -2000"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-weight" className={labelCls}>
+                      Weight (kg) — optional
+                    </label>
+                    <input
+                      id="consignment-weight"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      className={inputCls}
+                      value={form.weightKg}
+                      onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value }))}
+                      placeholder="e.g. 2.5"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-boxes" className={labelCls}>
+                      Box Count
+                    </label>
+                    <input
+                      id="consignment-boxes"
+                      type="number"
+                      min="1"
+                      className={inputCls}
+                      value={form.boxCount}
+                      onChange={(e) => setForm((f) => ({ ...f, boxCount: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-order" className={labelCls}>
+                      Order # (optional)
+                    </label>
+                    <input
+                      id="consignment-order"
+                      className={inputCls}
+                      value={form.associatedOrderNumber}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, associatedOrderNumber: e.target.value }))
+                      }
+                      placeholder="ORD-…"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="consignment-po" className={labelCls}>
+                      PO # (optional)
+                    </label>
+                    <input
+                      id="consignment-po"
+                      className={inputCls}
+                      value={form.associatedPoNumber}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, associatedPoNumber: e.target.value }))
+                      }
+                      placeholder="PO-…"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <Button type="submit" disabled={saving}>
+                      {saving ? 'Saving…' : 'Log Consignment'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
+              Only admins and super admins can log consignments.
+            </div>
+          )}
 
           {/* Consignments table */}
           <Card>
@@ -800,7 +830,7 @@ export default function LogisticsPageClient({
                                     {c.associatedOrderNumber ?? '—'}
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3">
-                                    {status === 'DISCREPANCY' && (
+                                    {canManageLogistics && status === 'DISCREPANCY' && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -829,112 +859,118 @@ export default function LogisticsPageClient({
       {tab === 'statements' && (
         <div className="space-y-6">
           {/* Reconcile form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Reconcile Monthly Bill</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={(e) => void submitReconcile(e)}
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-              >
-                <div>
-                  <label htmlFor="statement-courier" className={labelCls}>
-                    Courier Partner
-                  </label>
-                  <select
-                    id="statement-courier"
-                    className={inputCls}
-                    value={rForm.courierId}
-                    onChange={(e) => setRForm((f) => ({ ...f, courierId: e.target.value }))}
-                    required
-                  >
-                    {couriers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="statement-invoice" className={labelCls}>
-                    Invoice Number
-                  </label>
-                  <input
-                    id="statement-invoice"
-                    className={inputCls}
-                    value={rForm.statementInvoiceNumber}
-                    onChange={(e) =>
-                      setRForm((f) => ({ ...f, statementInvoiceNumber: e.target.value }))
-                    }
-                    required
-                    minLength={2}
-                    placeholder="INV-2025-05"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="statement-month" className={labelCls}>
-                    Billing Month
-                  </label>
-                  <select
-                    id="statement-month"
-                    className={inputCls}
-                    value={rForm.billingMonth}
-                    onChange={(e) => setRForm((f) => ({ ...f, billingMonth: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select month</option>
-                    {BILLING_MONTH_OPTIONS.map((month) => (
-                      <option key={month.value} value={month.value}>
-                        {month.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="statement-year" className={labelCls}>
-                    Billing Year
-                  </label>
-                  <select
-                    id="statement-year"
-                    className={inputCls}
-                    value={rForm.billingYear}
-                    onChange={(e) => setRForm((f) => ({ ...f, billingYear: e.target.value }))}
-                    required
-                  >
-                    {yearOptions.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="statement-charged" className={labelCls}>
-                    Courier Charged Total (₹)
-                  </label>
-                  <input
-                    id="statement-charged"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className={inputCls}
-                    value={rForm.courierChargedRupees}
-                    onChange={(e) =>
-                      setRForm((f) => ({ ...f, courierChargedRupees: e.target.value }))
-                    }
-                    required
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Processing…' : 'Run Reconciliation'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          {canManageLogistics ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Reconcile Monthly Bill</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={(e) => void submitReconcile(e)}
+                  className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  <div>
+                    <label htmlFor="statement-courier" className={labelCls}>
+                      Courier Partner
+                    </label>
+                    <select
+                      id="statement-courier"
+                      className={inputCls}
+                      value={rForm.courierId}
+                      onChange={(e) => setRForm((f) => ({ ...f, courierId: e.target.value }))}
+                      required
+                    >
+                      {couriers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="statement-invoice" className={labelCls}>
+                      Invoice Number
+                    </label>
+                    <input
+                      id="statement-invoice"
+                      className={inputCls}
+                      value={rForm.statementInvoiceNumber}
+                      onChange={(e) =>
+                        setRForm((f) => ({ ...f, statementInvoiceNumber: e.target.value }))
+                      }
+                      required
+                      minLength={2}
+                      placeholder="INV-2025-05"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="statement-month" className={labelCls}>
+                      Billing Month
+                    </label>
+                    <select
+                      id="statement-month"
+                      className={inputCls}
+                      value={rForm.billingMonth}
+                      onChange={(e) => setRForm((f) => ({ ...f, billingMonth: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select month</option>
+                      {BILLING_MONTH_OPTIONS.map((month) => (
+                        <option key={month.value} value={month.value}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="statement-year" className={labelCls}>
+                      Billing Year
+                    </label>
+                    <select
+                      id="statement-year"
+                      className={inputCls}
+                      value={rForm.billingYear}
+                      onChange={(e) => setRForm((f) => ({ ...f, billingYear: e.target.value }))}
+                      required
+                    >
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="statement-charged" className={labelCls}>
+                      Courier Charged Total (₹)
+                    </label>
+                    <input
+                      id="statement-charged"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={inputCls}
+                      value={rForm.courierChargedRupees}
+                      onChange={(e) =>
+                        setRForm((f) => ({ ...f, courierChargedRupees: e.target.value }))
+                      }
+                      required
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="submit" disabled={saving}>
+                      {saving ? 'Processing…' : 'Run Reconciliation'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
+              Only admins and super admins can create or update courier statements.
+            </div>
+          )}
 
           {/* Statements table */}
           <Card>
@@ -1013,7 +1049,7 @@ export default function LogisticsPageClient({
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="flex flex-wrap gap-2">
-                              {s.status !== 'PAID' && (
+                              {canManageLogistics && s.status !== 'PAID' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1022,7 +1058,7 @@ export default function LogisticsPageClient({
                                   Add line
                                 </Button>
                               )}
-                              {s.status === 'RECONCILED' && (
+                              {canManageLogistics && s.status === 'RECONCILED' && (
                                 <Button
                                   size="sm"
                                   variant="outline"

@@ -19,6 +19,9 @@ export const metadata: Metadata = {
 export default async function LogisticsPage(): Promise<JSX.Element> {
   const session = await getSession();
   if (!session) redirect('/auth/sign-in?next=/admin/finance/logistics');
+  const canManageLogistics = session.user.roles.some(
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
+  );
 
   const opts = { next: { revalidate: 0 } } as const;
 
@@ -35,6 +38,7 @@ export default async function LogisticsPage(): Promise<JSX.Element> {
         couriers={couriers}
         consignments={consignments}
         statements={statements}
+        canManageLogistics={canManageLogistics}
       />
     );
   } catch (err) {

@@ -585,6 +585,98 @@ export class AdminService {
     return this.buildSalesByCityReport(AdminService.utcMonthStart());
   }
 
+  async salesAnalytics(filters: { period?: string; anchor?: string }): Promise<{
+    period: BuyerAnalyticsPeriod;
+    anchor: string;
+    label: string;
+    totalGrossPaise: number;
+    totalOrders: number;
+    productRows: {
+      productId: string;
+      productName: string;
+      chargedQuantity: number;
+      freeQuantity: number;
+      grossPaise: number;
+      discountPaise: number;
+      sharePercent: number;
+    }[];
+    regionRows: {
+      region: string;
+      orderCount: number;
+      grossPaise: number;
+      sharePercent: number;
+    }[];
+  }> {
+    const period = AdminService.isBuyerAnalyticsPeriod(filters.period) ? filters.period : 'month';
+    const anchor = AdminService.normalizeAnalyticsAnchor(period, filters.anchor);
+    const range = AdminService.businessPeriodRange(period, anchor);
+    const orders = await this.prisma.order.findMany({
+      where: { placedAt: { gte: range.start, lt: range.end } },
+      include: {
+        items: true,
+        buyer: { select: { businessProfile: { select: { state: true } } } },
+      },
+    });
+
+    const totalGrossPaise = orders.reduce((sum, order) => sum + Number(order.totalPaise), 0);
+    const productBuckets = new Map<
+      string,
+      {
+        productId: string;
+        productName: string;
+        chargedQuantity: number;
+        freeQuantity: number;
+        grossPaise: number;
+        discountPaise: number;
+      }
+    >();
+    const regionBuckets = new Map<
+      string,
+      { region: string; orderCount: number; grossPaise: number }
+    >();
+
+    for (const order of orders) {
+      const region = order.buyer.businessProfile?.state.trim() ?? 'Unknown';
+      const regionBucket = regionBuckets.get(region) ?? { region, orderCount: 0, grossPaise: 0 };
+      regionBucket.orderCount += 1;
+      regionBucket.grossPaise += Number(order.totalPaise);
+      regionBuckets.set(region, regionBucket);
+
+      for (const item of order.items) {
+        const bucket = productBuckets.get(item.productId) ?? {
+          productId: item.productId,
+          productName: item.productNameSnapshot,
+          chargedQuantity: 0,
+          freeQuantity: 0,
+          grossPaise: 0,
+          discountPaise: 0,
+        };
+        bucket.chargedQuantity += item.quantity;
+        bucket.freeQuantity += item.schemeFreeQuantity;
+        bucket.grossPaise += Number(item.lineTotalPaise);
+        bucket.discountPaise += Number(item.discountPaise);
+        productBuckets.set(item.productId, bucket);
+      }
+    }
+
+    const share = (value: number): number =>
+      totalGrossPaise > 0 ? Math.round((value * 1000) / totalGrossPaise) / 10 : 0;
+
+    return {
+      period,
+      anchor,
+      label: AdminService.analyticsPeriodLabel(period, anchor),
+      totalGrossPaise,
+      totalOrders: orders.length,
+      productRows: [...productBuckets.values()]
+        .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
+        .sort((a, b) => b.grossPaise - a.grossPaise),
+      regionRows: [...regionBuckets.values()]
+        .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
+        .sort((a, b) => b.grossPaise - a.grossPaise),
+    };
+  }
+
   private static utcMonthStart(): Date {
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
@@ -611,6 +703,62 @@ export class AdminService {
 
   private static isBuyerAnalyticsPeriod(value: string | undefined): value is BuyerAnalyticsPeriod {
     return value === 'day' || value === 'week' || value === 'month' || value === 'year';
+  }
+
+  private static normalizeAnalyticsAnchor(
+    period: BuyerAnalyticsPeriod,
+    anchor: string | undefined,
+  ): string {
+    const current = AdminService.currentBusinessParts();
+    if (period === 'day') {
+      const parsed = AdminService.parseAnchorDate(anchor);
+      return `${parsed.year}-${String(parsed.month + 1).padStart(2, '0')}-${String(parsed.date).padStart(2, '0')}`;
+    }
+    if (period === 'week') {
+      const start = AdminService.parseAnchorWeek(anchor);
+      return AdminService.isoWeekKey(start);
+    }
+    if (period === 'month') {
+      const parsed = AdminService.parseAnchorMonth(anchor);
+      return `${parsed.year}-${String(parsed.month + 1).padStart(2, '0')}`;
+    }
+    return String(AdminService.parseAnchorYear(anchor) || current.year);
+  }
+
+  private static formatUtcDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+    return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
+  }
+
+  private static analyticsPeriodLabel(period: BuyerAnalyticsPeriod, anchor: string): string {
+    if (period === 'day') {
+      const { year, month, date } = AdminService.parseAnchorDate(anchor);
+      return AdminService.formatUtcDate(new Date(Date.UTC(year, month, date)), {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    }
+    if (period === 'week') {
+      const start = AdminService.parseAnchorWeek(anchor);
+      const end = new Date(start);
+      end.setUTCDate(start.getUTCDate() + 6);
+      return `${anchor.replace('-W', ' Week ')} · ${AdminService.formatUtcDate(start, {
+        day: '2-digit',
+        month: 'short',
+      })} - ${AdminService.formatUtcDate(end, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })}`;
+    }
+    if (period === 'month') {
+      const { year, month } = AdminService.parseAnchorMonth(anchor);
+      return AdminService.formatUtcDate(new Date(Date.UTC(year, month, 1)), {
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+    return anchor;
   }
 
   private static currentBusinessParts(now = new Date()): {

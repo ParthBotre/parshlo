@@ -17,16 +17,26 @@ import {
 export function OrderStatusActions({
   orderId,
   status,
+  canApproveOrClose,
 }: {
   orderId: string;
   status: OrderStatus;
+  canApproveOrClose: boolean;
 }): JSX.Element {
   const router = useRouter();
   const [busy, setBusy] = useState<OrderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const progressOptions = nextProgressOrderStatuses(status);
-  const destructiveOptions = nextDestructiveOrderStatuses(status);
+  const progressOptions = canApproveOrClose ? nextProgressOrderStatuses(status) : [];
+  const destructiveOptions = canApproveOrClose ? nextDestructiveOrderStatuses(status) : [];
+
+  if (!canApproveOrClose) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Only an admin or super admin can update order status.
+      </p>
+    );
+  }
 
   const updateStatus = async (next: OrderStatus): Promise<void> => {
     if (isDestructiveOrderStatus(next)) {

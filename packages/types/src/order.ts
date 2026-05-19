@@ -18,13 +18,13 @@ export type OrderStatus = z.infer<typeof OrderStatus>;
 
 /** Allowed status transitions (canonical workflow). */
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
-  RECEIVED: ['UNDER_REVIEW', 'CANCELLED', 'REJECTED'],
+  RECEIVED: ['UNDER_REVIEW'],
   UNDER_REVIEW: ['APPROVED', 'REJECTED', 'CANCELLED'],
-  APPROVED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['DISPATCHED', 'CANCELLED'],
-  DISPATCHED: ['OUT_FOR_DELIVERY', 'DELIVERED'],
-  OUT_FOR_DELIVERY: ['DELIVERED'],
+  APPROVED: ['PREPARING'],
+  PREPARING: ['DISPATCHED'],
+  DISPATCHED: [],
   DELIVERED: [],
+  OUT_FOR_DELIVERY: [],
   CANCELLED: [],
   REJECTED: [],
 };
@@ -32,6 +32,8 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[
 export const OrderItemInput = z.object({
   productId: EntityId,
   quantity: z.number().int().positive(),
+  schemeFreeQuantity: z.number().int().nonnegative().default(0),
+  discountPaise: Paise.default(0),
 });
 export type OrderItemInput = z.infer<typeof OrderItemInput>;
 
@@ -54,7 +56,9 @@ export const OrderItemView = z.object({
   productId: EntityId,
   productName: z.string(),
   quantity: z.number().int().positive(),
+  schemeFreeQuantity: z.number().int().nonnegative().default(0),
   unitPricePaise: Paise,
+  discountPaise: Paise.default(0),
   gstRate: z.string(),
   lineSubtotalPaise: Paise,
   lineGstPaise: Paise,

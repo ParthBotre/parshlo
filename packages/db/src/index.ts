@@ -5,10 +5,9 @@ import { PrismaClient } from '@prisma/client';
  * connection pool when Next.js dev server reloads.
  */
 
-declare global {
-   
-  var __parshloPrisma: PrismaClient | undefined;
-}
+const globalForPrisma = globalThis as typeof globalThis & {
+  __parshloPrisma?: PrismaClient;
+};
 
 function createClient(): PrismaClient {
   const client = new PrismaClient({
@@ -17,10 +16,10 @@ function createClient(): PrismaClient {
   return client;
 }
 
-export const prisma: PrismaClient = globalThis.__parshloPrisma ?? createClient();
+export const prisma: PrismaClient = globalForPrisma.__parshloPrisma ?? createClient();
 
 if (process.env.NODE_ENV !== 'production') {
-  globalThis.__parshloPrisma = prisma;
+  globalForPrisma.__parshloPrisma = prisma;
 }
 
 export * from '@prisma/client';

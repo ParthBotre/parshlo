@@ -44,6 +44,7 @@ const COURIER_PARTNER_NAMES: Record<'PROFESSIONAL' | 'MARK' | 'TEJ', string> = {
   MARK: 'Mark Couriers',
   TEJ: 'Tej Couriers',
 };
+const ADMIN_APPROVAL_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 @Injectable()
 export class OrderService {
@@ -65,7 +66,11 @@ export class OrderService {
    *   6. Honor Idempotency-Key — return prior order on retry.
    */
   /** Staff-only: place an order attributed to an approved buyer account. */
-  async placeOrderOnBehalf(actorId: string, input: PlaceOrderOnBehalfInput): Promise<OrderView> {
+  async placeOrderOnBehalf(
+    actorId: string,
+    input: PlaceOrderOnBehalfInput,
+    actorRoles: readonly string[] = [],
+  ): Promise<OrderView> {
     const target = await this.prisma.user.findUnique({
       where: { id: input.buyerId, deletedAt: null },
     });
@@ -76,13 +81,13 @@ export class OrderService {
       });
     }
     const { buyerId, ...orderInput } = input;
-    return this.placeOrder(buyerId, orderInput, { actorId });
+    return this.placeOrder(buyerId, orderInput, { actorId, actorRoles });
   }
 
   async placeOrder(
     buyerId: string,
     input: PlaceOrderInput,
-    options?: { actorId?: string },
+    options?: { actorId?: string; actorRoles?: readonly string[] },
   ): Promise<OrderView> {
     // Idempotency check before doing any work
     const prior = await this.prisma.order.findUnique({
@@ -99,6 +104,15 @@ export class OrderService {
     const businessProfile = buyer?.businessProfile;
     if (!buyer || buyer.accountStatus !== 'APPROVED' || !businessProfile) {
       throw new ForbiddenException({ code: 'ACCOUNT_NOT_APPROVED' });
+    }
+    if (
+      !options?.actorId &&
+      input.items.some((item) => item.schemeFreeQuantity > 0 || item.discountPaise > 0)
+    ) {
+      throw new ForbiddenException({
+        code: 'ORDER_ADJUSTMENT_FORBIDDEN',
+        message: 'Only staff can apply schemes, free quantity, or discounts.',
+      });
     }
 
     const order = await this.prisma.$transaction(
@@ -125,9 +139,11 @@ export class OrderService {
               message: `Product ${item.productId} is not available.`,
             });
           }
+          const freeQty = item.schemeFreeQuantity;
+          const stockQty = item.quantity + freeQty;
           const available =
             (product.inventory?.availableQty ?? 0) - (product.inventory?.reservedQty ?? 0);
-          if (item.quantity > available) {
+          if (stockQty > available) {
             throw new ConflictException({
               code: 'INSUFFICIENT_STOCK',
               message: `Insufficient stock for ${product.name}.`,
@@ -136,7 +152,15 @@ export class OrderService {
 
           const unit = product.wholesalePricePaise;
           const qty = BigInt(item.quantity);
-          const lineSubtotal = unit * qty;
+          const undiscountedSubtotal = unit * qty;
+          const discount = BigInt(item.discountPaise);
+          if (discount > undiscountedSubtotal) {
+            throw new BadRequestException({
+              code: 'DISCOUNT_EXCEEDS_LINE_SUBTOTAL',
+              message: `Discount cannot exceed subtotal for ${product.name}.`,
+            });
+          }
+          const lineSubtotal = undiscountedSubtotal - discount;
           const lineGst = (lineSubtotal * GST_RATE_BASIS[product.gstRate]) / 10000n;
           const lineTotal = lineSubtotal + lineGst;
 
@@ -144,7 +168,9 @@ export class OrderService {
             productId: product.id,
             productNameSnapshot: product.name,
             quantity: item.quantity,
+            schemeFreeQuantity: freeQty,
             unitPricePaise: unit,
+            discountPaise: discount,
             gstRate: product.gstRate,
             lineSubtotalPaise: lineSubtotal,
             lineGstPaise: lineGst,
@@ -153,7 +179,7 @@ export class OrderService {
 
           subtotal += lineSubtotal;
           gstTotal += lineGst;
-          stockUpdates.push({ productId: product.id, qty: item.quantity });
+          stockUpdates.push({ productId: product.id, qty: stockQty });
         }
 
         // Reserve stock atomically
@@ -165,10 +191,16 @@ export class OrderService {
         }
 
         const orderNumber = await this.nextOrderNumber(tx);
+        const placedByStaff = Boolean(options?.actorId && options.actorId !== buyerId);
+        const requiresAdminReview =
+          placedByStaff &&
+          !(options?.actorRoles ?? []).some((role) => ADMIN_APPROVAL_ROLES.has(role));
+        const initialStatus: OrderStatus = requiresAdminReview ? 'UNDER_REVIEW' : 'RECEIVED';
         const created = await tx.order.create({
           data: {
             orderNumber,
             buyerId,
+            status: initialStatus,
             buyerBusinessName: businessProfile.businessName,
             buyerGstin: businessProfile.gstin,
             purchaseOrderNumber: input.purchaseOrderNumber ?? null,
@@ -178,7 +210,9 @@ export class OrderService {
             totalPaise: subtotal + gstTotal,
             idempotencyKey: input.idempotencyKey,
             items: { createMany: { data: itemData } },
-            statusEvents: { create: { status: 'RECEIVED', actorId: options?.actorId ?? buyerId } },
+            statusEvents: {
+              create: { status: initialStatus, actorId: options?.actorId ?? buyerId },
+            },
           },
           include: { items: true },
         });
@@ -409,7 +443,16 @@ export class OrderService {
     orderId: string,
     actorId: string,
     input: UpdateOrderStatusInput,
+    actorRoles: readonly string[] = [],
   ): Promise<OrderView> {
+    const isAdminApprover = actorRoles.some((role) => ADMIN_APPROVAL_ROLES.has(role));
+    if (!isAdminApprover) {
+      throw new ForbiddenException({
+        code: 'ADMIN_APPROVAL_REQUIRED',
+        message: 'Only an admin or super admin can update order status.',
+      });
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -429,7 +472,7 @@ export class OrderService {
         for (const item of order.items) {
           await tx.inventory.update({
             where: { productId: item.productId },
-            data: { reservedQty: { decrement: item.quantity } },
+            data: { reservedQty: { decrement: item.quantity + item.schemeFreeQuantity } },
           });
         }
       }
@@ -439,8 +482,8 @@ export class OrderService {
           await tx.inventory.update({
             where: { productId: item.productId },
             data: {
-              availableQty: { decrement: item.quantity },
-              reservedQty: { decrement: item.quantity },
+              availableQty: { decrement: item.quantity + item.schemeFreeQuantity },
+              reservedQty: { decrement: item.quantity + item.schemeFreeQuantity },
             },
           });
         }
@@ -451,7 +494,6 @@ export class OrderService {
         data: {
           status: input.status,
           dispatchedAt: input.status === 'DISPATCHED' ? new Date() : undefined,
-          deliveredAt: input.status === 'DELIVERED' ? new Date() : undefined,
           cancelledAt: input.status === 'CANCELLED' ? new Date() : undefined,
           rejectedAt: input.status === 'REJECTED' ? new Date() : undefined,
           statusEvents: {
@@ -520,6 +562,8 @@ export class OrderService {
       productNameSnapshot: string;
       quantity: number;
       unitPricePaise: bigint;
+      schemeFreeQuantity: number;
+      discountPaise: bigint;
       gstRate: PrismaGstRate;
       lineSubtotalPaise: bigint;
       lineGstPaise: bigint;
@@ -530,7 +574,9 @@ export class OrderService {
       productId: i.productId,
       productName: i.productNameSnapshot,
       quantity: i.quantity,
+      schemeFreeQuantity: i.schemeFreeQuantity,
       unitPricePaise: Number(i.unitPricePaise),
+      discountPaise: Number(i.discountPaise),
       gstRate: GST_RATE_MAP[i.gstRate],
       lineSubtotalPaise: Number(i.lineSubtotalPaise),
       lineGstPaise: Number(i.lineGstPaise),

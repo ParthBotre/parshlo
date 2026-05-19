@@ -70,7 +70,7 @@ export class OrderController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateOrderStatusInput)) body: UpdateOrderStatusInput,
   ): Promise<OrderView> {
-    return this.orders.updateStatus(id, user.userId, body);
+    return this.orders.updateStatus(id, user.userId, body, user.roles);
   }
 
   @Patch(':id/courier-receipt')
