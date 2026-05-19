@@ -230,9 +230,15 @@ export function listAllBuyers(
 export function getAdminBuyer(
   accessToken: string,
   id: string,
+  filters: { period?: string; anchor?: string } = {},
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
 ): Promise<z.infer<typeof AdminBuyerDetail>> {
-  return apiCall(`/v1/admin/buyers/${encodeURIComponent(id)}`, AdminBuyerDetail, {
+  const params = new URLSearchParams();
+  if (filters.period) params.set('period', filters.period);
+  if (filters.anchor) params.set('anchor', filters.anchor);
+  const search = params.toString() ? `?${params.toString()}` : '';
+
+  return apiCall(`/v1/admin/buyers/${encodeURIComponent(id)}${search}`, AdminBuyerDetail, {
     method: 'GET',
     accessToken,
     ...options,

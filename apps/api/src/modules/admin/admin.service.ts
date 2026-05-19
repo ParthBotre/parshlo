@@ -308,7 +308,10 @@ export class AdminService {
     return users.map((u) => this.toBuyerRow(u, summaries.get(u.id)));
   }
 
-  async getBuyer(id: string): Promise<BuyerDetail> {
+  async getBuyer(
+    id: string,
+    filters: { period?: string; anchor?: string } = {},
+  ): Promise<BuyerDetail> {
     const user = await this.prisma.user.findFirst({
       where: { id, roles: { has: 'BUYER' }, deletedAt: null },
       include: { businessProfile: true },
@@ -318,12 +321,17 @@ export class AdminService {
     }
 
     const periodStarts = AdminService.businessPeriodStarts();
+    const selectedPeriod = AdminService.isBuyerAnalyticsPeriod(filters.period)
+      ? filters.period
+      : 'month';
+    const selectedRange = AdminService.businessPeriodRange(selectedPeriod, filters.anchor);
     const [
       lifetime,
       currentDay,
       currentWeek,
       currentMonth,
       currentYear,
+      selectedAggregate,
       statusGroups,
       latestOrder,
       recentOrders,
@@ -337,6 +345,7 @@ export class AdminService {
       this.orderPeriodAggregate(id, periodStarts.week),
       this.orderPeriodAggregate(id, periodStarts.month),
       this.orderPeriodAggregate(id, periodStarts.year),
+      this.orderPeriodAggregate(id, selectedRange.start, selectedRange.end),
       this.prisma.order.groupBy({
         by: ['status'],
         where: { buyerId: id },
@@ -362,10 +371,12 @@ export class AdminService {
       summary.totalOrders > 0 ? Math.round(summary.totalPaise / summary.totalOrders) : 0;
     summary.periodAnalytics.day = this.toBuyerPeriodSummary(currentDay);
     summary.periodAnalytics.week = this.toBuyerPeriodSummary(currentWeek);
-    summary.periodAnalytics.month = this.toBuyerPeriodSummary(currentMonth);
+    const currentMonthSummary = this.toBuyerPeriodSummary(currentMonth);
+    summary.periodAnalytics.month = currentMonthSummary;
     summary.periodAnalytics.year = this.toBuyerPeriodSummary(currentYear);
-    summary.currentMonthOrders = summary.periodAnalytics.month.orderCount;
-    summary.currentMonthPaise = summary.periodAnalytics.month.totalPaise;
+    summary.periodAnalytics[selectedPeriod] = this.toBuyerPeriodSummary(selectedAggregate);
+    summary.currentMonthOrders = currentMonthSummary.orderCount;
+    summary.currentMonthPaise = currentMonthSummary.totalPaise;
     for (const row of statusGroups) {
       summary.statusCounts[row.status] = row._count._all;
     }
@@ -598,12 +609,159 @@ export class AdminService {
     };
   }
 
+  private static isBuyerAnalyticsPeriod(value: string | undefined): value is BuyerAnalyticsPeriod {
+    return value === 'day' || value === 'week' || value === 'month' || value === 'year';
+  }
+
+  private static currentBusinessParts(now = new Date()): {
+    year: number;
+    month: number;
+    date: number;
+  } {
+    const indiaOffsetMs = 5.5 * 60 * 60 * 1000;
+    const businessNow = new Date(now.getTime() + indiaOffsetMs);
+    return {
+      year: businessNow.getUTCFullYear(),
+      month: businessNow.getUTCMonth(),
+      date: businessNow.getUTCDate(),
+    };
+  }
+
+  private static businessDateStart(year: number, month: number, date: number): Date {
+    const indiaOffsetMs = 5.5 * 60 * 60 * 1000;
+    return new Date(Date.UTC(year, month, date) - indiaOffsetMs);
+  }
+
+  private static parseAnchorDate(anchor: string | undefined): {
+    year: number;
+    month: number;
+    date: number;
+  } {
+    const match = anchor?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return AdminService.currentBusinessParts();
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const date = Number(match[3]);
+    const parsed = new Date(Date.UTC(year, month, date));
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month ||
+      parsed.getUTCDate() !== date
+    ) {
+      return AdminService.currentBusinessParts();
+    }
+
+    return { year, month, date };
+  }
+
+  private static isoWeekKey(date: Date): string {
+    const day = date.getUTCDay() || 7;
+    const thursday = new Date(date);
+    thursday.setUTCDate(date.getUTCDate() + 4 - day);
+    const year = thursday.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return `${year}-W${String(week).padStart(2, '0')}`;
+  }
+
+  private static isoWeekStart(year: number, week: number): Date | null {
+    if (week < 1 || week > 53) return null;
+
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7;
+    const start = new Date(jan4);
+    start.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
+    return AdminService.isoWeekKey(start) === `${year}-W${String(week).padStart(2, '0')}`
+      ? start
+      : null;
+  }
+
+  private static parseAnchorWeek(anchor: string | undefined): Date {
+    const weekMatch = /^(\d{4})-W(\d{2})$/.exec(anchor ?? '');
+    if (weekMatch) {
+      const start = AdminService.isoWeekStart(Number(weekMatch[1]), Number(weekMatch[2]));
+      if (start) return start;
+    }
+
+    const { year, month, date } = AdminService.parseAnchorDate(anchor);
+    const anchorDate = new Date(Date.UTC(year, month, date));
+    const day = anchorDate.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    return new Date(Date.UTC(year, month, date + mondayOffset));
+  }
+
+  private static parseAnchorMonth(anchor: string | undefined): { year: number; month: number } {
+    const match = anchor?.match(/^(\d{4})-(\d{2})$/);
+    if (!match) {
+      const current = AdminService.currentBusinessParts();
+      return { year: current.year, month: current.month };
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    if (month < 0 || month > 11) {
+      const current = AdminService.currentBusinessParts();
+      return { year: current.year, month: current.month };
+    }
+
+    return { year, month };
+  }
+
+  private static parseAnchorYear(anchor: string | undefined): number {
+    const match = anchor?.match(/^(\d{4})$/);
+    return match ? Number(match[1]) : AdminService.currentBusinessParts().year;
+  }
+
+  private static businessPeriodRange(
+    period: BuyerAnalyticsPeriod,
+    anchor: string | undefined,
+  ): { start: Date; end: Date } {
+    if (period === 'day') {
+      const { year, month, date } = AdminService.parseAnchorDate(anchor);
+      const start = AdminService.businessDateStart(year, month, date);
+      return { start, end: AdminService.businessDateStart(year, month, date + 1) };
+    }
+
+    if (period === 'week') {
+      const startDate = AdminService.parseAnchorWeek(anchor);
+      const start = AdminService.businessDateStart(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate(),
+      );
+      const end = AdminService.businessDateStart(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate() + 7,
+      );
+      return { start, end };
+    }
+
+    if (period === 'month') {
+      const { year, month } = AdminService.parseAnchorMonth(anchor);
+      return {
+        start: AdminService.businessDateStart(year, month, 1),
+        end: AdminService.businessDateStart(year, month + 1, 1),
+      };
+    }
+
+    const year = AdminService.parseAnchorYear(anchor);
+    return {
+      start: AdminService.businessDateStart(year, 0, 1),
+      end: AdminService.businessDateStart(year + 1, 0, 1),
+    };
+  }
+
   private orderPeriodAggregate(
     buyerId: string,
     start: Date,
+    end?: Date,
   ): Promise<{ _count: { _all: number }; _sum: { totalPaise: bigint | null } }> {
     return this.prisma.order.aggregate({
-      where: { buyerId, placedAt: { gte: start } },
+      where: { buyerId, placedAt: end ? { gte: start, lt: end } : { gte: start } },
       _count: { _all: true },
       _sum: { totalPaise: true },
     });

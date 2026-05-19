@@ -167,8 +167,12 @@ export class AdminController {
   }
 
   @Get('buyers/:id')
-  buyer(@Param('id') id: string): ReturnType<AdminService['getBuyer']> {
-    return this.admin.getBuyer(id);
+  buyer(
+    @Param('id') id: string,
+    @Query('period') period?: string,
+    @Query('anchor') anchor?: string,
+  ): ReturnType<AdminService['getBuyer']> {
+    return this.admin.getBuyer(id, { period, anchor });
   }
 
   @Post('buyers')

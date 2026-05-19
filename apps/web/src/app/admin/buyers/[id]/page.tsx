@@ -23,6 +23,8 @@ const PERIOD_ANALYTICS_LABELS = [
 ] as const;
 type BuyerAnalyticsPeriod = (typeof PERIOD_ANALYTICS_LABELS)[number]['key'];
 
+const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+
 const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
   APPROVED: 'success',
   PENDING_VERIFICATION: 'warning',
@@ -33,7 +35,7 @@ const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'secondary' | 'out
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; anchor?: string }>;
 }
 
 function isBuyerAnalyticsPeriod(value: string | undefined): value is BuyerAnalyticsPeriod {
@@ -42,6 +44,205 @@ function isBuyerAnalyticsPeriod(value: string | undefined): value is BuyerAnalyt
 
 function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleDateString('en-IN') : '—';
+}
+
+function businessCalendarDate(now = new Date()): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return new Date(Date.UTC(value('year'), value('month') - 1, value('day')));
+}
+
+function formatUtcDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
+}
+
+function dateKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function isoWeekStart(year: number, week: number): Date | null {
+  if (week < 1 || week > 53) return null;
+
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const start = new Date(jan4);
+  start.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
+  return weekKey(start) === `${year}-W${String(week).padStart(2, '0')}` ? start : null;
+}
+
+function weekKey(date: Date): string {
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(date);
+  thursday.setUTCDate(date.getUTCDate() + 4 - day);
+  const year = thursday.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function parseWeekKey(value: string): Date | null {
+  const match = /^(\d{4})-W(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  return isoWeekStart(Number(match[1]), Number(match[2]));
+}
+
+function normalizePeriodAnchor(period: BuyerAnalyticsPeriod, anchor: string | undefined): string {
+  const today = businessCalendarDate();
+
+  if (period === 'day') {
+    return anchor && parseDateKey(anchor) ? anchor : dateKey(today);
+  }
+
+  if (period === 'week') {
+    if (anchor && parseWeekKey(anchor)) return anchor;
+    const dateAnchor = anchor ? parseDateKey(anchor) : null;
+    return weekKey(dateAnchor ?? today);
+  }
+
+  if (period === 'month') {
+    const match = /^(\d{4})-(\d{2})$/.exec(anchor ?? '');
+    const month = match ? Number(match[2]) : 0;
+    return match && month >= 1 && month <= 12 ? match[0] : dateKey(today).slice(0, 7);
+  }
+
+  return anchor && /^\d{4}$/.test(anchor) ? anchor : String(today.getUTCFullYear());
+}
+
+function periodContextLabel(period: BuyerAnalyticsPeriod, anchor: string): string {
+  const anchorDate = parseDateKey(anchor) ?? businessCalendarDate();
+
+  if (period === 'day') {
+    return formatUtcDate(anchorDate, {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  if (period === 'week') {
+    const start = parseWeekKey(anchor) ?? anchorDate;
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    return `${anchor.replace('-W', ' Week ')} · ${formatUtcDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
+  }
+
+  if (period === 'month') {
+    const [year, month] = anchor.split('-').map(Number);
+    return formatUtcDate(new Date(Date.UTC(year, month - 1, 1)), {
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  return anchor;
+}
+
+function periodInputConfig(period: BuyerAnalyticsPeriod): {
+  label: string;
+  type: 'date' | 'month' | 'number';
+  min?: string;
+  max?: string;
+  inputMode?: 'numeric';
+} {
+  if (period === 'day') {
+    return { label: 'Date', type: 'date' };
+  }
+
+  if (period === 'week') {
+    return { label: 'Week', type: 'date' };
+  }
+
+  if (period === 'month') {
+    return { label: 'Month', type: 'month' };
+  }
+
+  return { label: 'Year', type: 'number', min: '2000', max: '2100', inputMode: 'numeric' };
+}
+
+function defaultAnchorForPeriod(period: BuyerAnalyticsPeriod): string {
+  return normalizePeriodAnchor(period, undefined);
+}
+
+function weekCalendar(anchor: string): {
+  monthLabel: string;
+  previousAnchor: string;
+  nextAnchor: string;
+  weeks: {
+    key: string;
+    label: string;
+    selected: boolean;
+    days: { date: Date; inMonth: boolean }[];
+  }[];
+} {
+  const selectedStart = parseWeekKey(anchor) ?? businessCalendarDate();
+  const monthStart = new Date(
+    Date.UTC(selectedStart.getUTCFullYear(), selectedStart.getUTCMonth(), 1),
+  );
+  const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+  const firstDay = monthStart.getUTCDay() || 7;
+  const cursor = new Date(monthStart);
+  cursor.setUTCDate(monthStart.getUTCDate() - firstDay + 1);
+
+  const weeks = [];
+  while (cursor <= monthEnd || weeks.length < 5) {
+    const start = new Date(cursor);
+    const key = weekKey(start);
+    const weekNumber = key.split('-W')[1] ?? '';
+    weeks.push({
+      key,
+      label: `W${weekNumber}`,
+      selected: key === anchor,
+      days: Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(start);
+        date.setUTCDate(start.getUTCDate() + index);
+        return {
+          date,
+          inMonth: date.getUTCMonth() === monthStart.getUTCMonth(),
+        };
+      }),
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+
+  return {
+    monthLabel: formatUtcDate(monthStart, { month: 'long', year: 'numeric' }),
+    previousAnchor: weekKey(
+      new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1)),
+    ),
+    nextAnchor: weekKey(
+      new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)),
+    ),
+    weeks,
+  };
 }
 
 function statusBreakdownLabel(statusCounts: Record<string, number>): string {
@@ -63,13 +264,19 @@ export default async function BuyerDetailPage({
   }
 
   const { id } = await params;
-  const { period: rawPeriod } = await searchParams;
+  const { period: rawPeriod, anchor: rawAnchor } = await searchParams;
   const selectedPeriod = isBuyerAnalyticsPeriod(rawPeriod) ? rawPeriod : 'month';
+  const selectedAnchor = normalizePeriodAnchor(selectedPeriod, rawAnchor);
   let buyer: Awaited<ReturnType<typeof getAdminBuyer>> | null = null;
   let error: string | null = null;
 
   try {
-    buyer = await getAdminBuyer(session.accessToken, id, { next: { revalidate: 0 } });
+    buyer = await getAdminBuyer(
+      session.accessToken,
+      id,
+      { period: selectedPeriod, anchor: selectedAnchor },
+      { next: { revalidate: 0 } },
+    );
   } catch (err) {
     if (err instanceof ApiError) {
       error = err.problem.detail ?? 'Could not load buyer.';
@@ -95,6 +302,9 @@ export default async function BuyerDetailPage({
   const selectedPeriodLabel =
     PERIOD_ANALYTICS_LABELS.find((period) => period.key === selectedPeriod)?.label ?? 'Monthly';
   const selectedPeriodAnalytics = summary.periodAnalytics[selectedPeriod];
+  const selectedPeriodContext = periodContextLabel(selectedPeriod, selectedAnchor);
+  const inputConfig = periodInputConfig(selectedPeriod);
+  const selectedWeekCalendar = selectedPeriod === 'week' ? weekCalendar(selectedAnchor) : null;
 
   return (
     <div className="space-y-6">
@@ -156,14 +366,14 @@ export default async function BuyerDetailPage({
               <div>
                 <CardTitle className="text-base">Period Analytics</CardTitle>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  {selectedPeriodLabel} buyer performance
+                  {selectedPeriodLabel} buyer performance · {selectedPeriodContext}
                 </p>
               </div>
               <div className="bg-secondary/50 inline-flex rounded-md p-1">
                 {PERIOD_ANALYTICS_LABELS.map((period) => (
-                  <Link
+                  <a
                     key={period.key}
-                    href={`/admin/buyers/${buyer.id}?period=${period.key}`}
+                    href={`/admin/buyers/${buyer.id}?period=${period.key}&anchor=${defaultAnchorForPeriod(period.key)}`}
                     className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                       selectedPeriod === period.key
                         ? 'bg-background text-foreground shadow-sm'
@@ -171,12 +381,115 @@ export default async function BuyerDetailPage({
                     }`}
                   >
                     {period.label}
-                  </Link>
+                  </a>
                 ))}
               </div>
             </div>
+            {selectedWeekCalendar ? (
+              <div className="bg-background mt-4 w-full max-w-md rounded-md border p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <a
+                    href={`/admin/buyers/${buyer.id}?period=week&anchor=${selectedWeekCalendar.previousAnchor}`}
+                    className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-lg leading-none"
+                    aria-label="Previous month"
+                  >
+                    ←
+                  </a>
+                  <p className="text-sm font-medium">{selectedWeekCalendar.monthLabel}</p>
+                  <a
+                    href={`/admin/buyers/${buyer.id}?period=week&anchor=${selectedWeekCalendar.nextAnchor}`}
+                    className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-lg leading-none"
+                    aria-label="Next month"
+                  >
+                    →
+                  </a>
+                </div>
+                <table className="w-full table-fixed text-center text-xs">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="w-12 pb-2 font-medium">Week</th>
+                      {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+                        <th key={`${day}-${index}`} className="pb-2 font-medium">
+                          {day}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedWeekCalendar.weeks.map((week) => (
+                      <tr
+                        key={week.key}
+                        className={
+                          week.selected ? 'bg-primary/15 text-foreground' : 'text-foreground'
+                        }
+                      >
+                        <td className="py-1">
+                          <a
+                            href={`/admin/buyers/${buyer.id}?period=week&anchor=${week.key}`}
+                            className={`block rounded px-1 py-2 font-medium ${
+                              week.selected
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-secondary'
+                            }`}
+                            aria-current={week.selected ? 'date' : undefined}
+                          >
+                            {week.label}
+                          </a>
+                        </td>
+                        {week.days.map((day) => (
+                          <td key={dateKey(day.date)} className="py-1">
+                            <a
+                              href={`/admin/buyers/${buyer.id}?period=week&anchor=${week.key}`}
+                              className={`block rounded px-1 py-2 ${
+                                week.selected ? 'bg-primary/10 font-semibold' : 'hover:bg-secondary'
+                              } ${day.inMonth ? '' : 'text-muted-foreground/60'}`}
+                              aria-current={week.selected ? 'date' : undefined}
+                            >
+                              {day.date.getUTCDate()}
+                            </a>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <form
+                key={`${selectedPeriod}-${selectedAnchor}`}
+                method="get"
+                className="mt-4 flex flex-wrap items-end gap-3"
+              >
+                <input type="hidden" name="period" value={selectedPeriod} />
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {inputConfig.label}
+                  <input
+                    key={`${selectedPeriod}-${selectedAnchor}-input`}
+                    type={inputConfig.type}
+                    name="anchor"
+                    defaultValue={selectedAnchor}
+                    min={inputConfig.min}
+                    max={inputConfig.max}
+                    inputMode={inputConfig.inputMode}
+                    className="border-input bg-background text-foreground focus:border-primary h-9 w-44 rounded-md border px-3 text-sm shadow-sm outline-none transition-colors"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 rounded-md px-4 text-sm font-medium shadow-sm transition-colors"
+                >
+                  Apply
+                </button>
+              </form>
+            )}
           </CardHeader>
           <CardContent>
+            <div className="bg-secondary/30 mb-4 rounded-md px-3 py-2">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                Active {selectedPeriodLabel.toLowerCase()} window
+              </p>
+              <p className="text-sm font-medium">{selectedPeriodContext}</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <p className="text-muted-foreground text-xs uppercase tracking-wide">Orders</p>
