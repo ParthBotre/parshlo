@@ -92,8 +92,55 @@ const AdminBuyerRow = z.object({
   city: z.string().nullable(),
   state: z.string().nullable(),
   createdAt: z.string(),
+  orderSummary: z.object({
+    totalOrders: z.number(),
+    totalPaise: z.number(),
+    currentMonthOrders: z.number(),
+    currentMonthPaise: z.number(),
+    averageOrderPaise: z.number(),
+    latestOrderNumber: z.string().nullable(),
+    latestOrderStatus: z.string().nullable(),
+    latestOrderAt: z.string().nullable(),
+    statusCounts: z.record(z.string(), z.number()),
+    periodAnalytics: z.object({
+      day: z.object({
+        orderCount: z.number(),
+        totalPaise: z.number(),
+        averageOrderPaise: z.number(),
+      }),
+      week: z.object({
+        orderCount: z.number(),
+        totalPaise: z.number(),
+        averageOrderPaise: z.number(),
+      }),
+      month: z.object({
+        orderCount: z.number(),
+        totalPaise: z.number(),
+        averageOrderPaise: z.number(),
+      }),
+      year: z.object({
+        orderCount: z.number(),
+        totalPaise: z.number(),
+        averageOrderPaise: z.number(),
+      }),
+    }),
+  }),
 });
 const AdminBuyerList = z.array(AdminBuyerRow);
+const AdminBuyerDetail = AdminBuyerRow.extend({
+  recentOrders: z.array(
+    z.object({
+      id: z.string(),
+      orderNumber: z.string(),
+      status: z.string(),
+      placedAt: z.string(),
+      totalPaise: z.number(),
+      itemCount: z.number(),
+      courierService: z.string().nullable(),
+      courierDocketNumber: z.string().nullable(),
+    }),
+  ),
+});
 
 export function listPendingKyc(
   accessToken: string,
@@ -174,6 +221,18 @@ export function listAllBuyers(
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
 ): Promise<z.infer<typeof AdminBuyerList>> {
   return apiCall('/v1/admin/buyers', AdminBuyerList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function getAdminBuyer(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<z.infer<typeof AdminBuyerDetail>> {
+  return apiCall(`/v1/admin/buyers/${encodeURIComponent(id)}`, AdminBuyerDetail, {
     method: 'GET',
     accessToken,
     ...options,

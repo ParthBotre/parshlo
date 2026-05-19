@@ -4,29 +4,106 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { type Prisma } from '@parshlo/db';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 
-function isUtcCalendarMonthRange(start: Date, end: Date): boolean {
+const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+
+function calendarParts(date: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return {
+    year: value('year'),
+    month: value('month'),
+    day: value('day'),
+    hour: value('hour'),
+    minute: value('minute'),
+    second: value('second'),
+  };
+}
+
+function isBusinessCalendarMonthRange(start: Date, end: Date): boolean {
+  const startParts = calendarParts(start);
+  const endParts = calendarParts(end);
   if (
-    start.getUTCHours() !== 0 ||
-    start.getUTCMinutes() !== 0 ||
-    start.getUTCSeconds() !== 0 ||
-    start.getUTCMilliseconds() !== 0 ||
-    start.getUTCDate() !== 1
+    startParts.day !== 1 ||
+    startParts.hour !== 0 ||
+    startParts.minute !== 0 ||
+    startParts.second !== 0
   ) {
     return false;
   }
 
-  const expectedEnd = new Date(
-    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0, 23, 59, 59, 999),
+  const lastDay = new Date(Date.UTC(startParts.year, startParts.month, 0)).getUTCDate();
+  return (
+    endParts.year === startParts.year &&
+    endParts.month === startParts.month &&
+    endParts.day === lastDay &&
+    endParts.hour === 23 &&
+    endParts.minute === 59 &&
+    endParts.second === 59 &&
+    end.getMilliseconds() === 999
   );
-  return end.getTime() === expectedEnd.getTime();
 }
 
 @Injectable()
 export class FinanceLogisticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async recalculateStatement(
+    tx: Prisma.TransactionClient,
+    statementId: string,
+  ): Promise<void> {
+    const statement = await tx.courierLedgerStatement.findUnique({
+      where: { id: statementId },
+    });
+    if (!statement) throw new NotFoundException({ code: 'STATEMENT_NOT_FOUND' });
+    if (statement.status === 'PAID') {
+      throw new BadRequestException({
+        code: 'STATEMENT_ALREADY_PAID',
+        message: 'Paid statements are locked. Create a new monthly statement adjustment instead.',
+      });
+    }
+
+    const aggregate = await tx.adminConsignmentLog.aggregate({
+      _sum: { amountPaise: true },
+      where: { statementId },
+    });
+    const systemCalculated = aggregate._sum.amountPaise ?? 0n;
+    const status =
+      systemCalculated === statement.courierChargedTotalPaise ? 'RECONCILED' : 'FLAGGED';
+    const consignmentStatus = status === 'RECONCILED' ? 'MATCHED' : 'DISCREPANCY';
+
+    await tx.courierLedgerStatement.update({
+      where: { id: statementId },
+      data: {
+        systemCalculatedTotalPaise: systemCalculated,
+        status,
+      },
+    });
+    await tx.adminConsignmentLog.updateMany({
+      where: { statementId },
+      data: { status: consignmentStatus },
+    });
+  }
 
   private serializeConsignment<
     T extends {
@@ -141,20 +218,43 @@ export class FinanceLogisticsService {
     });
     if (existing) throw new ConflictException({ code: 'DOCKET_ALREADY_EXISTS' });
 
-    const consignment = await this.prisma.adminConsignmentLog.create({
-      data: {
-        courierId: dto.courierId,
-        type: dto.type,
-        docketNumber: dto.docketNumber,
-        consignmentDate: dto.consignmentDate,
-        amountPaise: dto.amountPaise,
-        weightKg: dto.weightKg,
-        boxCount: dto.boxCount,
-        associatedPoNumber: dto.associatedPoNumber,
-        associatedOrderNumber: dto.associatedOrderNumber,
-      },
-      include: { courier: true, statement: { select: { status: true } } },
+    const consignment = await this.prisma.$transaction(async (tx) => {
+      const matchingStatement = await tx.courierLedgerStatement.findFirst({
+        where: {
+          courierId: dto.courierId,
+          billingPeriodStart: { lte: dto.consignmentDate },
+          billingPeriodEnd: { gte: dto.consignmentDate },
+          status: { not: 'PAID' },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const created = await tx.adminConsignmentLog.create({
+        data: {
+          courierId: dto.courierId,
+          type: dto.type,
+          docketNumber: dto.docketNumber,
+          consignmentDate: dto.consignmentDate,
+          amountPaise: dto.amountPaise,
+          weightKg: dto.weightKg,
+          boxCount: dto.boxCount,
+          statementId: matchingStatement?.id,
+          status: matchingStatement ? 'DISCREPANCY' : 'UNBILLED',
+          associatedPoNumber: dto.associatedPoNumber,
+          associatedOrderNumber: dto.associatedOrderNumber,
+        },
+      });
+
+      if (matchingStatement) {
+        await this.recalculateStatement(tx, matchingStatement.id);
+      }
+
+      return tx.adminConsignmentLog.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { courier: true, statement: { select: { status: true } } },
+      });
     });
+
     return this.serializeConsignment(consignment);
   }
 
@@ -205,7 +305,7 @@ export class FinanceLogisticsService {
     if (dto.billingPeriodStart >= dto.billingPeriodEnd) {
       throw new BadRequestException({ code: 'INVALID_BILLING_PERIOD' });
     }
-    if (!isUtcCalendarMonthRange(dto.billingPeriodStart, dto.billingPeriodEnd)) {
+    if (!isBusinessCalendarMonthRange(dto.billingPeriodStart, dto.billingPeriodEnd)) {
       throw new BadRequestException({
         code: 'BILLING_PERIOD_MUST_BE_MONTHLY',
         message: 'Courier statements must cover one complete calendar month.',

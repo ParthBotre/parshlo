@@ -19,6 +19,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'
 type Statement = LogisticsStatement;
 type ConsignmentPeriod = 'day' | 'week' | 'month' | 'year';
 
+const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+
 const STATUS_COLORS: Record<string, string> = {
   UNBILLED: 'secondary',
   MATCHED: 'default',
@@ -42,7 +44,55 @@ function paise(v: string | number | bigint) {
 }
 
 function fmt(d: string) {
-  return new Date(d).toLocaleDateString('en-IN');
+  return new Date(d).toLocaleDateString('en-IN', { timeZone: BUSINESS_TIME_ZONE });
+}
+
+function calendarParts(date: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return { year: value('year'), month: value('month'), day: value('day') };
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function calendarDateKey(date: Date): string {
+  const parts = calendarParts(date);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+function formatCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-IN', { ...options, timeZone: BUSINESS_TIME_ZONE });
+}
+
+function formatUtcCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
+}
+
+function businessCalendarDate(date: Date): Date {
+  const parts = calendarParts(date);
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+}
+
+function dateInputToBusinessIso(dateValue: string): string {
+  return `${dateValue}T00:00:00.000+05:30`;
+}
+
+function dateInputFromBusinessIso(value: string): string {
+  return calendarDateKey(new Date(value));
+}
+
+function dateInputToStatementLabel(dateValue: string): string {
+  return new Date(`${dateValue}T00:00:00.000+05:30`).toLocaleDateString('en-IN', {
+    timeZone: BUSINESS_TIME_ZONE,
+  });
 }
 
 function monthToBillingPeriod(
@@ -55,9 +105,19 @@ function monthToBillingPeriod(
     return null;
   }
 
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
-  return { start: start.toISOString(), end: end.toISOString() };
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    start: `${year}-${pad2(month)}-01T00:00:00.000+05:30`,
+    end: `${year}-${pad2(month)}-${pad2(lastDay)}T23:59:59.999+05:30`,
+  };
+}
+
+function statementPeriodLabel(statement: Statement): string {
+  const { year, month } = calendarParts(new Date(statement.billingPeriodStart));
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const startLabel = dateInputToStatementLabel(`${year}-${pad2(month)}-01`);
+  const endLabel = dateInputToStatementLabel(`${year}-${pad2(month)}-${pad2(lastDay)}`);
+  return `${startLabel} – ${endLabel}`;
 }
 
 const BILLING_MONTH_OPTIONS = [
@@ -94,17 +154,16 @@ function displayConsignmentStatus(consignment: Consignment) {
 }
 
 function startOfWeek(date: Date) {
-  const start = new Date(date);
-  const day = start.getDay();
+  const start = businessCalendarDate(date);
+  const day = start.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diff);
-  start.setHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() + diff);
   return start;
 }
 
 function formatPeriodLabel(date: Date, period: ConsignmentPeriod) {
   if (period === 'day') {
-    return date.toLocaleDateString('en-IN', {
+    return formatCalendarDate(date, {
       weekday: 'short',
       day: '2-digit',
       month: 'short',
@@ -115,20 +174,20 @@ function formatPeriodLabel(date: Date, period: ConsignmentPeriod) {
   if (period === 'week') {
     const start = startOfWeek(date);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return `${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    end.setUTCDate(start.getUTCDate() + 6);
+    return `${formatUtcCalendarDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcCalendarDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
   }
 
   if (period === 'month') {
-    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    return formatCalendarDate(date, { month: 'long', year: 'numeric' });
   }
 
-  return date.toLocaleDateString('en-IN', { year: 'numeric' });
+  return formatCalendarDate(date, { year: 'numeric' });
 }
 
 function periodKey(date: Date, period: ConsignmentPeriod) {
   if (period === 'day') {
-    return date.toISOString().slice(0, 10);
+    return calendarDateKey(date);
   }
 
   if (period === 'week') {
@@ -136,10 +195,11 @@ function periodKey(date: Date, period: ConsignmentPeriod) {
   }
 
   if (period === 'month') {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const parts = calendarParts(date);
+    return `${parts.year}-${pad2(parts.month)}`;
   }
 
-  return String(date.getFullYear());
+  return String(calendarParts(date).year);
 }
 
 function groupConsignments(consignments: Consignment[], period: ConsignmentPeriod) {
@@ -260,7 +320,7 @@ export default function LogisticsPageClient({
           courierId: form.courierId,
           type: form.type,
           docketNumber: form.docketNumber,
-          consignmentDate: new Date(form.consignmentDate).toISOString(),
+          consignmentDate: dateInputToBusinessIso(form.consignmentDate),
           amountPaise: Math.round(parseFloat(form.amountRupees) * 100),
           weightKg: form.weightKg ? parseFloat(form.weightKg) : undefined,
           boxCount: parseInt(form.boxCount),
@@ -271,7 +331,45 @@ export default function LogisticsPageClient({
       );
       // Attach courier name for display
       const courier = couriers.find((c) => c.id === form.courierId);
-      setConsignments((prev) => [{ ...created, courier: { name: courier?.name ?? '' } }, ...prev]);
+      const createdWithCourier = { ...created, courier: { name: courier?.name ?? '' } };
+      if (created.statementId) {
+        setStatements((prev) =>
+          prev.map((statement) => {
+            if (statement.id !== created.statementId) return statement;
+
+            const systemCalculatedTotalPaise = (
+              BigInt(statement.systemCalculatedTotalPaise) + BigInt(created.amountPaise)
+            ).toString();
+            const status =
+              systemCalculatedTotalPaise === String(statement.courierChargedTotalPaise)
+                ? 'RECONCILED'
+                : 'FLAGGED';
+
+            return {
+              ...statement,
+              systemCalculatedTotalPaise,
+              status,
+              _count: { consignments: statement._count.consignments + 1 },
+            };
+          }),
+        );
+        const statementStatus = created.statement?.status ?? 'FLAGGED';
+        const consignmentStatus = statementStatus === 'RECONCILED' ? 'MATCHED' : 'DISCREPANCY';
+        setConsignments((prev) => [
+          createdWithCourier,
+          ...prev.map((consignment) =>
+            consignment.statementId === created.statementId
+              ? {
+                  ...consignment,
+                  status: consignmentStatus,
+                  statement: { status: statementStatus },
+                }
+              : consignment,
+          ),
+        ]);
+      } else {
+        setConsignments((prev) => [createdWithCourier, ...prev]);
+      }
       setForm((f) => ({
         ...f,
         docketNumber: '',
@@ -338,9 +436,7 @@ export default function LogisticsPageClient({
       setStatements((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'PAID' } : s)));
       setConsignments((prev) =>
         prev.map((c) =>
-          c.statementId === id || isConsignmentInStatementWindow(c, paid)
-            ? { ...c, statementId: id, statement: { status: 'PAID' } }
-            : c,
+          c.statementId === paid.id ? { ...c, statementId: id, statement: { status: 'PAID' } } : c,
         ),
       );
     } catch (err) {
@@ -357,6 +453,24 @@ export default function LogisticsPageClient({
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  function beginStatementLine(statement: Statement) {
+    setTab('consignments');
+    setDashboardCourierId(statement.courierId);
+    setConsignmentPeriod('month');
+    setForm((current) => ({
+      ...current,
+      courierId: statement.courierId,
+      type: 'OUTGOING',
+      docketNumber: '',
+      consignmentDate: dateInputFromBusinessIso(statement.billingPeriodStart),
+      amountRupees: '',
+      weightKg: '',
+      boxCount: '1',
+      associatedOrderNumber: '',
+      associatedPoNumber: statement.statementInvoiceNumber,
+    }));
   }
 
   const inputCls =
@@ -507,18 +621,17 @@ export default function LogisticsPageClient({
                 </div>
                 <div>
                   <label htmlFor="consignment-amount" className={labelCls}>
-                    Amount (₹)
+                    Amount / Adjustment (₹)
                   </label>
                   <input
                     id="consignment-amount"
                     type="number"
                     step="0.01"
-                    min="0"
                     className={inputCls}
                     value={form.amountRupees}
                     onChange={(e) => setForm((f) => ({ ...f, amountRupees: e.target.value }))}
                     required
-                    placeholder="0.00"
+                    placeholder="e.g. 2000 or -2000"
                   />
                 </div>
                 <div>
@@ -877,7 +990,7 @@ export default function LogisticsPageClient({
                             {s.statementInvoiceNumber}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-xs">
-                            {fmt(s.billingPeriodStart)} – {fmt(s.billingPeriodEnd)}
+                            {statementPeriodLabel(s)}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
                             {paise(charged)}
@@ -899,15 +1012,26 @@ export default function LogisticsPageClient({
                             </Badge>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
-                            {s.status === 'RECONCILED' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void markPaid(s.id)}
-                              >
-                                Mark Paid
-                              </Button>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                              {s.status !== 'PAID' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => beginStatementLine(s)}
+                                >
+                                  Add line
+                                </Button>
+                              )}
+                              {s.status === 'RECONCILED' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void markPaid(s.id)}
+                                >
+                                  Mark Paid
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

@@ -35,6 +35,8 @@ interface PageProps {
 type OrderPeriod = 'day' | 'week' | 'month' | 'year';
 type AdminOrder = Awaited<ReturnType<typeof listAllOrders>>[number];
 
+const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
+
 const PERIOD_FILTERS: { label: string; value: OrderPeriod }[] = [
   { label: 'Daily', value: 'day' },
   { label: 'Weekly', value: 'week' },
@@ -46,27 +48,61 @@ function isOrderPeriod(value: string | undefined): value is OrderPeriod {
   return value === 'day' || value === 'week' || value === 'month' || value === 'year';
 }
 
+function calendarParts(date: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return { year: value('year'), month: value('month'), day: value('day') };
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function calendarDateKey(date: Date): string {
+  const parts = calendarParts(date);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+function formatCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-IN', { ...options, timeZone: BUSINESS_TIME_ZONE });
+}
+
+function formatUtcCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
+}
+
+function businessCalendarDate(date: Date): Date {
+  const parts = calendarParts(date);
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+}
+
 function startOfWeek(date: Date): Date {
-  const start = new Date(date);
-  const day = start.getDay();
+  const start = businessCalendarDate(date);
+  const day = start.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diff);
-  start.setHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() + diff);
   return start;
 }
 
 function periodKey(date: Date, period: OrderPeriod): string {
-  if (period === 'day') return date.toISOString().slice(0, 10);
+  if (period === 'day') return calendarDateKey(date);
   if (period === 'week') return startOfWeek(date).toISOString().slice(0, 10);
   if (period === 'month') {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const parts = calendarParts(date);
+    return `${parts.year}-${pad2(parts.month)}`;
   }
-  return String(date.getFullYear());
+  return String(calendarParts(date).year);
 }
 
 function periodLabel(date: Date, period: OrderPeriod): string {
   if (period === 'day') {
-    return date.toLocaleDateString('en-IN', {
+    return formatCalendarDate(date, {
       weekday: 'short',
       day: '2-digit',
       month: 'short',
@@ -76,13 +112,13 @@ function periodLabel(date: Date, period: OrderPeriod): string {
   if (period === 'week') {
     const start = startOfWeek(date);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return `${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    end.setUTCDate(start.getUTCDate() + 6);
+    return `${formatUtcCalendarDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcCalendarDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
   }
   if (period === 'month') {
-    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    return formatCalendarDate(date, { month: 'long', year: 'numeric' });
   }
-  return date.toLocaleDateString('en-IN', { year: 'numeric' });
+  return formatCalendarDate(date, { year: 'numeric' });
 }
 
 function groupOrders(orders: AdminOrder[], period: OrderPeriod) {
@@ -239,7 +275,11 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                                 </Badge>
                               </td>
                               <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
-                                {new Date(o.placedAt).toLocaleDateString('en-IN')}
+                                {formatCalendarDate(new Date(o.placedAt), {
+                                  day: 'numeric',
+                                  month: 'numeric',
+                                  year: 'numeric',
+                                })}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
                                 {formatINR(o.totalPaise)}

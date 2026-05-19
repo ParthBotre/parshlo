@@ -166,6 +166,11 @@ export class AdminController {
     return this.admin.listBuyers();
   }
 
+  @Get('buyers/:id')
+  buyer(@Param('id') id: string): ReturnType<AdminService['getBuyer']> {
+    return this.admin.getBuyer(id);
+  }
+
   @Post('buyers')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)

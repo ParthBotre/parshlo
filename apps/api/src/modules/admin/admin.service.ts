@@ -1,41 +1,120 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { type AdminCreateBuyerInput, type OrderStatus } from '@parshlo/types';
 
 import { PrismaService } from '../prisma/prisma.service.js';
+
+const ORDER_STATUSES: OrderStatus[] = [
+  'RECEIVED',
+  'UNDER_REVIEW',
+  'APPROVED',
+  'PREPARING',
+  'DISPATCHED',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'CANCELLED',
+  'REJECTED',
+];
+
+const BUYER_ANALYTICS_PERIODS = ['day', 'week', 'month', 'year'] as const;
+type BuyerAnalyticsPeriod = (typeof BUYER_ANALYTICS_PERIODS)[number];
+
+interface BuyerPeriodSummary {
+  orderCount: number;
+  totalPaise: number;
+  averageOrderPaise: number;
+}
+
+interface BuyerOrderSummary {
+  totalOrders: number;
+  totalPaise: number;
+  currentMonthOrders: number;
+  currentMonthPaise: number;
+  averageOrderPaise: number;
+  latestOrderNumber: string | null;
+  latestOrderStatus: string | null;
+  latestOrderAt: string | null;
+  statusCounts: Record<OrderStatus, number>;
+  periodAnalytics: Record<BuyerAnalyticsPeriod, BuyerPeriodSummary>;
+}
+
+interface BuyerRow {
+  id: string;
+  email: string;
+  fullName: string;
+  accountStatus: string;
+  businessName: string | null;
+  gstin: string | null;
+  mobile: string | null;
+  businessType: string | null;
+  drugLicenseNumber: string | null;
+  city: string | null;
+  state: string | null;
+  createdAt: string;
+  orderSummary: BuyerOrderSummary;
+}
+
+interface BuyerRecentOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  placedAt: string;
+  totalPaise: number;
+  itemCount: number;
+  courierService: string | null;
+  courierDocketNumber: string | null;
+}
+
+interface BuyerDetail extends BuyerRow {
+  recentOrders: BuyerRecentOrder[];
+}
 
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private toBuyerRow(user: {
-    id: string;
-    email: string;
-    fullName: string;
-    accountStatus: string;
-    createdAt: Date;
-    businessProfile: {
-      businessName: string;
-      gstin: string;
-      mobile: string;
-      businessType: string;
-      drugLicenseNumber: string;
-      city: string;
-      state: string;
-    } | null;
-  }): {
-    id: string;
-    email: string;
-    fullName: string;
-    accountStatus: string;
-    businessName: string | null;
-    gstin: string | null;
-    mobile: string | null;
-    businessType: string | null;
-    drugLicenseNumber: string | null;
-    city: string | null;
-    state: string | null;
-    createdAt: string;
-  } {
+  private emptyBuyerPeriodSummary(): BuyerPeriodSummary {
+    return { orderCount: 0, totalPaise: 0, averageOrderPaise: 0 };
+  }
+
+  private emptyBuyerOrderSummary(): BuyerOrderSummary {
+    return {
+      totalOrders: 0,
+      totalPaise: 0,
+      currentMonthOrders: 0,
+      currentMonthPaise: 0,
+      averageOrderPaise: 0,
+      latestOrderNumber: null,
+      latestOrderStatus: null,
+      latestOrderAt: null,
+      statusCounts: Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0])) as Record<
+        OrderStatus,
+        number
+      >,
+      periodAnalytics: Object.fromEntries(
+        BUYER_ANALYTICS_PERIODS.map((period) => [period, this.emptyBuyerPeriodSummary()]),
+      ) as Record<BuyerAnalyticsPeriod, BuyerPeriodSummary>,
+    };
+  }
+
+  private toBuyerRow(
+    user: {
+      id: string;
+      email: string;
+      fullName: string;
+      accountStatus: string;
+      createdAt: Date;
+      businessProfile: {
+        businessName: string;
+        gstin: string;
+        mobile: string;
+        businessType: string;
+        drugLicenseNumber: string;
+        city: string;
+        state: string;
+      } | null;
+    },
+    orderSummary: BuyerOrderSummary = this.emptyBuyerOrderSummary(),
+  ): BuyerRow {
     return {
       id: user.id,
       email: user.email,
@@ -49,6 +128,7 @@ export class AdminService {
       city: user.businessProfile?.city ?? null,
       state: user.businessProfile?.state ?? null,
       createdAt: user.createdAt.toISOString(),
+      orderSummary,
     };
   }
 
@@ -104,24 +184,210 @@ export class AdminService {
     }));
   }
 
-  async listBuyers(): Promise<
-    {
-      id: string;
-      email: string;
-      fullName: string;
-      accountStatus: string;
-      businessName: string | null;
-      gstin: string | null;
-      createdAt: string;
-    }[]
-  > {
+  async listBuyers(): Promise<BuyerRow[]> {
     const users = await this.prisma.user.findMany({
       where: { roles: { has: 'BUYER' }, deletedAt: null },
       include: { businessProfile: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return users.map((u) => this.toBuyerRow(u));
+    const buyerIds = users.map((user) => user.id);
+    if (buyerIds.length === 0) return [];
+
+    const periodStarts = AdminService.businessPeriodStarts();
+    const [
+      lifetime,
+      currentDay,
+      currentWeek,
+      currentMonth,
+      currentYear,
+      statusGroups,
+      latestOrders,
+    ] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: buyerIds } },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: buyerIds }, placedAt: { gte: periodStarts.day } },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: buyerIds }, placedAt: { gte: periodStarts.week } },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: buyerIds }, placedAt: { gte: periodStarts.month } },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['buyerId'],
+        where: { buyerId: { in: buyerIds }, placedAt: { gte: periodStarts.year } },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['buyerId', 'status'],
+        where: { buyerId: { in: buyerIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.order.findMany({
+        where: { buyerId: { in: buyerIds } },
+        orderBy: { placedAt: 'desc' },
+        select: {
+          buyerId: true,
+          orderNumber: true,
+          status: true,
+          placedAt: true,
+        },
+      }),
+    ]);
+
+    const summaries = new Map<string, BuyerOrderSummary>();
+    for (const buyerId of buyerIds) {
+      summaries.set(buyerId, this.emptyBuyerOrderSummary());
+    }
+
+    for (const row of lifetime) {
+      const summary = summaries.get(row.buyerId);
+      if (!summary) continue;
+      summary.totalOrders = row._count._all;
+      summary.totalPaise = Number(row._sum.totalPaise ?? 0n);
+      summary.averageOrderPaise =
+        summary.totalOrders > 0 ? Math.round(summary.totalPaise / summary.totalOrders) : 0;
+    }
+
+    const applyPeriodRows = (period: BuyerAnalyticsPeriod, rows: typeof currentMonth): void => {
+      for (const row of rows) {
+        const summary = summaries.get(row.buyerId);
+        if (!summary) continue;
+        const orderCount = row._count._all;
+        const totalPaise = Number(row._sum.totalPaise ?? 0n);
+        summary.periodAnalytics[period] = {
+          orderCount,
+          totalPaise,
+          averageOrderPaise: orderCount > 0 ? Math.round(totalPaise / orderCount) : 0,
+        };
+      }
+    };
+
+    applyPeriodRows('day', currentDay);
+    applyPeriodRows('week', currentWeek);
+    applyPeriodRows('month', currentMonth);
+    applyPeriodRows('year', currentYear);
+
+    for (const row of currentMonth) {
+      const summary = summaries.get(row.buyerId);
+      if (!summary) continue;
+      summary.currentMonthOrders = row._count._all;
+      summary.currentMonthPaise = Number(row._sum.totalPaise ?? 0n);
+    }
+
+    for (const row of statusGroups) {
+      const summary = summaries.get(row.buyerId);
+      if (!summary) continue;
+      summary.statusCounts[row.status] = row._count._all;
+    }
+
+    for (const order of latestOrders) {
+      const summary = summaries.get(order.buyerId);
+      if (!summary || summary.latestOrderAt) continue;
+      summary.latestOrderNumber = order.orderNumber;
+      summary.latestOrderStatus = order.status;
+      summary.latestOrderAt = order.placedAt.toISOString();
+    }
+
+    return users.map((u) => this.toBuyerRow(u, summaries.get(u.id)));
+  }
+
+  async getBuyer(id: string): Promise<BuyerDetail> {
+    const user = await this.prisma.user.findFirst({
+      where: { id, roles: { has: 'BUYER' }, deletedAt: null },
+      include: { businessProfile: true },
+    });
+    if (!user) {
+      throw new NotFoundException({ code: 'BUYER_NOT_FOUND' });
+    }
+
+    const periodStarts = AdminService.businessPeriodStarts();
+    const [
+      lifetime,
+      currentDay,
+      currentWeek,
+      currentMonth,
+      currentYear,
+      statusGroups,
+      latestOrder,
+      recentOrders,
+    ] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { buyerId: id },
+        _count: { _all: true },
+        _sum: { totalPaise: true },
+      }),
+      this.orderPeriodAggregate(id, periodStarts.day),
+      this.orderPeriodAggregate(id, periodStarts.week),
+      this.orderPeriodAggregate(id, periodStarts.month),
+      this.orderPeriodAggregate(id, periodStarts.year),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: { buyerId: id },
+        _count: { _all: true },
+      }),
+      this.prisma.order.findFirst({
+        where: { buyerId: id },
+        orderBy: { placedAt: 'desc' },
+        select: { orderNumber: true, status: true, placedAt: true },
+      }),
+      this.prisma.order.findMany({
+        where: { buyerId: id },
+        orderBy: { placedAt: 'desc' },
+        take: 100,
+        include: { _count: { select: { items: true } } },
+      }),
+    ]);
+
+    const summary = this.emptyBuyerOrderSummary();
+    summary.totalOrders = lifetime._count._all;
+    summary.totalPaise = Number(lifetime._sum.totalPaise ?? 0n);
+    summary.averageOrderPaise =
+      summary.totalOrders > 0 ? Math.round(summary.totalPaise / summary.totalOrders) : 0;
+    summary.periodAnalytics.day = this.toBuyerPeriodSummary(currentDay);
+    summary.periodAnalytics.week = this.toBuyerPeriodSummary(currentWeek);
+    summary.periodAnalytics.month = this.toBuyerPeriodSummary(currentMonth);
+    summary.periodAnalytics.year = this.toBuyerPeriodSummary(currentYear);
+    summary.currentMonthOrders = summary.periodAnalytics.month.orderCount;
+    summary.currentMonthPaise = summary.periodAnalytics.month.totalPaise;
+    for (const row of statusGroups) {
+      summary.statusCounts[row.status] = row._count._all;
+    }
+    if (latestOrder) {
+      summary.latestOrderNumber = latestOrder.orderNumber;
+      summary.latestOrderStatus = latestOrder.status;
+      summary.latestOrderAt = latestOrder.placedAt.toISOString();
+    }
+
+    return {
+      ...this.toBuyerRow(user, summary),
+      recentOrders: recentOrders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        placedAt: order.placedAt.toISOString(),
+        totalPaise: Number(order.totalPaise),
+        itemCount: order._count.items,
+        courierService: order.courierService,
+        courierDocketNumber: order.courierDocketNumber,
+      })),
+    };
   }
 
   async createBuyer(
@@ -313,6 +579,47 @@ export class AdminService {
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
     return startOfMonth;
+  }
+
+  private static businessPeriodStarts(now = new Date()): Record<BuyerAnalyticsPeriod, Date> {
+    const indiaOffsetMs = 5.5 * 60 * 60 * 1000;
+    const businessNow = new Date(now.getTime() + indiaOffsetMs);
+    const year = businessNow.getUTCFullYear();
+    const month = businessNow.getUTCMonth();
+    const date = businessNow.getUTCDate();
+    const day = businessNow.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+
+    return {
+      day: new Date(Date.UTC(year, month, date) - indiaOffsetMs),
+      week: new Date(Date.UTC(year, month, date + mondayOffset) - indiaOffsetMs),
+      month: new Date(Date.UTC(year, month, 1) - indiaOffsetMs),
+      year: new Date(Date.UTC(year, 0, 1) - indiaOffsetMs),
+    };
+  }
+
+  private orderPeriodAggregate(
+    buyerId: string,
+    start: Date,
+  ): Promise<{ _count: { _all: number }; _sum: { totalPaise: bigint | null } }> {
+    return this.prisma.order.aggregate({
+      where: { buyerId, placedAt: { gte: start } },
+      _count: { _all: true },
+      _sum: { totalPaise: true },
+    });
+  }
+
+  private toBuyerPeriodSummary(aggregate: {
+    _count: { _all: number };
+    _sum: { totalPaise: bigint | null };
+  }): BuyerPeriodSummary {
+    const orderCount = aggregate._count._all;
+    const totalPaise = Number(aggregate._sum.totalPaise ?? 0n);
+    return {
+      orderCount,
+      totalPaise,
+      averageOrderPaise: orderCount > 0 ? Math.round(totalPaise / orderCount) : 0,
+    };
   }
 
   private async buildSalesByCityReport(startOfMonth: Date): Promise<{

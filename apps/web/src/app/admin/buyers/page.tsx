@@ -1,4 +1,5 @@
 import { type Metadata } from 'next';
+import Link from 'next/link';
 
 import { AdminBuyerCreateForm } from '@/components/admin/admin-buyer-create-form';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { listAllBuyers } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Admin · Buyers',
@@ -36,6 +38,13 @@ export default async function BuyersPage(): Promise<JSX.Element> {
   const canCreateBuyer = session.user.roles.some(
     (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
   );
+  const totalOrders = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalOrders, 0);
+  const totalRevenuePaise = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalPaise, 0);
+  const monthOrders = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.currentMonthOrders, 0);
+  const monthRevenuePaise = buyers.reduce(
+    (sum, buyer) => sum + buyer.orderSummary.currentMonthPaise,
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -46,6 +55,35 @@ export default async function BuyersPage(): Promise<JSX.Element> {
         </p>
       </div>
       {canCreateBuyer ? <AdminBuyerCreateForm /> : null}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">Buyers</p>
+            <p className="mt-1 font-mono text-2xl font-semibold">{buyers.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">Lifetime Orders</p>
+            <p className="mt-1 font-mono text-2xl font-semibold">{totalOrders}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+              Lifetime Revenue
+            </p>
+            <p className="mt-1 font-mono text-2xl font-semibold">{formatINR(totalRevenuePaise)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">This Month</p>
+            <p className="mt-1 font-mono text-2xl font-semibold">{formatINR(monthRevenuePaise)}</p>
+            <p className="text-muted-foreground text-xs">{monthOrders} orders</p>
+          </CardContent>
+        </Card>
+      </div>
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -68,7 +106,9 @@ export default async function BuyersPage(): Promise<JSX.Element> {
                 {buyers.map((b) => (
                   <tr key={b.id} className="border-t">
                     <td className="whitespace-nowrap px-5 py-3 font-medium">
-                      {b.businessName ?? '—'}
+                      <Link href={`/admin/buyers/${b.id}`} className="text-primary hover:underline">
+                        {b.businessName ?? '—'}
+                      </Link>
                     </td>
                     <td className="px-5 py-3">
                       <p className="whitespace-nowrap">{b.fullName}</p>

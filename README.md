@@ -97,21 +97,21 @@ The full architecture decisions are recorded as ADRs under [`docs/adr/`](./docs/
 
 ## Tech stack
 
-| Layer | Choice | Why |
-| --- | --- | --- |
-| Monorepo | **Turborepo + pnpm workspaces** | Fast, cached, content-aware task graph; industry standard. |
-| Frontend | **Next.js 15** App Router, **TypeScript** strict, **Tailwind**, **shadcn/ui**, **Framer Motion**, **TanStack Query** | RSC for fast public pages; familiar to FAANG-tier hiring teams. |
-| Backend | **NestJS 10** on **Fastify**, **Zod** validation, **Pino** logs | Opinionated, modular, DI-friendly; testable; production hardened. |
-| DB | **PostgreSQL 16** + **Prisma 5** | Type-safe ORM, painless migrations, transactional integrity. |
-| Cache / queue | **Redis 7** + **BullMQ** | Sessions, rate limits, async jobs (emails, invoices). |
-| Auth | **Auth0** with MFA, JWKS-validated RS256 JWTs | Enterprise SSO/MFA without rolling our own auth. |
-| Storage | **S3** (LocalStack in dev) | Encrypted-at-rest KYC documents + invoices. |
-| Email | **Resend** + React Email templates | Modern, reliable transactional email. |
-| Observability | **Pino** + **OpenTelemetry** hooks + **Sentry** | Structured logs, distributed traces, error monitoring. |
-| Testing | **Vitest**, **Jest**, **Supertest**, **Playwright**, **Testcontainers** | Unit, integration, contract, E2E coverage. |
-| Quality | ESLint flat config, Prettier, Husky + lint-staged, commitlint | Conventional Commits enforced. |
-| CI/CD | **GitHub Actions** (lint, typecheck, test, build, CodeQL, npm audit) | Fast feedback, security scanning baked in. |
-| Containers | Docker multi-stage (non-root), `docker-compose` for local | Reproducible local + prod parity. |
+| Layer         | Choice                                                                                                               | Why                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Monorepo      | **Turborepo + pnpm workspaces**                                                                                      | Fast, cached, content-aware task graph; industry standard.        |
+| Frontend      | **Next.js 15** App Router, **TypeScript** strict, **Tailwind**, **shadcn/ui**, **Framer Motion**, **TanStack Query** | RSC for fast public pages; familiar to FAANG-tier hiring teams.   |
+| Backend       | **NestJS 10** on **Fastify**, **Zod** validation, **Pino** logs                                                      | Opinionated, modular, DI-friendly; testable; production hardened. |
+| DB            | **PostgreSQL 16** + **Prisma 5**                                                                                     | Type-safe ORM, painless migrations, transactional integrity.      |
+| Cache / queue | **Redis 7** + **BullMQ**                                                                                             | Sessions, rate limits, async jobs (emails, invoices).             |
+| Auth          | **Auth0** with MFA, JWKS-validated RS256 JWTs                                                                        | Enterprise SSO/MFA without rolling our own auth.                  |
+| Storage       | **S3** (LocalStack in dev)                                                                                           | Encrypted-at-rest KYC documents + invoices.                       |
+| Email         | **Resend** + React Email templates                                                                                   | Modern, reliable transactional email.                             |
+| Observability | **Pino** + **OpenTelemetry** hooks + **Sentry**                                                                      | Structured logs, distributed traces, error monitoring.            |
+| Testing       | **Vitest**, **Jest**, **Supertest**, **Playwright**, **Testcontainers**                                              | Unit, integration, contract, E2E coverage.                        |
+| Quality       | ESLint flat config, Prettier, Husky + lint-staged, commitlint                                                        | Conventional Commits enforced.                                    |
+| CI/CD         | **GitHub Actions** (lint, typecheck, test, build, CodeQL, npm audit)                                                 | Fast feedback, security scanning baked in.                        |
+| Containers    | Docker multi-stage (non-root), `docker-compose` for local                                                            | Reproducible local + prod parity.                                 |
 
 ---
 
@@ -122,6 +122,9 @@ parshlo/
 ├── apps/
 │   ├── api/                  # NestJS + Fastify backend (REST /v1)
 │   ├── web/                  # Next.js 15 site + B2B + admin portals
+│   │                         #   · /admin/orders/[id] order inspection
+│   │                         #   · /admin/buyers/[id] buyer analytics
+│   │                         #   · /admin/finance/logistics reconciliation
 │   └── worker/               # BullMQ background processor
 │                             #   · transactional email
 │                             #   · invoice PDF generation
@@ -160,11 +163,13 @@ parshlo/
 ## Getting started
 
 ### Prerequisites
+
 - **Node.js 22.x** (`.nvmrc` provided)
 - **pnpm 9** (managed via `packageManager` in `package.json`)
 - **Docker** (for local Postgres / Redis / MailHog / LocalStack)
 
 ### 1. Install
+
 ```bash
 nvm use            # picks up .nvmrc
 corepack enable    # turns on pnpm via Node
@@ -172,6 +177,7 @@ pnpm install
 ```
 
 ### 2. Bring up infra
+
 ```bash
 make up            # postgres + redis + mailhog + localstack
 cp .env.example .env
@@ -179,17 +185,20 @@ cp apps/web/.env.example apps/web/.env.local
 ```
 
 ### 3. Migrate + seed the database
+
 ```bash
 make db-migrate
 make db-seed
 ```
 
 ### 4. Run the app
+
 ```bash
 make dev           # api on :4000, web on :3000, worker in same task graph
 ```
 
 Open:
+
 - Web — http://localhost:3000
 - API Swagger — http://localhost:4000/docs
 - API metrics — http://localhost:4000/metrics
@@ -282,21 +291,21 @@ make help                 # full menu
 
 ## Docs index
 
-| Doc | Purpose |
-| --- | --- |
-| [`docs/architecture.md`](./docs/architecture.md) | System overview, request flow, data model walkthrough |
-| [`docs/security.md`](./docs/security.md) | Security controls + STRIDE threat model |
-| [`docs/deploy.md`](./docs/deploy.md) | Production deploy guide (Docker + Terraform + ECS) |
-| [`docs/demo-script.md`](./docs/demo-script.md) | 5-minute walkthrough script (great for Loom recordings) |
-| [`docs/release-process.md`](./docs/release-process.md) | Branching, tagging, hotfixes, rollback |
-| [`docs/adr/0001-monorepo.md`](./docs/adr/0001-monorepo.md) | Why pnpm + Turborepo |
-| [`docs/adr/0002-nestjs-on-fastify.md`](./docs/adr/0002-nestjs-on-fastify.md) | Why NestJS + Fastify |
-| [`docs/adr/0003-prisma-postgres.md`](./docs/adr/0003-prisma-postgres.md) | Why Prisma + Postgres |
-| [`docs/adr/0004-auth0.md`](./docs/adr/0004-auth0.md) | Why Auth0 over rolling our own |
-| [`docs/adr/0005-zod-shared-types.md`](./docs/adr/0005-zod-shared-types.md) | Why Zod as the contract source |
-| [`docs/runbooks/incident-response.md`](./docs/runbooks/incident-response.md) | On-call response template |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Branch + commit + PR conventions |
-| [`SECURITY.md`](./SECURITY.md) | Responsible disclosure |
+| Doc                                                                          | Purpose                                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`docs/architecture.md`](./docs/architecture.md)                             | System overview, request flow, data model walkthrough   |
+| [`docs/security.md`](./docs/security.md)                                     | Security controls + STRIDE threat model                 |
+| [`docs/deploy.md`](./docs/deploy.md)                                         | Production deploy guide (Docker + Terraform + ECS)      |
+| [`docs/demo-script.md`](./docs/demo-script.md)                               | 5-minute walkthrough script (great for Loom recordings) |
+| [`docs/release-process.md`](./docs/release-process.md)                       | Branching, tagging, hotfixes, rollback                  |
+| [`docs/adr/0001-monorepo.md`](./docs/adr/0001-monorepo.md)                   | Why pnpm + Turborepo                                    |
+| [`docs/adr/0002-nestjs-on-fastify.md`](./docs/adr/0002-nestjs-on-fastify.md) | Why NestJS + Fastify                                    |
+| [`docs/adr/0003-prisma-postgres.md`](./docs/adr/0003-prisma-postgres.md)     | Why Prisma + Postgres                                   |
+| [`docs/adr/0004-auth0.md`](./docs/adr/0004-auth0.md)                         | Why Auth0 over rolling our own                          |
+| [`docs/adr/0005-zod-shared-types.md`](./docs/adr/0005-zod-shared-types.md)   | Why Zod as the contract source                          |
+| [`docs/runbooks/incident-response.md`](./docs/runbooks/incident-response.md) | On-call response template                               |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                       | Branch + commit + PR conventions                        |
+| [`SECURITY.md`](./SECURITY.md)                                               | Responsible disclosure                                  |
 
 ---
 
