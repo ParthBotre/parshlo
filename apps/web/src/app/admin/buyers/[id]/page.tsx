@@ -547,7 +547,7 @@ export default async function BuyerDetailPage({
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,0.8fr)]">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-base">Recent Orders</CardTitle>
           </CardHeader>

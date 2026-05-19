@@ -589,7 +589,7 @@ export default function LogisticsPageClient({
                     onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                   >
                     <option value="OUTGOING">Outgoing (to retailer)</option>
-                    <option value="INCOMING">Incoming (from manufacturer)</option>
+                    <option value="INCOMING">Incoming (from CFA)</option>
                   </select>
                 </div>
                 <div>

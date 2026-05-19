@@ -39,7 +39,7 @@ export default async function BuyersPage(): Promise<JSX.Element> {
     (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
   );
   const totalOrders = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalOrders, 0);
-  const totalRevenuePaise = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalPaise, 0);
+  // const totalRevenuePaise = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalPaise, 0);
   const monthOrders = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.currentMonthOrders, 0);
   const monthRevenuePaise = buyers.reduce(
     (sum, buyer) => sum + buyer.orderSummary.currentMonthPaise,
@@ -54,7 +54,18 @@ export default async function BuyersPage(): Promise<JSX.Element> {
           Register verified buyer accounts and manage approved B2B customers.
         </p>
       </div>
-      {canCreateBuyer ? <AdminBuyerCreateForm /> : null}
+      {canCreateBuyer && (
+        <details className="group">
+          <summary className="inline-flex cursor-pointer list-none">
+            <span className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium">
+              Add Buyer
+            </span>
+          </summary>
+          <div className="mt-4">
+            <AdminBuyerCreateForm />
+          </div>
+        </details>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -69,12 +80,12 @@ export default async function BuyersPage(): Promise<JSX.Element> {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          {/* <CardContent className="p-4">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               Lifetime Revenue
             </p>
             <p className="mt-1 font-mono text-2xl font-semibold">{formatINR(totalRevenuePaise)}</p>
-          </CardContent>
+          </CardContent> */}
         </Card>
         <Card>
           <CardContent className="p-4">
