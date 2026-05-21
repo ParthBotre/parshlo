@@ -1,7 +1,7 @@
-import { UpdateOrderStatusInput as UpdateOrderStatusInputSchema } from '@parshlo/types';
+import { UpdateOrderBeforeApprovalInput } from '@parshlo/types';
 import { NextResponse } from 'next/server';
 
-import { updateOrderStatus } from '@/lib/api/orders';
+import { updateAdminOrderBeforeApproval } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
@@ -15,12 +15,11 @@ export async function PATCH(
   if (!session) {
     return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
   }
-  if (!session.user.roles.some((r) => ADMIN_ROLES.has(r))) {
-    return NextResponse.json({ detail: 'Forbidden' }, { status: 403 });
+  if (!session.user.roles.some((role) => ADMIN_ROLES.has(role))) {
+    return NextResponse.json({ detail: 'Only admins can edit orders.' }, { status: 403 });
   }
 
   const { id } = await params;
-
   let json: unknown;
   try {
     json = await req.json();
@@ -28,21 +27,21 @@ export async function PATCH(
     return NextResponse.json({ detail: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const parsed = UpdateOrderStatusInputSchema.safeParse(json);
+  const parsed = UpdateOrderBeforeApprovalInput.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { detail: parsed.error.issues.map((i) => i.message).join('; ') },
+      { detail: parsed.error.issues.map((issue) => issue.message).join('; ') },
       { status: 400 },
     );
   }
 
   try {
-    const order = await updateOrderStatus(session.accessToken, id, parsed.data);
+    const order = await updateAdminOrderBeforeApproval(session.accessToken, id, parsed.data);
     return NextResponse.json(order);
   } catch (err) {
     if (err instanceof ApiError) {
       return NextResponse.json(err.problem, { status: err.status });
     }
-    return NextResponse.json({ detail: 'Status update failed' }, { status: 500 });
+    return NextResponse.json({ detail: 'Order edit failed' }, { status: 500 });
   }
 }

@@ -5,7 +5,7 @@ import { createBuyer } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
-const BUYER_CREATE_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
+const BUYER_CREATE_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
 
 export async function POST(req: Request): Promise<Response> {
   const session = await getSession();
@@ -29,7 +29,7 @@ export async function POST(req: Request): Promise<Response> {
         title: 'Forbidden',
         status: 403,
         code: 'FORBIDDEN',
-        detail: 'Only admins can add buyers.',
+        detail: 'Only admins and managers can add buyers.',
       },
       { status: 403 },
     );

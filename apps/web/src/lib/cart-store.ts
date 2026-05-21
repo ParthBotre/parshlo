@@ -4,13 +4,16 @@ import { type BuyerProductView } from '@parshlo/types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { clampCartQuantity } from '@/lib/cart-quantity';
+import { UNLIMITED_CART_QTY, clampCartQuantity } from '@/lib/cart-quantity';
 
 export interface CartLine {
   productId: string;
   slug: string;
   name: string;
   unitPricePaise: number;
+  rateAPaise?: number;
+  rateBPaise?: number;
+  priceTier?: BuyerProductView['priceTier'];
   gstRate: BuyerProductView['gstRate'];
   /** Available units when added; used to cap manual quantity entry. */
   maxQty: number;
@@ -33,10 +36,10 @@ export const useCart = create<CartState>()(
       lines: [],
       add: (product, qty = 1) =>
         set((state) => {
-          const nextQty = clampCartQuantity(qty, product.availableQty);
+          const nextQty = clampCartQuantity(qty, UNLIMITED_CART_QTY);
           const existing = state.lines.find((l) => l.productId === product.id);
           if (existing) {
-            const maxQty = Math.max(existing.maxQty, product.availableQty);
+            const maxQty = Math.max(existing.maxQty, UNLIMITED_CART_QTY);
             return {
               lines: state.lines.map((l) =>
                 l.productId === product.id
@@ -57,8 +60,11 @@ export const useCart = create<CartState>()(
                 slug: product.slug,
                 name: product.name,
                 unitPricePaise: product.wholesalePricePaise,
+                rateAPaise: product.rateAPaise,
+                rateBPaise: product.rateBPaise,
+                priceTier: product.priceTier,
                 gstRate: product.gstRate,
-                maxQty: product.availableQty,
+                maxQty: UNLIMITED_CART_QTY,
                 qty: nextQty,
               },
             ],
@@ -85,18 +91,6 @@ export const useCart = create<CartState>()(
   ),
 );
 
-/**
- * Compute totals for the cart. Mirrors the server-side computation in
- * apps/api/src/modules/order/order.service.ts.
- */
-const GST_BASIS: Record<BuyerProductView['gstRate'], number> = {
-  '0': 0,
-  '5': 500,
-  '12': 1200,
-  '18': 1800,
-  '28': 2800,
-};
-
 export function totals(lines: CartLine[]): {
   subtotal: number;
   gst: number;
@@ -108,7 +102,7 @@ export function totals(lines: CartLine[]): {
   for (const l of lines) {
     const rawSubtotal = l.unitPricePaise * l.qty;
     const lineSubtotal = Math.max(rawSubtotal - (l.discountPaise ?? 0), 0);
-    const lineGst = Math.round((lineSubtotal * GST_BASIS[l.gstRate]) / 10_000);
+    const lineGst = 0;
     subtotal += lineSubtotal;
     gst += lineGst;
   }

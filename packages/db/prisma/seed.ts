@@ -6,11 +6,10 @@
  *   - 1 admin user (admin@parshlo.local)
  *   - 1 pre-approved demo buyer (buyer@parshlo.local) with a complete business profile
  *   - 16 product categories
- *   - 38 real Parshlo SKUs with placeholder prices/MOQ + best-guess compositions
+ *   - real Parshlo SKUs with catalog PTR/PTS/MRP where known + best-guess compositions
  *
  * Notes for the Parshlo team:
- *   - Wholesale prices and MRP are PLACEHOLDERS. Update them with your real wholesale
- *     rates before any real buyer touches the catalog. Search for "PLACEHOLDER" below.
+ *   - Rate A = PTS and Rate B = PTR. These are GST-inclusive catalog rates.
  *   - Compositions and `prescriptionRequired` flags are best-guess inferences from the
  *     brand name. Verify each one against your actual product master before going live.
  *   - The wipe step at the top deletes ALL invoices/orders/products. Safe in dev only.
@@ -26,7 +25,8 @@ import {
 
 const prisma = new PrismaClient();
 
-// Price tiers in paise (₹1 = 100 paise). All marked PLACEHOLDER.
+// Fallback price tiers in paise (₹1 = 100 paise). Used only when a SKU is not
+// present in CATALOG_PRICES yet.
 const PRICE = {
   // Essentials: low-cost basics (calcium, iron, folate, basic vitamins).
   ESSENTIAL: { wholesale: 4000n, mrp: 7500n },
@@ -44,8 +44,59 @@ const PRICE = {
   PROTEIN_DM: { wholesale: 75000n, mrp: 120000n },
 } as const;
 
+const CATALOG_PRICES: Record<string, { mrp: bigint; ptr: bigint; pts: bigint }> = {
+  'calonest-plus-cap': { mrp: 23400n, ptr: 17829n, pts: 16046n },
+  'calonest-xt-tab': { mrp: 23400n, ptr: 17829n, pts: 16046n },
+  'calonest-tab': { mrp: 18300n, ptr: 13943n, pts: 12549n },
+  'collamat-plus-tab': { mrp: 54200n, ptr: 41295n, pts: 37166n },
+  'cosamax-dn-tab': { mrp: 22700n, ptr: 17295n, pts: 15566n },
+  'cumigold-cap': { mrp: 32600n, ptr: 24838n, pts: 22354n },
+  'defcya-6-tab': { mrp: 15000n, ptr: 11429n, pts: 10286n },
+  'defcya-12-mg-cap': { mrp: 25300n, ptr: 19276n, pts: 17349n },
+  'dexlet-d-cap': { mrp: 11800n, ptr: 8990n, pts: 8091n },
+  'dexlet-tab': { mrp: 9100n, ptr: 6933n, pts: 6240n },
+  'dibenza-spray': { mrp: 23400n, ptr: 17829n, pts: 16046n },
+  'ezyrol-d3-60k-cap': { mrp: 12400n, ptr: 9448n, pts: 8503n },
+  'ezyrol-nano-shots': { mrp: 7200n, ptr: 5486n, pts: 4937n },
+  'fawound-ds-tab': { mrp: 40300n, ptr: 30705n, pts: 27634n },
+  'fawound-plus-tab': { mrp: 28600n, ptr: 21790n, pts: 19611n },
+  'fawound-tab': { mrp: 20063n, ptr: 15286n, pts: 13757n },
+  'femsure-tab': { mrp: 19800n, ptr: 15086n, pts: 13577n },
+  'flexcel-60-tab': { mrp: 8400n, ptr: 6400n, pts: 5760n },
+  'flexcel-90-tab': { mrp: 10500n, ptr: 8000n, pts: 7200n },
+  'flexcel-eth-4-tab': { mrp: 25300n, ptr: 19276n, pts: 17349n },
+  'fracsure-plus-tab': { mrp: 22200n, ptr: 16914n, pts: 15223n },
+  'fracsure-tab': { mrp: 42200n, ptr: 32152n, pts: 28937n },
+  'gbcard-nt-tab': { mrp: 23400n, ptr: 17829n, pts: 16046n },
+  'ironest-tab': { mrp: 21200n, ptr: 16152n, pts: 14537n },
+  'ironest-xt-tab': { mrp: 21200n, ptr: 16152n, pts: 14537n },
+  'metiace-tab': { mrp: 11000n, ptr: 8381n, pts: 7543n },
+  'protilo-dm': { mrp: 79100n, ptr: 60267n, pts: 54240n },
+  'protilo-sf': { mrp: 41400n, ptr: 31543n, pts: 28389n },
+  'protilo-sf-chocolate': { mrp: 45000n, ptr: 34286n, pts: 30857n },
+  'protilo-sf-kesar': { mrp: 41465n, ptr: 31592n, pts: 28433n },
+  'protilo-chocolate': { mrp: 39000n, ptr: 29714n, pts: 26743n },
+  'protilo-kesar': { mrp: 39000n, ptr: 29714n, pts: 26743n },
+  'roxinoe-dt-tab': { mrp: 13100n, ptr: 9981n, pts: 8983n },
+  'tendofab-plus-cap': { mrp: 38270n, ptr: 29158n, pts: 26242n },
+  'tendofab-v-tab': { mrp: 30200n, ptr: 23010n, pts: 20709n },
+  'tremecya-tab': { mrp: 22500n, ptr: 17143n, pts: 15429n },
+  'tremecya-d-tab': { mrp: 13300n, ptr: 10133n, pts: 9120n },
+  'upfolet-tab': { mrp: 20200n, ptr: 15390n, pts: 13851n },
+  'upfolet-plus-tab': { mrp: 14000n, ptr: 10667n, pts: 9600n },
+};
+
 /** Default manufacturer label on seeded catalog SKUs. */
 const MANUFACTURER = 'Parshlo';
+
+const NON_CATALOG_PRODUCT_SLUGS = [
+  'flexcel-gel',
+  'gbcard-sr-tab',
+  'itabro-200-cap',
+  'protilo-vanilla',
+  'tendofab-plus-tab',
+  'tolecya-tab',
+] as const;
 
 interface ProductSeed {
   slug: string;
@@ -64,6 +115,35 @@ interface ProductSeed {
   moq: number;
   prescriptionRequired: boolean;
   scheduleDrug: ScheduleDrug;
+}
+
+function catalogPriceFor(
+  slug: string,
+  fallback: { wholesalePricePaise: bigint; mrpPaise: bigint },
+): {
+  wholesalePricePaise: bigint;
+  rateAPaise: bigint;
+  rateBPaise: bigint;
+  mrpPaise: bigint;
+  gstRate: GstRate;
+} {
+  const catalog = CATALOG_PRICES[slug];
+  if (!catalog) {
+    return {
+      wholesalePricePaise: fallback.wholesalePricePaise,
+      rateAPaise: fallback.wholesalePricePaise,
+      rateBPaise: fallback.wholesalePricePaise,
+      mrpPaise: fallback.mrpPaise,
+      gstRate: GstRate.FIVE,
+    };
+  }
+  return {
+    wholesalePricePaise: catalog.pts,
+    rateAPaise: catalog.pts,
+    rateBPaise: catalog.ptr,
+    mrpPaise: catalog.mrp,
+    gstRate: GstRate.FIVE,
+  };
 }
 
 async function main(): Promise<void> {
@@ -88,6 +168,8 @@ async function main(): Promise<void> {
     { id: 'cld001profess00000000001', name: 'Professional Couriers' },
     { id: 'cld002tej0000000000000002', name: 'Tej Couriers' },
     { id: 'cld003mark0000000000000003', name: 'Mark Couriers' },
+    { id: 'cld004shipkart00000000004', name: 'SHIPKART' },
+    { id: 'cld005vishwa000000000005', name: 'VISHWA COURIERS' },
   ];
 
   for (const c of couriers) {
@@ -641,6 +723,24 @@ async function main(): Promise<void> {
       prescriptionRequired: true,
       scheduleDrug: ScheduleDrug.SCHEDULE_H,
     },
+    {
+      slug: 'defcya-12-mg-cap',
+      name: 'Defcya 12 Mg Cap',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: '12mg',
+      form: ProductForm.CAPSULE,
+      packaging: '10 capsules/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'corticosteroid',
+      wholesalePricePaise: PRICE.MID.wholesale,
+      mrpPaise: PRICE.MID.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: true,
+      scheduleDrug: ScheduleDrug.SCHEDULE_H,
+    },
 
     // --- Muscle Relaxant ------------------------------------------------------
     {
@@ -799,6 +899,60 @@ async function main(): Promise<void> {
       scheduleDrug: ScheduleDrug.NONE,
     },
     {
+      slug: 'ironest-xt-tab',
+      name: 'Ironest XT Tab',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: 'XT',
+      form: ProductForm.TABLET,
+      packaging: '10 tablets/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'nutraceuticals',
+      wholesalePricePaise: PRICE.ESSENTIAL.wholesale,
+      mrpPaise: PRICE.ESSENTIAL.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: false,
+      scheduleDrug: ScheduleDrug.NONE,
+    },
+    {
+      slug: 'metiace-tab',
+      name: 'Metiace Tab',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: 'Pending',
+      form: ProductForm.TABLET,
+      packaging: '10 tablets/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'nutraceuticals',
+      wholesalePricePaise: PRICE.ESSENTIAL.wholesale,
+      mrpPaise: PRICE.ESSENTIAL.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: false,
+      scheduleDrug: ScheduleDrug.NONE,
+    },
+    {
+      slug: 'upfolet-tab',
+      name: 'Upfolet Tab',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: 'Pending',
+      form: ProductForm.TABLET,
+      packaging: '10 tablets/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'nutraceuticals',
+      wholesalePricePaise: PRICE.MID.wholesale,
+      mrpPaise: PRICE.MID.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: false,
+      scheduleDrug: ScheduleDrug.NONE,
+    },
+    {
       slug: 'upfolet-plus-tab',
       name: 'Upfolet Plus Tab',
       composition:
@@ -882,6 +1036,24 @@ async function main(): Promise<void> {
       scheduleDrug: ScheduleDrug.NONE,
     },
     {
+      slug: 'protilo-kesar',
+      name: 'Protilo 200 Gm Powder (Kesar)',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: '200g',
+      form: ProductForm.POWDER,
+      packaging: '200g pack',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '21069099',
+      categorySlug: 'protein-supplement',
+      wholesalePricePaise: PRICE.PROTEIN.wholesale,
+      mrpPaise: PRICE.PROTEIN.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 6,
+      prescriptionRequired: false,
+      scheduleDrug: ScheduleDrug.NONE,
+    },
+    {
       slug: 'protilo-vanilla',
       name: 'Protilo Vanilla Powder',
       composition: 'Whey Protein Concentrate + Vitamins/Minerals — Vanilla Flavour',
@@ -899,6 +1071,42 @@ async function main(): Promise<void> {
       moq: 6,
       prescriptionRequired: false,
       scheduleDrug: ScheduleDrug.NONE,
+    },
+    {
+      slug: 'tremecya-tab',
+      name: 'Tremecya Tab',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: 'Pending',
+      form: ProductForm.TABLET,
+      packaging: '10 tablets/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'analgesics',
+      wholesalePricePaise: PRICE.MID.wholesale,
+      mrpPaise: PRICE.MID.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: true,
+      scheduleDrug: ScheduleDrug.SCHEDULE_H,
+    },
+    {
+      slug: 'tremecya-d-tab',
+      name: 'Tremecya D Tab',
+      composition: 'Composition pending stakeholder confirmation',
+      strength: 'Pending',
+      form: ProductForm.TABLET,
+      packaging: '10 tablets/strip · 10 strips/box',
+      description: 'Product details pending stakeholder confirmation.',
+      manufacturer: MANUFACTURER,
+      hsnCode: '30049099',
+      categorySlug: 'analgesics',
+      wholesalePricePaise: PRICE.MID.wholesale,
+      mrpPaise: PRICE.MID.mrp,
+      gstRate: GstRate.FIVE,
+      moq: 10,
+      prescriptionRequired: true,
+      scheduleDrug: ScheduleDrug.SCHEDULE_H,
     },
     {
       slug: 'protilo-sf',
@@ -964,9 +1172,20 @@ async function main(): Promise<void> {
     const category = await prisma.productCategory.findUniqueOrThrow({
       where: { slug: p.categorySlug },
     });
+    const price = catalogPriceFor(p.slug, {
+      wholesalePricePaise: p.wholesalePricePaise,
+      mrpPaise: p.mrpPaise,
+    });
     await prisma.product.upsert({
       where: { slug: p.slug },
-      update: {},
+      update: {
+        wholesalePricePaise: price.wholesalePricePaise,
+        rateAPaise: price.rateAPaise,
+        rateBPaise: price.rateBPaise,
+        mrpPaise: price.mrpPaise,
+        gstRate: price.gstRate,
+        status: ProductStatus.ACTIVE,
+      },
       create: {
         slug: p.slug,
         name: p.name,
@@ -981,9 +1200,11 @@ async function main(): Promise<void> {
         imageKeys: [],
         prescriptionRequired: p.prescriptionRequired,
         scheduleDrug: p.scheduleDrug,
-        wholesalePricePaise: p.wholesalePricePaise,
-        mrpPaise: p.mrpPaise,
-        gstRate: p.gstRate,
+        wholesalePricePaise: price.wholesalePricePaise,
+        rateAPaise: price.rateAPaise,
+        rateBPaise: price.rateBPaise,
+        mrpPaise: price.mrpPaise,
+        gstRate: price.gstRate,
         moq: p.moq,
         status: ProductStatus.ACTIVE,
         inventory: {
@@ -996,6 +1217,10 @@ async function main(): Promise<void> {
       },
     });
   }
+  await prisma.product.updateMany({
+    where: { slug: { in: [...NON_CATALOG_PRODUCT_SLUGS] } },
+    data: { status: ProductStatus.DISABLED },
+  });
   console.log(`  ✓ ${products.length} products`);
 
   console.log('✅ Seed complete.');

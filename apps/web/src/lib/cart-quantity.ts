@@ -1,6 +1,8 @@
-/** Clamp order quantity to at least 1 and at most available stock. */
+export const UNLIMITED_CART_QTY = 999_999;
+
+/** Clamp order quantity to at least 1 and at most the configured order safety cap. */
 export function clampCartQuantity(qty: number, maxQty: number): number {
-  const max = Math.max(1, Math.floor(maxQty));
+  const max = Number.isFinite(maxQty) && maxQty > 0 ? Math.floor(maxQty) : UNLIMITED_CART_QTY;
   const value = Math.floor(qty);
   if (!Number.isFinite(value)) {
     return 1;

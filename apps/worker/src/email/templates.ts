@@ -74,7 +74,7 @@ export function renderOrderPlacedBuyer(d: OrderPlacedBuyerData): Rendered {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
       ${rows}
       <tr><td style="padding:8px 0">Subtotal</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace">${rupees(d.subtotalPaise)}</td></tr>
-      <tr><td style="padding:8px 0;color:#6b7480">GST</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;color:#6b7480">${rupees(d.gstPaise)}</td></tr>
+      <tr><td style="padding:8px 0;color:#6b7480">GST Rate</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;color:#6b7480">5% included in price</td></tr>
       <tr><td style="padding:8px 0;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;font-weight:600">${rupees(d.totalPaise)}</td></tr>
     </table>
   `;

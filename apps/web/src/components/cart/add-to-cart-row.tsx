@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { Button } from '@/components/ui/button';
-import { clampCartQuantity } from '@/lib/cart-quantity';
+import { UNLIMITED_CART_QTY, clampCartQuantity } from '@/lib/cart-quantity';
 
 export function AddToCartRow({
   product,
@@ -22,7 +22,7 @@ export function AddToCartRow({
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <CartQuantityInput
         qty={qty}
-        maxQty={product.availableQty}
+        maxQty={UNLIMITED_CART_QTY}
         onQtyChange={setQty}
         disabled={disabled}
         className="w-full justify-center sm:w-auto"
@@ -31,7 +31,7 @@ export function AddToCartRow({
         type="button"
         className="w-full shrink-0 sm:flex-1"
         disabled={disabled}
-        onClick={() => onAdd(product, clampCartQuantity(qty, product.availableQty))}
+        onClick={() => onAdd(product, clampCartQuantity(qty, UNLIMITED_CART_QTY))}
       >
         Add to cart
       </Button>

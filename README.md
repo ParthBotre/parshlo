@@ -124,7 +124,7 @@ parshlo/
 │   ├── web/                  # Next.js 15 site + B2B + admin portals
 │   │                         #   · /admin/analytics/gross sales + product/region analytics
 │   │                         #   · /admin/orders/[id] order inspection
-│   │                         #   · /api/admin/orders/[id]/csv CSV order export
+│   │                         #   · /api/admin/orders/[id] pre-approval order edit + CSV export
 │   │                         #   · /admin/buyers/[id] buyer analytics
 │   │                         #   · /admin/finance/logistics reconciliation
 │   └── worker/               # BullMQ background processor
@@ -133,7 +133,7 @@ parshlo/
 │                             #   · KYC decision notifications
 ├── packages/
 │   ├── config/               # Shared ESLint, tsconfig, Tailwind preset
-│   ├── db/                   # Prisma schema + migrations + client + seed personas
+│   ├── db/                   # Prisma schema + migrations + client + seed personas/catalog
 │   ├── logger/               # Pino structured logger (PII redaction)
 │   ├── queue/                # Typed BullMQ producers + payload contracts
 │   ├── telemetry/            # OTel + Sentry + Prometheus init
@@ -229,7 +229,7 @@ The Prisma schema (`packages/db/prisma/schema.prisma`) encodes the entire busine
 
 - **User**, **BusinessProfile** — accounts + KYC details (GSTIN unique, account lifecycle: `PENDING_VERIFICATION → UNDER_REVIEW → APPROVED|REJECTED|SUSPENDED`).
 - **KycApplication**, **KycDocument** — review workflow with reviewer + reason.
-- **Product**, **ProductCategory**, **Inventory**, **ProductBatch** — formulations, MOQ, GST rate, schedule drug class, stock tracking.
+- **Product**, **ProductCategory**, **Inventory**, **ProductBatch** — formulations, MOQ, display GST rate, MRP, Rate A/PTS, Rate B/PTR, schedule drug class, stock tracking.
 - **Order**, **OrderItem**, **OrderStatusEvent**, **Invoice** — full procurement lifecycle (`RECEIVED → UNDER_REVIEW → APPROVED → PREPARING → DISPATCHED`, with `CANCELLED` / `REJECTED` terminals). Manager-created orders require admin or super admin approval, and only admin/super admin roles can transition status, enter shipment tracking, or manage logistics statements.
 - **AuditLog** — immutable trail for every mutating action.
 - **IdempotencyKey** — duplicate-order protection on retries.

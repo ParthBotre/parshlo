@@ -1,53 +1,43 @@
 'use client';
 
 import { type BuyerProductView } from '@parshlo/types';
-
-import { CatalogFilters } from './catalog-filters';
+import { useMemo, useState } from 'react';
 
 import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useCatalogFilters } from '@/lib/use-catalog-filters';
 
 export function AdminCatalogGrid({ products }: { products: BuyerProductView[] }): JSX.Element {
-  const filters = useCatalogFilters(products);
-  const countLabel = filters.isFiltered
-    ? `${filters.filteredProducts.length} of ${products.length} SKUs`
-    : `${products.length} SKUs`;
+  const [query, setQuery] = useState('');
+  const visibleProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return products;
+    }
+    return products.filter((product) => product.name.toLowerCase().includes(needle));
+  }, [products, query]);
+  const countLabel =
+    visibleProducts.length === products.length
+      ? `${products.length} SKUs`
+      : `${visibleProducts.length} of ${products.length} SKUs`;
 
   return (
     <div className="space-y-4">
-      <CatalogFilters
-        searchQuery={filters.searchQuery}
-        onSearchChange={filters.setSearchQuery}
-        categories={filters.categories}
-        selectedCategories={filters.selectedCategories}
-        onToggleCategory={filters.toggleCategory}
-        isFiltered={filters.isFiltered}
-        onClear={filters.clearFilters}
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+        placeholder="Search products..."
+        className="border-input bg-background placeholder:text-muted-foreground focus:border-primary h-11 w-full rounded-md border px-3 text-base outline-none transition-colors sm:text-sm"
       />
-
       <p className="text-muted-foreground text-xs">{countLabel}</p>
 
-      {filters.filteredProducts.length === 0 ? (
+      {visibleProducts.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-12 text-center text-sm">
-          No products match your filters.
-          {filters.isFiltered ? (
-            <Button
-              variant="link"
-              onClick={filters.clearFilters}
-              className="ml-1 h-auto p-0 text-sm"
-            >
-              Reset
-            </Button>
-          ) : null}
+          No products match your search.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filters.filteredProducts.map((p) => {
-            const isLow = p.availableQty <= 200;
-            const isOut = p.status === 'OUT_OF_STOCK' || p.availableQty <= 0;
+          {visibleProducts.map((p) => {
             return (
               <Card key={p.id} className="flex h-full flex-col overflow-hidden">
                 <div className="relative aspect-square overflow-hidden border-b">
@@ -71,25 +61,15 @@ export function AdminCatalogGrid({ products }: { products: BuyerProductView[] })
                   </Badge>
                 </div>
                 <CardContent className="flex flex-1 flex-col gap-3 p-4">
-                  <Badge variant="secondary" className="w-fit">
-                    {p.category}
-                  </Badge>
                   <div>
                     <h3 className="font-display line-clamp-2 text-base font-semibold leading-tight">
-                      {p.name}
+                      {p.name.toUpperCase()}
                     </h3>
-                    <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
-                      {p.composition}
-                    </p>
                   </div>
                   <div className="mt-auto grid grid-cols-2 gap-2 pt-1 text-xs">
                     <Field label="Form" value={p.form} />
-                    <Field label="GST" value={`${p.gstRate}%`} />
-                    <Field
-                      label="Stock"
-                      value={String(p.availableQty)}
-                      tone={isOut ? 'danger' : isLow ? 'warning' : 'default'}
-                    />
+                    <Field label="Pack" value={p.packaging} />
+                    <Field label="GST Rate" value={`${p.gstRate}% included`} />
                   </div>
                 </CardContent>
               </Card>

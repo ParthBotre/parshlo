@@ -4,7 +4,7 @@ import { type BuyerProductView } from '@parshlo/types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { clampCartQuantity } from '@/lib/cart-quantity';
+import { UNLIMITED_CART_QTY, clampCartQuantity } from '@/lib/cart-quantity';
 import { type CartLine, totals } from '@/lib/cart-store';
 
 export { totals };
@@ -14,6 +14,7 @@ interface AdminCartState {
   lines: CartLine[];
   add: (product: BuyerProductView, qty?: number) => void;
   setQty: (productId: string, qty: number) => void;
+  setPriceTier: (productId: string, tier: NonNullable<CartLine['priceTier']>) => void;
   setFreeQty: (productId: string, qty: number) => void;
   setDiscountPaise: (productId: string, paise: number) => void;
   remove: (productId: string) => void;
@@ -26,10 +27,10 @@ export const useAdminCart = create<AdminCartState>()(
       lines: [],
       add: (product, qty = 1) =>
         set((state) => {
-          const nextQty = clampCartQuantity(qty, product.availableQty);
+          const nextQty = clampCartQuantity(qty, UNLIMITED_CART_QTY);
           const existing = state.lines.find((l) => l.productId === product.id);
           if (existing) {
-            const maxQty = Math.max(existing.maxQty, product.availableQty);
+            const maxQty = Math.max(existing.maxQty, UNLIMITED_CART_QTY);
             return {
               lines: state.lines.map((l) =>
                 l.productId === product.id
@@ -50,8 +51,11 @@ export const useAdminCart = create<AdminCartState>()(
                 slug: product.slug,
                 name: product.name,
                 unitPricePaise: product.wholesalePricePaise,
+                rateAPaise: product.rateAPaise,
+                rateBPaise: product.rateBPaise,
+                priceTier: product.priceTier,
                 gstRate: product.gstRate,
-                maxQty: product.availableQty,
+                maxQty: UNLIMITED_CART_QTY,
                 qty: nextQty,
               },
             ],
@@ -71,6 +75,24 @@ export const useAdminCart = create<AdminCartState>()(
                 }
               : l,
           ),
+        })),
+      setPriceTier: (productId, tier) =>
+        set((state) => ({
+          lines: state.lines.map((l) => {
+            if (l.productId !== productId) {
+              return l;
+            }
+            const unitPricePaise =
+              tier === 'RATE_B'
+                ? (l.rateBPaise ?? l.unitPricePaise)
+                : (l.rateAPaise ?? l.unitPricePaise);
+            return {
+              ...l,
+              priceTier: tier,
+              unitPricePaise,
+              discountPaise: Math.min(l.discountPaise ?? 0, unitPricePaise * l.qty),
+            };
+          }),
         })),
       setFreeQty: (productId, qty) =>
         set((state) => ({

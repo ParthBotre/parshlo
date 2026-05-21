@@ -85,9 +85,11 @@ export function CartDrawer({
                 <li key={line.productId} className="space-y-2 rounded-md border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{line.name}</p>
+                      <p className="truncate text-sm font-medium">{line.name.toUpperCase()}</p>
                       <p className="text-muted-foreground text-xs">
-                        {formatINR(line.unitPricePaise)} each · GST {line.gstRate}%
+                        {formatINR(line.unitPricePaise)} each ·{' '}
+                        {line.priceTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} · GST GST
+                        Rate ({line.gstRate}%) included in price
                       </p>
                     </div>
                     <Button
@@ -128,7 +130,7 @@ export function CartDrawer({
 
           <dl className="space-y-1 text-sm">
             <Row label="Subtotal" value={formatINR(t.subtotal)} />
-            <Row label="GST" value={formatINR(t.gst)} muted />
+            <Row label="GST Rate" value="5% included in selected rates" muted />
             <Row label="Total" value={formatINR(t.total)} bold />
           </dl>
 

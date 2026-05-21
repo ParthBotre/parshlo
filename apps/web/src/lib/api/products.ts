@@ -8,7 +8,7 @@ const BuyerProductList = z.array(BuyerProductView);
 
 /** Public, unauthenticated, no pricing exposed. */
 export function listPublicProducts(
-  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+  options: Pick<ApiCallOptions, 'cache' | 'next' | 'baseUrl'> = {},
 ): Promise<z.infer<typeof PublicProductList>> {
   return apiCall('/v1/products/public', PublicProductList, {
     method: 'GET',
@@ -18,7 +18,7 @@ export function listPublicProducts(
 
 export function getPublicProduct(
   slug: string,
-  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+  options: Pick<ApiCallOptions, 'cache' | 'next' | 'baseUrl'> = {},
 ): Promise<z.infer<typeof PublicProductView>> {
   return apiCall(`/v1/products/public/${encodeURIComponent(slug)}`, PublicProductView, {
     method: 'GET',

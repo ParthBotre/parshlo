@@ -7,7 +7,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type GstRate as PrismaGstRate, Prisma } from '@parshlo/db';
+import {
+  type BusinessType as PrismaBusinessType,
+  type GstRate as PrismaGstRate,
+  Prisma,
+} from '@parshlo/db';
 import { JobProducer } from '@parshlo/queue';
 import {
   type AttachCourierReceiptInput,
@@ -19,6 +23,8 @@ import {
   type OrderView,
   type PlaceOrderInput,
   type PlaceOrderOnBehalfInput,
+  type ProductPriceTier,
+  type UpdateOrderBeforeApprovalInput,
   type UpdateOrderStatusInput,
 } from '@parshlo/types';
 
@@ -31,20 +37,21 @@ const GST_RATE_MAP: Record<PrismaGstRate, GstRate> = {
   EIGHTEEN: '18',
   TWENTYEIGHT: '28',
 };
-const GST_RATE_BASIS: Record<PrismaGstRate, bigint> = {
-  ZERO: 0n,
-  FIVE: 500n,
-  TWELVE: 1200n,
-  EIGHTEEN: 1800n,
-  TWENTYEIGHT: 2800n,
-};
-
-const COURIER_PARTNER_NAMES: Record<'PROFESSIONAL' | 'MARK' | 'TEJ', string> = {
+const COURIER_PARTNER_NAMES: Record<
+  'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA',
+  string
+> = {
   PROFESSIONAL: 'Professional Couriers',
   MARK: 'Mark Couriers',
   TEJ: 'Tej Couriers',
+  SHIPKART: 'SHIPKART',
+  VISHWA: 'VISHWA COURIERS',
 };
 const ADMIN_APPROVAL_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
+
+function priceTierForBusinessType(businessType?: PrismaBusinessType | null): ProductPriceTier {
+  return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
+}
 
 @Injectable()
 export class OrderService {
@@ -120,7 +127,6 @@ export class OrderService {
         const productIds = input.items.map((i) => i.productId);
         const products = await tx.product.findMany({
           where: { id: { in: productIds }, deletedAt: null },
-          include: { inventory: true },
         });
         if (products.length !== productIds.length) {
           throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
@@ -129,7 +135,6 @@ export class OrderService {
         const itemData: Prisma.OrderItemCreateManyOrderInput[] = [];
         let subtotal = 0n;
         let gstTotal = 0n;
-        const stockUpdates: { productId: string; qty: number }[] = [];
 
         for (const item of input.items) {
           const product = products.find((p) => p.id === item.productId);
@@ -140,17 +145,16 @@ export class OrderService {
             });
           }
           const freeQty = item.schemeFreeQuantity;
-          const stockQty = item.quantity + freeQty;
-          const available =
-            (product.inventory?.availableQty ?? 0) - (product.inventory?.reservedQty ?? 0);
-          if (stockQty > available) {
-            throw new ConflictException({
-              code: 'INSUFFICIENT_STOCK',
-              message: `Insufficient stock for ${product.name}.`,
-            });
-          }
 
-          const unit = product.wholesalePricePaise;
+          const defaultTier = priceTierForBusinessType(businessProfile.businessType);
+          const requestedTier =
+            options?.actorId && options.actorId !== buyerId
+              ? (item.priceTier ?? defaultTier)
+              : defaultTier;
+          const unit =
+            requestedTier === 'RATE_B'
+              ? product.rateBPaise || product.wholesalePricePaise
+              : product.rateAPaise || product.wholesalePricePaise;
           const qty = BigInt(item.quantity);
           const undiscountedSubtotal = unit * qty;
           const discount = BigInt(item.discountPaise);
@@ -161,12 +165,12 @@ export class OrderService {
             });
           }
           const lineSubtotal = undiscountedSubtotal - discount;
-          const lineGst = (lineSubtotal * GST_RATE_BASIS[product.gstRate]) / 10000n;
+          const lineGst = 0n;
           const lineTotal = lineSubtotal + lineGst;
 
           itemData.push({
             productId: product.id,
-            productNameSnapshot: product.name,
+            productNameSnapshot: product.name.toUpperCase(),
             quantity: item.quantity,
             schemeFreeQuantity: freeQty,
             unitPricePaise: unit,
@@ -179,15 +183,6 @@ export class OrderService {
 
           subtotal += lineSubtotal;
           gstTotal += lineGst;
-          stockUpdates.push({ productId: product.id, qty: stockQty });
-        }
-
-        // Reserve stock atomically
-        for (const upd of stockUpdates) {
-          await tx.inventory.update({
-            where: { productId: upd.productId },
-            data: { reservedQty: { increment: upd.qty } },
-          });
         }
 
         const orderNumber = await this.nextOrderNumber(tx);
@@ -344,7 +339,7 @@ export class OrderService {
   async updateCourierTracking(
     orderId: string,
     input: {
-      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ';
+      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA';
       docketNumber: string;
       freightAmountPaise: number;
       weightKg?: number;
@@ -467,28 +462,6 @@ export class OrderService {
           message: `Cannot transition ${order.status} → ${input.status}.`,
         });
       }
-      // On terminal cancel/reject, release reserved inventory.
-      if (input.status === 'CANCELLED' || input.status === 'REJECTED') {
-        for (const item of order.items) {
-          await tx.inventory.update({
-            where: { productId: item.productId },
-            data: { reservedQty: { decrement: item.quantity + item.schemeFreeQuantity } },
-          });
-        }
-      }
-      // On dispatch, convert reservation → consumption.
-      if (input.status === 'DISPATCHED') {
-        for (const item of order.items) {
-          await tx.inventory.update({
-            where: { productId: item.productId },
-            data: {
-              availableQty: { decrement: item.quantity + item.schemeFreeQuantity },
-              reservedQty: { decrement: item.quantity + item.schemeFreeQuantity },
-            },
-          });
-        }
-      }
-
       const updated = await tx.order.update({
         where: { id: orderId },
         data: {
@@ -499,6 +472,117 @@ export class OrderService {
           statusEvents: {
             create: { status: input.status, note: input.note ?? null, actorId },
           },
+        },
+        include: { items: true },
+      });
+
+      return this.toView(updated, updated.items);
+    });
+  }
+
+  async updateBeforeApproval(
+    orderId: string,
+    actorRoles: readonly string[],
+    input: UpdateOrderBeforeApprovalInput,
+  ): Promise<OrderView> {
+    const isAdminApprover = actorRoles.some((role) => ADMIN_APPROVAL_ROLES.has(role));
+    if (!isAdminApprover) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only an admin or super admin can edit an order before approval.',
+      });
+    }
+
+    const productIds = input.items.map((item) => item.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      throw new BadRequestException({
+        code: 'DUPLICATE_ORDER_ITEM',
+        message: 'Each product can appear only once in an order edit.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { buyer: { include: { businessProfile: true } }, items: true },
+      });
+      if (!order) {
+        throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
+      }
+      if (order.status !== 'RECEIVED' && order.status !== 'UNDER_REVIEW') {
+        throw new BadRequestException({
+          code: 'ORDER_ALREADY_APPROVED',
+          message: 'Orders can be edited only before approval.',
+        });
+      }
+      const businessProfile = order.buyer.businessProfile;
+      if (!businessProfile) {
+        throw new BadRequestException({
+          code: 'BUYER_PROFILE_MISSING',
+          message: 'Buyer profile is missing.',
+        });
+      }
+
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds }, deletedAt: null },
+      });
+      if (products.length !== productIds.length) {
+        throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
+      }
+
+      const defaultTier = priceTierForBusinessType(businessProfile.businessType);
+      const itemData: Prisma.OrderItemCreateManyOrderInput[] = [];
+      let subtotal = 0n;
+
+      for (const item of input.items) {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product || product.status !== 'ACTIVE') {
+          throw new BadRequestException({
+            code: 'PRODUCT_UNAVAILABLE',
+            message: `Product ${item.productId} is not available.`,
+          });
+        }
+
+        const requestedTier = item.priceTier ?? defaultTier;
+        const unit =
+          requestedTier === 'RATE_B'
+            ? product.rateBPaise || product.wholesalePricePaise
+            : product.rateAPaise || product.wholesalePricePaise;
+        const undiscountedSubtotal = unit * BigInt(item.quantity);
+        const discount = BigInt(item.discountPaise);
+        if (discount > undiscountedSubtotal) {
+          throw new BadRequestException({
+            code: 'DISCOUNT_EXCEEDS_LINE_SUBTOTAL',
+            message: `Discount cannot exceed subtotal for ${product.name}.`,
+          });
+        }
+        const lineSubtotal = undiscountedSubtotal - discount;
+
+        itemData.push({
+          productId: product.id,
+          productNameSnapshot: product.name.toUpperCase(),
+          quantity: item.quantity,
+          schemeFreeQuantity: item.schemeFreeQuantity,
+          unitPricePaise: unit,
+          discountPaise: discount,
+          gstRate: product.gstRate,
+          lineSubtotalPaise: lineSubtotal,
+          lineGstPaise: 0n,
+          lineTotalPaise: lineSubtotal,
+        });
+        subtotal += lineSubtotal;
+      }
+
+      await tx.orderItem.deleteMany({ where: { orderId } });
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          purchaseOrderNumber: input.purchaseOrderNumber ?? null,
+          notes: input.notes ?? null,
+          subtotalPaise: subtotal,
+          gstPaise: 0n,
+          totalPaise: subtotal,
+          items: { createMany: { data: itemData } },
         },
         include: { items: true },
       });
@@ -552,7 +636,7 @@ export class OrderService {
       deliveredAt: Date | null;
       courierReceiptContentType: string | null;
       courierReceiptUploadedAt: Date | null;
-      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | null;
+      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA' | null;
       courierDocketNumber: string | null;
       courierTrackingSetAt: Date | null;
       courierTrackingUpdatedAt: Date | null;

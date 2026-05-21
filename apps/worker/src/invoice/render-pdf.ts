@@ -96,7 +96,7 @@ export async function renderInvoicePdf(
   draw('PRODUCT', { x: margin + 6, size: 9, font: helvBold });
   draw('QTY', { x: margin + 290, size: 9, font: helvBold });
   draw('UNIT', { x: margin + 330, size: 9, font: helvBold });
-  draw('GST', { x: margin + 400, size: 9, font: helvBold });
+  draw('GST RATE', { x: margin + 400, size: 9, font: helvBold });
   draw('TOTAL', { x: margin + 460, size: 9, font: helvBold });
   y -= 22;
 
@@ -116,7 +116,7 @@ export async function renderInvoicePdf(
       font: mono,
       color: black,
     });
-    page.drawText(`${item.gstRate}% ${rupees(item.lineGstPaise)}`, {
+    page.drawText(`${item.gstRate}% incl.`, {
       x: margin + 400,
       y,
       size: 8,
@@ -144,7 +144,7 @@ export async function renderInvoicePdf(
   y -= 14;
   drawRight(page, 'Subtotal', rupees(data.subtotalPaise), margin, y, mono, helv);
   y -= 14;
-  drawRight(page, 'GST', rupees(data.gstPaise), margin, y, mono, helv);
+  drawRight(page, 'GST Rate', '5% included', margin, y, mono, helv);
   y -= 16;
   drawRight(page, 'TOTAL (INR)', rupees(data.totalPaise), margin, y, mono, helvBold, true);
 

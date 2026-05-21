@@ -122,8 +122,8 @@ export default async function GrossSalesByCityPage({
 
       <Card>
         <CardContent className="space-y-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="bg-secondary/50 inline-flex rounded-md p-1">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="bg-secondary/50 flex max-w-full overflow-x-auto rounded-md p-1">
               {PERIODS.map((p) => (
                 <a
                   key={p.key}
@@ -138,7 +138,7 @@ export default async function GrossSalesByCityPage({
                 </a>
               ))}
             </div>
-            <form method="get" className="flex flex-wrap items-end gap-2">
+            <form method="get" className="flex max-w-full flex-wrap items-end gap-2">
               <input type="hidden" name="period" value={period} />
               {period === 'month' ? (
                 <>
@@ -284,7 +284,7 @@ function SalesTable({
           <p className="text-muted-foreground p-8 text-center text-sm">{empty}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   {headers.map((header, index) => (
@@ -300,7 +300,7 @@ function SalesTable({
                     {row.map((cell, cellIndex) => (
                       <td
                         key={`${index}-${cellIndex}`}
-                        className={`px-4 py-3 ${cellIndex === 0 ? 'font-medium' : 'text-right font-mono'}`}
+                        className={`px-4 py-3 ${cellIndex === 0 ? 'max-w-[260px] whitespace-normal break-words font-medium' : 'whitespace-nowrap text-right font-mono'}`}
                       >
                         {cell}
                       </td>

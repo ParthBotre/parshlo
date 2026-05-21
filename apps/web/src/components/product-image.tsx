@@ -1,8 +1,9 @@
 'use client';
 
 import { Pill } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { PRODUCT_IMAGE_FILE_BY_SLUG } from '@/lib/product-images';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,9 +37,18 @@ export function ProductImage({
   className,
   iconClassName,
 }: ProductImageProps): JSX.Element {
-  const [extIdx, setExtIdx] = useState(0);
+  const candidates = useMemo(() => {
+    const uploadedFile = PRODUCT_IMAGE_FILE_BY_SLUG[slug];
+    const conventionFiles = EXTS.map((ext) => `${slug}.${ext}`);
+    return uploadedFile ? [uploadedFile, ...conventionFiles] : conventionFiles;
+  }, [slug]);
+  const [imageIdx, setImageIdx] = useState(0);
 
-  if (extIdx >= EXTS.length) {
+  useEffect(() => {
+    setImageIdx(0);
+  }, [slug]);
+
+  if (imageIdx >= candidates.length) {
     return (
       <div
         className={cn(
@@ -56,13 +66,13 @@ export function ProductImage({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/product-images/${slug}.${EXTS[extIdx]}`}
+      src={`/product-images/${candidates[imageIdx]}`}
       alt={alt}
       // `object-contain` shows the full product (no cropping). White letterbox
       // bands keep the pharma photo on a clean clinical background regardless of
       // the image's own aspect ratio.
       className={cn('h-full w-full bg-white object-contain p-2', className)}
-      onError={() => setExtIdx((i) => i + 1)}
+      onError={() => setImageIdx((i) => i + 1)}
       loading="lazy"
       decoding="async"
     />

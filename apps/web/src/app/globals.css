@@ -113,6 +113,13 @@
     background-color: hsl(var(--primary) / 0.25);
     color: hsl(var(--foreground));
   }
+
+  input,
+  select,
+  textarea,
+  [contenteditable='true'] {
+    font-size: 16px !important;
+  }
 }
 
 @layer utilities {
@@ -124,6 +131,7 @@
   .tracking-display {
     letter-spacing: -0.015em;
   }
+
   .tracking-display-tight {
     letter-spacing: -0.028em;
   }
@@ -135,12 +143,14 @@
     -webkit-backdrop-filter: saturate(160%) blur(20px);
     border: 1px solid hsl(var(--border) / 0.7);
   }
+
   .glass-strong {
     background-color: hsl(var(--card) / 0.78);
     backdrop-filter: saturate(180%) blur(28px);
     -webkit-backdrop-filter: saturate(180%) blur(28px);
     border: 1px solid hsl(var(--border) / 0.6);
   }
+
   .glass-nav {
     background-color: hsl(var(--background) / 0.65);
     backdrop-filter: saturate(180%) blur(24px);
@@ -172,6 +182,7 @@
       box-shadow 0.25s ease,
       background-color 0.25s ease;
   }
+
   .lift:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 32px -12px hsl(0 0% 0% / 0.55);

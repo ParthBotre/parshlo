@@ -8,15 +8,14 @@ import { useMemo, useState } from 'react';
 import { AdminCartDrawer } from '@/components/admin/admin-cart-drawer';
 import { AddToCartRow } from '@/components/cart/add-to-cart-row';
 import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
-import { CatalogFilters } from '@/components/catalog/catalog-filters';
 import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { totals, useAdminCart } from '@/lib/admin-cart-store';
 import { type AdminBuyer, placeOrderOnBehalfFromBrowser } from '@/lib/api/admin';
+import { UNLIMITED_CART_QTY } from '@/lib/cart-quantity';
 import { PRICING_ENABLED } from '@/lib/feature-flags';
-import { useCatalogFilters } from '@/lib/use-catalog-filters';
 import { formatINR } from '@/lib/utils';
 
 function buyerLabel(b: AdminBuyer): string {
@@ -27,6 +26,10 @@ function buyerLabel(b: AdminBuyer): string {
 
 function canPlaceForBuyer(b: AdminBuyer): boolean {
   return b.accountStatus === 'APPROVED' && Boolean(b.gstin);
+}
+
+function priceTierForBusinessType(businessType?: string | null): BuyerProductView['priceTier'] {
+  return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
 }
 
 export function AdminPlaceOrderPanel({
@@ -41,7 +44,7 @@ export function AdminPlaceOrderPanel({
   const { itemCount } = totals(cart.lines);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [buyerId, setBuyerId] = useState('');
-  const filters = useCatalogFilters(products);
+  const [query, setQuery] = useState('');
 
   const sortedBuyers = useMemo(
     () =>
@@ -60,9 +63,17 @@ export function AdminPlaceOrderPanel({
 
   const selectedBuyer = sortedBuyers.find((b) => b.id === buyerId) ?? null;
   const catalogEnabled = Boolean(selectedBuyer && canPlaceForBuyer(selectedBuyer));
-  const countLabel = filters.isFiltered
-    ? `${filters.filteredProducts.length} of ${products.length} products`
-    : `${products.length} products`;
+  const visibleProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return products;
+    }
+    return products.filter((product) => product.name.toLowerCase().includes(needle));
+  }, [products, query]);
+  const countLabel =
+    visibleProducts.length === products.length
+      ? `${products.length} products`
+      : `${visibleProducts.length} of ${products.length} products`;
 
   const onBuyerChange = (nextId: string): void => {
     setBuyerId(nextId);
@@ -123,7 +134,7 @@ export function AdminPlaceOrderPanel({
       <div className="bg-background/80 sticky top-20 z-30 -mx-4 mb-2 flex items-center justify-between gap-3 border-b px-4 py-2 backdrop-blur md:mx-0 md:rounded-lg md:border md:px-3">
         <p className="text-muted-foreground text-sm">
           {countLabel}
-          {PRICING_ENABLED ? ' · prices shown ex-GST' : ' · pricing coming soon'}
+          {PRICING_ENABLED ? ' · rates include GST' : ' · pricing coming soon'}
         </p>
         <Button
           onClick={() => setDrawerOpen(true)}
@@ -143,26 +154,26 @@ export function AdminPlaceOrderPanel({
         </div>
       ) : null}
 
-      <div className="mb-4">
-        <CatalogFilters
-          searchQuery={filters.searchQuery}
-          onSearchChange={filters.setSearchQuery}
-          categories={filters.categories}
-          selectedCategories={filters.selectedCategories}
-          onToggleCategory={filters.toggleCategory}
-          isFiltered={filters.isFiltered}
-          onClear={filters.clearFilters}
-        />
-      </div>
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+        placeholder="Search products..."
+        className="border-input bg-background placeholder:text-muted-foreground focus:border-primary mb-4 h-11 w-full rounded-md border px-3 text-base outline-none transition-colors sm:text-sm"
+      />
 
-      {filters.filteredProducts.length === 0 ? (
+      {visibleProducts.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-12 text-center text-sm">
-          No products match your filters.
+          No products match your search.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filters.filteredProducts.map((p) => (
-            <AdminProductCard key={p.id} product={p} disabled={!catalogEnabled} />
+          {visibleProducts.map((p) => (
+            <AdminProductCard
+              key={p.id}
+              product={p}
+              buyer={selectedBuyer}
+              disabled={!catalogEnabled}
+            />
           ))}
         </div>
       )}
@@ -182,6 +193,7 @@ export function AdminPlaceOrderPanel({
               quantity: l.qty,
               schemeFreeQuantity: l.schemeFreeQuantity ?? 0,
               discountPaise: l.discountPaise ?? 0,
+              priceTier: l.priceTier,
             })),
             purchaseOrderNumber,
             notes,
@@ -199,14 +211,17 @@ export function AdminPlaceOrderPanel({
 
 function AdminProductCard({
   product,
+  buyer,
   disabled,
 }: {
   product: BuyerProductView;
+  buyer: AdminBuyer | null;
   disabled: boolean;
 }): JSX.Element {
   const cart = useAdminCart();
   const inCart = cart.lines.find((l) => l.productId === product.id);
-  const outOfStock = product.status === 'OUT_OF_STOCK' || product.availableQty <= 0;
+  const defaultTier = priceTierForBusinessType(buyer?.businessType);
+  const defaultPrice = defaultTier === 'RATE_B' ? product.rateBPaise : product.rateAPaise;
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
@@ -220,20 +235,20 @@ function AdminProductCard({
       </div>
       <CardContent className="flex flex-1 flex-col gap-3 p-4">
         <h3 className="font-display line-clamp-2 text-base font-semibold leading-tight">
-          {product.name}
+          {product.name.toUpperCase()}
         </h3>
+        <p className="text-muted-foreground text-xs uppercase tracking-wider">
+          {product.form} · {product.packaging}
+        </p>
         <p className="text-muted-foreground text-xs">
-          {formatINR(product.wholesalePricePaise)} · GST {product.gstRate}%
+          {formatINR(defaultPrice)} · {defaultTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} ·
+          GST Rate ({product.gstRate}%) included in price
         </p>
         <div className="mt-auto pt-1">
-          {outOfStock ? (
-            <Button variant="outline" disabled className="w-full">
-              Out of stock
-            </Button>
-          ) : inCart ? (
+          {inCart ? (
             <CartQuantityInput
               qty={inCart.qty}
-              maxQty={inCart.maxQty || product.availableQty}
+              maxQty={inCart.maxQty || UNLIMITED_CART_QTY}
               onQtyChange={(next) => cart.setQty(product.id, next)}
               disabled={disabled}
               className="w-full justify-center"
@@ -242,7 +257,9 @@ function AdminProductCard({
             <AddToCartRow
               product={product}
               disabled={disabled}
-              onAdd={(p, qty) => cart.add(p, qty)}
+              onAdd={(p, qty) => {
+                cart.add({ ...p, wholesalePricePaise: defaultPrice, priceTier: defaultTier }, qty);
+              }}
             />
           )}
         </div>

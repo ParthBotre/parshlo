@@ -39,6 +39,9 @@ export type Paise = z.infer<typeof Paise>;
 export const GstRate = z.enum(['0', '5', '12', '18', '28']);
 export type GstRate = z.infer<typeof GstRate>;
 
+export const ProductPriceTier = z.enum(['RATE_A', 'RATE_B']);
+export type ProductPriceTier = z.infer<typeof ProductPriceTier>;
+
 /** Public-facing product view (NO wholesale price, NO MRP exposed publicly per spec). */
 export const PublicProductView = z.object({
   id: EntityId,
@@ -60,8 +63,13 @@ export type PublicProductView = z.infer<typeof PublicProductView>;
 
 /** Verified-buyer view — adds wholesale pricing, MRP, MOQ, and live inventory. */
 export const BuyerProductView = PublicProductView.extend({
+  /** Selected inclusive rate for this buyer/session. Retained for cart compatibility. */
   wholesalePricePaise: Paise,
+  rateAPaise: Paise,
+  rateBPaise: Paise,
+  priceTier: ProductPriceTier,
   mrpPaise: Paise,
+  /** Display-only GST percentage. Rate A / Rate B are already GST-inclusive. */
   gstRate: GstRate,
   moq: z.number().int().positive(),
   availableQty: z.number().int().nonnegative(),
@@ -89,6 +97,8 @@ export const ProductWriteInput = z.object({
   prescriptionRequired: z.boolean(),
   scheduleDrug: ScheduleDrug,
   wholesalePricePaise: Paise,
+  rateAPaise: Paise.optional(),
+  rateBPaise: Paise.optional(),
   mrpPaise: Paise,
   gstRate: GstRate,
   moq: z.number().int().positive(),

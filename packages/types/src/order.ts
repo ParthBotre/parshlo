@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { EntityId, IsoDateString } from './common.js';
-import { Paise } from './product.js';
+import { Paise, ProductPriceTier } from './product.js';
 
 export const OrderStatus = z.enum([
   'RECEIVED',
@@ -34,6 +34,7 @@ export const OrderItemInput = z.object({
   quantity: z.number().int().positive(),
   schemeFreeQuantity: z.number().int().nonnegative().default(0),
   discountPaise: Paise.default(0),
+  priceTier: ProductPriceTier.optional(),
 });
 export type OrderItemInput = z.infer<typeof OrderItemInput>;
 
@@ -52,6 +53,9 @@ export const PlaceOrderOnBehalfInput = PlaceOrderInput.extend({
 });
 export type PlaceOrderOnBehalfInput = z.infer<typeof PlaceOrderOnBehalfInput>;
 
+export const UpdateOrderBeforeApprovalInput = PlaceOrderInput.omit({ idempotencyKey: true });
+export type UpdateOrderBeforeApprovalInput = z.infer<typeof UpdateOrderBeforeApprovalInput>;
+
 export const OrderItemView = z.object({
   productId: EntityId,
   productName: z.string(),
@@ -66,7 +70,7 @@ export const OrderItemView = z.object({
 });
 export type OrderItemView = z.infer<typeof OrderItemView>;
 
-export const CourierService = z.enum(['PROFESSIONAL', 'MARK', 'TEJ']);
+export const CourierService = z.enum(['PROFESSIONAL', 'MARK', 'TEJ', 'SHIPKART', 'VISHWA']);
 export type CourierService = z.infer<typeof CourierService>;
 
 export const UpdateCourierTrackingInput = z.object({

@@ -18,26 +18,23 @@ describe('cart totals', () => {
     expect(totals([])).toEqual({ subtotal: 0, gst: 0, total: 0, itemCount: 0 });
   });
 
-  it('computes subtotal + GST + total for a single line', () => {
+  it('computes totals from GST-inclusive rates for a single line', () => {
     const t = totals([line()]);
     expect(t.subtotal).toBe(100 * 1000);
-    // 12% of 100 000 paise = 12 000
-    expect(t.gst).toBe(12_000);
-    expect(t.total).toBe(112_000);
+    expect(t.gst).toBe(0);
+    expect(t.total).toBe(100_000);
     expect(t.itemCount).toBe(1);
   });
 
-  it('sums multiple lines with mixed GST rates', () => {
+  it('sums multiple lines without adding display-only GST rates', () => {
     const t = totals([
       line({ productId: 'a', unitPricePaise: 1000, qty: 10, gstRate: '5' }),
       line({ productId: 'b', unitPricePaise: 2000, qty: 5, gstRate: '12' }),
       line({ productId: 'c', unitPricePaise: 500, qty: 4, gstRate: '0' }),
     ]);
     expect(t.subtotal).toBe(10 * 1000 + 5 * 2000 + 4 * 500);
-    expect(t.gst).toBe(
-      Math.round((10 * 1000 * 500) / 10_000) + Math.round((5 * 2000 * 1200) / 10_000) + 0,
-    );
-    expect(t.total).toBe(t.subtotal + t.gst);
+    expect(t.gst).toBe(0);
+    expect(t.total).toBe(t.subtotal);
     expect(t.itemCount).toBe(3);
   });
 });

@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { type GstRate as PrismaGstRate } from '@parshlo/db';
+import { type BusinessType, type GstRate as PrismaGstRate } from '@parshlo/db';
 import {
   type BuyerProductView,
   type GstRate,
+  type ProductPriceTier,
   type PublicProductView,
 } from '@parshlo/types';
 
@@ -15,6 +16,10 @@ const GST_RATE_MAP: Record<PrismaGstRate, GstRate> = {
   EIGHTEEN: '18',
   TWENTYEIGHT: '28',
 };
+
+export function priceTierForBusinessType(businessType?: BusinessType | null): ProductPriceTier {
+  return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
+}
 
 @Injectable()
 export class ProductService {
@@ -29,7 +34,7 @@ export class ProductService {
     return products.map((p) => ({
       id: p.id,
       slug: p.slug,
-      name: p.name,
+      name: p.name.toUpperCase(),
       composition: p.composition,
       strength: p.strength,
       form: p.form,
@@ -55,7 +60,7 @@ export class ProductService {
     return {
       id: p.id,
       slug: p.slug,
-      name: p.name,
+      name: p.name.toUpperCase(),
       composition: p.composition,
       strength: p.strength,
       form: p.form,
@@ -70,33 +75,42 @@ export class ProductService {
     };
   }
 
-  async listForBuyer(): Promise<BuyerProductView[]> {
+  async listForBuyer(businessType?: BusinessType | null): Promise<BuyerProductView[]> {
+    const tier = priceTierForBusinessType(businessType);
     const products = await this.prisma.product.findMany({
       where: { status: { in: ['ACTIVE', 'OUT_OF_STOCK'] }, deletedAt: null },
       include: { category: true, inventory: true },
       orderBy: { name: 'asc' },
     });
-    return products.map((p) => ({
-      id: p.id,
-      slug: p.slug,
-      name: p.name,
-      composition: p.composition,
-      strength: p.strength,
-      form: p.form,
-      packaging: p.packaging,
-      description: p.description,
-      category: p.category.name,
-      manufacturer: p.manufacturer,
-      imageUrls: [],
-      prescriptionRequired: p.prescriptionRequired,
-      scheduleDrug: p.scheduleDrug,
-      status: p.status,
-      wholesalePricePaise: Number(p.wholesalePricePaise),
-      mrpPaise: Number(p.mrpPaise),
-      gstRate: GST_RATE_MAP[p.gstRate],
-      moq: p.moq,
-      availableQty: p.inventory?.availableQty ?? 0,
-      batchInfo: null,
-    }));
+    return products.map((p) => {
+      const rateA = Number(p.rateAPaise || p.wholesalePricePaise);
+      const rateB = Number(p.rateBPaise || p.wholesalePricePaise);
+      const selectedPrice = tier === 'RATE_B' ? rateB : rateA;
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name.toUpperCase(),
+        composition: p.composition,
+        strength: p.strength,
+        form: p.form,
+        packaging: p.packaging,
+        description: p.description,
+        category: p.category.name,
+        manufacturer: p.manufacturer,
+        imageUrls: [],
+        prescriptionRequired: p.prescriptionRequired,
+        scheduleDrug: p.scheduleDrug,
+        status: p.status,
+        wholesalePricePaise: selectedPrice,
+        rateAPaise: rateA,
+        rateBPaise: rateB,
+        priceTier: tier,
+        mrpPaise: Number(p.mrpPaise),
+        gstRate: GST_RATE_MAP[p.gstRate],
+        moq: p.moq,
+        availableQty: p.inventory?.availableQty ?? 0,
+        batchInfo: null,
+      };
+    });
   }
 }

@@ -17,8 +17,7 @@ export interface CartQuantityInputProps {
 }
 
 /**
- * Quantity control for catalog cards and cart lines. Users can type any whole
- * number from 1 up to available stock.
+ * Quantity control for catalog cards and cart lines.
  */
 export function CartQuantityInput({
   qty,
@@ -76,7 +75,7 @@ export function CartQuantityInput({
             e.currentTarget.blur();
           }
         }}
-        className="h-8 min-w-[4.5rem] px-2 text-center font-mono text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-8 min-w-[4.5rem] px-2 text-center font-mono text-base [appearance:textfield] sm:text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         aria-label="Quantity"
       />
       <Button

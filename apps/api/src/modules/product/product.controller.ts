@@ -42,13 +42,16 @@ export class ProductController {
     if (user.roles.some((role) => STAFF_ROLES.has(role))) {
       return this.products.listForBuyer();
     }
-    const dbUser = await this.prisma.user.findUnique({ where: { id: user.userId } });
-    if (!dbUser || dbUser.accountStatus !== 'APPROVED') {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.userId },
+      include: { businessProfile: true },
+    });
+    if (!dbUser || dbUser.accountStatus !== 'APPROVED' || !dbUser.businessProfile) {
       throw new ForbiddenException({
         code: 'ACCOUNT_NOT_APPROVED',
         message: 'Your B2B account is not yet approved.',
       });
     }
-    return this.products.listForBuyer();
+    return this.products.listForBuyer(dbUser.businessProfile.businessType);
   }
 }

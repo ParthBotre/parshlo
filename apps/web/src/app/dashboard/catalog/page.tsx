@@ -33,9 +33,7 @@ export default async function CatalogPage(): Promise<JSX.Element> {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Products</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Live wholesale pricing and stock levels for your account.
-        </p>
+        <p className="text-muted-foreground mt-1 text-sm">Wholesale pricing for your account.</p>
       </div>
 
       {error ? (

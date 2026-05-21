@@ -3,6 +3,7 @@ import {
   OrderView,
   type AdminCreateBuyerInput,
   type PlaceOrderOnBehalfInput,
+  type UpdateOrderBeforeApprovalInput,
 } from '@parshlo/types';
 import { z } from 'zod';
 
@@ -240,6 +241,20 @@ export function getAdminOrder(
   return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, OrderView, {
     method: 'GET',
     accessToken,
+    ...options,
+  });
+}
+
+export function updateAdminOrderBeforeApproval(
+  accessToken: string,
+  id: string,
+  input: UpdateOrderBeforeApprovalInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+) {
+  return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, OrderView, {
+    method: 'PATCH',
+    accessToken,
+    body: input,
     ...options,
   });
 }

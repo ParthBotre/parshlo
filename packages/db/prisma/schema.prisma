@@ -235,8 +235,15 @@ model Product {
   prescriptionRequired Boolean      @default(true)
   scheduleDrug         ScheduleDrug @default(NONE)
 
+  /// Selected/base wholesale price retained for backwards-compatible clients.
+  /// New pricing should prefer rateAPaise/rateBPaise.
   wholesalePricePaise BigInt
+  /// Rate A: PTS, used for chemists, stockists, wholesalers, distributors, and institutions.
+  rateAPaise          BigInt @default(0)
+  /// Rate B: PTR, used for retail pharmacy buyers.
+  rateBPaise          BigInt @default(0)
   mrpPaise            BigInt
+  /// Display-only GST band. PTR/PTS already include GST.
   gstRate             GstRate
   moq                 Int            @default(1)
 
@@ -297,6 +304,8 @@ enum CourierService {
   PROFESSIONAL
   MARK
   TEJ
+  SHIPKART
+  VISHWA
 }
 
 model Order {

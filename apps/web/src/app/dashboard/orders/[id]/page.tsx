@@ -123,7 +123,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
         <InfoCard
           label="Total"
           value={formatINR(order.totalPaise)}
-          sub={`Subtotal ${formatINR(order.subtotalPaise)} · GST ${formatINR(order.gstPaise)}`}
+          sub={`Subtotal ${formatINR(order.subtotalPaise)} · GST Rate (5%) included`}
         />
       </div>
 
@@ -139,7 +139,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
                     Unit
                   </th>
                   <th className="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell sm:px-5">
-                    GST
+                    GST Rate
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 text-right sm:px-5">Total</th>
                 </tr>
@@ -148,7 +148,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
                 {order.items.map((line) => (
                   <tr key={line.productId} className="border-t">
                     <td className="max-w-[160px] truncate px-4 py-3 sm:max-w-none sm:px-5">
-                      {line.productName}
+                      {line.productName.toUpperCase()}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
                       {line.quantity}
@@ -157,7 +157,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
                       {formatINR(line.unitPricePaise)}
                     </td>
                     <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 text-right font-mono sm:table-cell sm:px-5">
-                      {formatINR(line.lineGstPaise)}
+                      {line.gstRate}% included
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
                       {formatINR(line.lineTotalPaise)}

@@ -93,9 +93,11 @@ export function AdminCartDrawer({
                 <li key={line.productId} className="space-y-2 rounded-md border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{line.name}</p>
+                      <p className="truncate text-sm font-medium">{line.name.toUpperCase()}</p>
                       <p className="text-muted-foreground text-xs">
-                        {formatINR(line.unitPricePaise)} each · GST {line.gstRate}%
+                        {formatINR(line.unitPricePaise)} each ·{' '}
+                        {line.priceTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} · GST GST
+                        Rate ({line.gstRate}%) included in price
                       </p>
                     </div>
                     <Button
@@ -112,6 +114,26 @@ export function AdminCartDrawer({
                     maxQty={line.maxQty || line.qty}
                     onQtyChange={(next) => cart.setQty(line.productId, next)}
                   />
+                  <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                    Rate
+                    <select
+                      value={line.priceTier ?? 'RATE_A'}
+                      onChange={(e) =>
+                        cart.setPriceTier(
+                          line.productId,
+                          e.currentTarget.value === 'RATE_B' ? 'RATE_B' : 'RATE_A',
+                        )
+                      }
+                      className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
+                    >
+                      <option value="RATE_A">
+                        Rate A (PTS) · {formatINR(line.rateAPaise ?? line.unitPricePaise)}
+                      </option>
+                      <option value="RATE_B">
+                        Rate B (PTR) · {formatINR(line.rateBPaise ?? line.unitPricePaise)}
+                      </option>
+                    </select>
+                  </label>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="text-muted-foreground grid gap-1 text-xs font-medium">
                       Free qty
@@ -172,7 +194,7 @@ export function AdminCartDrawer({
 
           <dl className="space-y-1 text-sm">
             <Row label="Subtotal" value={formatINR(t.subtotal)} />
-            <Row label="GST" value={formatINR(t.gst)} muted />
+            <Row label="GST Rate" value="5% included in selected rates" muted />
             <Row label="Total" value={formatINR(t.total)} bold />
           </dl>
 

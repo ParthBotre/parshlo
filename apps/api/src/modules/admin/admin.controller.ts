@@ -17,6 +17,7 @@ import {
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
   UpdateCourierTrackingInput,
+  UpdateOrderBeforeApprovalInput,
   type AdminCreateBuyerInput,
   type AuthPrincipal,
   type OrderStatus,
@@ -97,6 +98,23 @@ export class AdminController {
   @Get('orders/:id')
   getOrder(@Param('id') id: string): Promise<OrderView> {
     return this.orderService.getOrderById(id);
+  }
+
+  @Patch('orders/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'order.edit_before_approval',
+    resource: 'Order',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  updateOrderBeforeApproval(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') orderId: string,
+    @Body(new ZodValidationPipe(UpdateOrderBeforeApprovalInput))
+    body: UpdateOrderBeforeApprovalInput,
+  ): Promise<OrderView> {
+    return this.orderService.updateBeforeApproval(orderId, user.roles, body);
   }
 
   @Post('orders/:id/courier-receipt/upload-url')
@@ -187,7 +205,7 @@ export class AdminController {
   @Post('buyers')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)
-  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @RequireRoles('ADMIN', 'SALES_MANAGER', 'SUPER_ADMIN')
   @Audit({
     action: 'buyer.create',
     resource: 'User',

@@ -100,45 +100,53 @@ export default async function GrossSalesLocationDetailPage({
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3">Buyer</th>
-                <th className="px-5 py-3">GSTIN</th>
-                <th className="px-5 py-3 text-right">Orders</th>
-                <th className="px-5 py-3 text-right">Gross</th>
-                <th className="px-5 py-3">Share in city</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.rows.map((row) => (
-                <tr key={row.gstin !== '—' ? row.gstin : row.businessName} className="border-t">
-                  <td className="px-5 py-3">
-                    <p className="font-medium">{row.businessName}</p>
-                    {row.contactName !== row.businessName ? (
-                      <p className="text-muted-foreground text-xs">{row.contactName}</p>
-                    ) : null}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 font-mono text-xs">{row.gstin}</td>
-                  <td className="px-5 py-3 text-right font-mono">{row.orderCount}</td>
-                  <td className="px-5 py-3 text-right font-mono">{formatINR(row.grossPaise)}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex min-w-[140px] items-center gap-2">
-                      <div className="bg-secondary h-2 flex-1 overflow-hidden rounded-full">
-                        <div
-                          className="bg-primary h-full rounded-full transition-all"
-                          style={{ width: `${Math.min(row.sharePercent, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-muted-foreground w-10 shrink-0 text-right font-mono text-xs">
-                        {row.sharePercent}%
-                      </span>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3">Buyer</th>
+                  <th className="px-5 py-3">GSTIN</th>
+                  <th className="px-5 py-3 text-right">Orders</th>
+                  <th className="px-5 py-3 text-right">Gross</th>
+                  <th className="px-5 py-3">Share in city</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.rows.map((row) => (
+                  <tr key={row.gstin !== '—' ? row.gstin : row.businessName} className="border-t">
+                    <td className="max-w-[260px] whitespace-normal break-words px-5 py-3">
+                      <p className="font-medium">{row.businessName}</p>
+                      {row.contactName !== row.businessName ? (
+                        <p className="text-muted-foreground text-xs">{row.contactName}</p>
+                      ) : null}
+                    </td>
+                    <td className="text-muted-foreground whitespace-nowrap px-5 py-3 font-mono text-xs">
+                      {row.gstin}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
+                      {row.orderCount}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
+                      {formatINR(row.grossPaise)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex min-w-[140px] items-center gap-2">
+                        <div className="bg-secondary h-2 flex-1 overflow-hidden rounded-full">
+                          <div
+                            className="bg-primary h-full rounded-full transition-all"
+                            style={{ width: `${Math.min(row.sharePercent, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-muted-foreground w-10 shrink-0 text-right font-mono text-xs">
+                          {row.sharePercent}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

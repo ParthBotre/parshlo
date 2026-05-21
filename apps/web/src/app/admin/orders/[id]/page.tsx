@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 
 // import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
 import { CourierTrackingForm } from '@/components/admin/courier-tracking-form';
+import { OrderEditForm } from '@/components/admin/order-edit-form';
 import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,6 +127,14 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
           <Card>
             <CardContent className="space-y-4 p-6">
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                Edit order before approval
+              </h2>
+              <OrderEditForm order={order} canEdit={canApproveOrClose} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="space-y-4 p-6">
+              <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
                 Update status
               </h2>
               <OrderStatusActions
@@ -178,7 +187,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <p className="text-muted-foreground text-xs uppercase tracking-wider">Total</p>
               <p className="font-mono text-lg font-semibold">{formatINR(order.totalPaise)}</p>
               <p className="text-muted-foreground text-xs">
-                Subtotal {formatINR(order.subtotalPaise)} · GST {formatINR(order.gstPaise)}
+                Subtotal {formatINR(order.subtotalPaise)} · GST Rate (5%) included
               </p>
             </div>
             {order.courierTracking ? (
@@ -223,7 +232,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                   <th className="whitespace-nowrap px-5 py-3 text-right">Free</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Discount</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">GST</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right">GST Rate</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Line total</th>
                 </tr>
               </thead>
@@ -231,7 +240,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                 {order.items.map((line) => (
                   <tr key={line.productId} className="border-t">
                     <td className="max-w-[160px] truncate px-5 py-3 sm:max-w-none">
-                      {line.productName}
+                      {line.productName.toUpperCase()}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {line.quantity}
@@ -246,7 +255,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                       {line.discountPaise > 0 ? `-${formatINR(line.discountPaise)}` : '—'}
                     </td>
                     <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
-                      {formatINR(line.lineGstPaise)}
+                      {line.gstRate}% included
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.lineTotalPaise)}
