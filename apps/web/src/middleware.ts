@@ -1,6 +1,7 @@
-import { getSession as getAuth0EdgeSession } from '@auth0/nextjs-auth0/edge';
 import { jwtVerify } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
+
+import { auth0 } from '@/lib/auth/auth0';
 
 /**
  * Edge middleware: gate /dashboard/* and /admin/* (ADMIN family roles).
@@ -47,7 +48,7 @@ async function readDevSession(req: NextRequest): Promise<{ roles: string[] } | n
 
 async function readAuth0Session(req: NextRequest): Promise<{ roles: string[] } | null> {
   try {
-    const session = await getAuth0EdgeSession(req, new NextResponse());
+    const session = await auth0.getSession(req);
     if (!session?.user) {
       return null;
     }
@@ -64,10 +65,19 @@ async function readAuth0Session(req: NextRequest): Promise<{ roles: string[] } |
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
+  const authRoute = pathname.startsWith('/api/auth');
   const protectedDashboard = pathname.startsWith('/dashboard');
   const protectedAdmin = pathname.startsWith('/admin');
 
-  if (!protectedDashboard && !protectedAdmin) {
+  if (process.env.AUTH_MODE !== 'dev') {
+    const authResponse = await auth0.middleware(req);
+    if (authRoute) {
+      return authResponse;
+    }
+    if (!protectedDashboard && !protectedAdmin) {
+      return authResponse;
+    }
+  } else if (!protectedDashboard && !protectedAdmin) {
     return NextResponse.next();
   }
 
@@ -96,5 +106,10 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/admin/:path*',
+    '/api/auth/:path*',
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|apple-icon.png|icon.png|opengraph-image.png).*)',
+  ],
 };

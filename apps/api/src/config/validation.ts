@@ -26,6 +26,7 @@ export const configValidationSchema = z
     S3_ENDPOINT: z.string().url().optional(),
     RESEND_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().default('Parshlo <no-reply@parshlo.local>'),
+    INVOICE_GENERATION_ENABLED: z.enum(['true', 'false']).default('false'),
   })
   .superRefine((env, ctx) => {
     if (env.AUTH_MODE === 'auth0') {

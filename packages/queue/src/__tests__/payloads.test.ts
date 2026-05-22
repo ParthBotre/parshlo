@@ -22,24 +22,26 @@ describe('SendEmailJob', () => {
   });
 
   it('rejects empty recipient array', () => {
-    expect(() =>
-      SendEmailJob.parse({ kind: 'ORDER_PLACED_BUYER', to: [], data: {} }),
-    ).toThrow();
+    expect(() => SendEmailJob.parse({ kind: 'ORDER_PLACED_BUYER', to: [], data: {} })).toThrow();
   });
 
   it('rejects unknown kinds', () => {
     expect(() =>
-      SendEmailJob.parse({ kind: 'NOPE' as unknown as 'ORDER_PLACED_BUYER', to: 'a@b.com', data: {} }),
+      SendEmailJob.parse({
+        kind: 'NOPE' as unknown as 'ORDER_PLACED_BUYER',
+        to: 'a@b.com',
+        data: {},
+      }),
     ).toThrow();
   });
 });
 
 describe('GenerateInvoiceJob', () => {
-  it('requires UUID orderId', () => {
-    expect(() => GenerateInvoiceJob.parse({ orderId: 'not-uuid' })).toThrow();
-    expect(
-      GenerateInvoiceJob.parse({ orderId: '11111111-1111-1111-1111-111111111111' }).orderId,
-    ).toBe('11111111-1111-1111-1111-111111111111');
+  it('accepts the database-issued order id used when invoice generation is enabled', () => {
+    expect(GenerateInvoiceJob.parse({ orderId: 'cmp9l1tl6000rl8880it3d610' }).orderId).toBe(
+      'cmp9l1tl6000rl8880it3d610',
+    );
+    expect(() => GenerateInvoiceJob.parse({ orderId: '' })).toThrow();
   });
 });
 

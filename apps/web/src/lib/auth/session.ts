@@ -1,4 +1,3 @@
-import { getAccessToken, getSession as getAuth0Session } from '@auth0/nextjs-auth0';
 import { PublicUser, Role, type Role as RoleType } from '@parshlo/types';
 import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
@@ -6,6 +5,8 @@ import { z } from 'zod';
 import 'server-only';
 
 import { apiCall, ApiError } from '../api-client';
+
+import { auth0 } from './auth0';
 
 /**
  * Parshlo session model.
@@ -160,12 +161,10 @@ async function fetchParshloProfile(
 }
 
 async function getAuth0ParshloSession(): Promise<Session | null> {
-  let auth0Session: Awaited<ReturnType<typeof getAuth0Session>>;
+  let auth0Session: Awaited<ReturnType<typeof auth0.getSession>>;
   try {
-    auth0Session = await getAuth0Session();
+    auth0Session = await auth0.getSession();
   } catch {
-    // Auth0 may throw when rolling sessions try to rewrite cookies during a
-    // Server Component render (Next.js only allows cookie writes in routes/actions).
     return null;
   }
   if (!auth0Session?.user) {
@@ -174,15 +173,10 @@ async function getAuth0ParshloSession(): Promise<Session | null> {
 
   let accessToken: string | undefined;
   try {
-    const tokenResult = await getAccessToken({ refresh: true });
-    accessToken = tokenResult.accessToken;
+    const tokenResult = await auth0.getAccessToken();
+    accessToken = tokenResult.token;
   } catch {
-    try {
-      const tokenResult = await getAccessToken();
-      accessToken = tokenResult.accessToken;
-    } catch {
-      return null;
-    }
+    return null;
   }
   if (!accessToken) {
     return null;

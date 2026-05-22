@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { HeaderClient } from './site-header.client';
 
 import { BrandMark } from '@/components/brand/brand-mark';
-import { getSession } from '@/lib/auth/session';
 import { site } from '@/lib/site';
 
 const NAV = [
@@ -14,8 +13,7 @@ const NAV = [
   { href: '/contact', label: 'Contact' },
 ] as const;
 
-export async function SiteHeader(): Promise<JSX.Element> {
-  const session = await getSession();
+export function SiteHeader(): JSX.Element {
   return (
     <header className="glass-nav border-border/60 sticky top-0 z-50 w-full border-b">
       <div className="container flex h-16 items-center justify-between">
@@ -35,7 +33,7 @@ export async function SiteHeader(): Promise<JSX.Element> {
           </span>
         </Link>
 
-        <HeaderClient nav={NAV} session={session ? { user: session.user } : null} />
+        <HeaderClient nav={NAV} session={null} />
       </div>
     </header>
   );

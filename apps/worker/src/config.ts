@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const BooleanFlag = z
+  .enum(['true', 'false'])
+  .default('false')
+  .transform((value) => value === 'true');
+
 const Schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DATABASE_URL: z.string().url(),
@@ -14,6 +19,7 @@ const Schema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),
   S3_BUCKET_INVOICES: z.string().default('parshlo-invoices-dev'),
+  INVOICE_GENERATION_ENABLED: BooleanFlag,
   WORKER_CONCURRENCY_EMAIL: z.coerce.number().int().min(1).default(10),
   WORKER_CONCURRENCY_INVOICE: z.coerce.number().int().min(1).default(4),
   WORKER_CONCURRENCY_KYC: z.coerce.number().int().min(1).default(4),

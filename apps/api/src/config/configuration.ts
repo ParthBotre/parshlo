@@ -32,6 +32,9 @@ export interface AppConfig {
   swagger: {
     enabled: boolean;
   };
+  features: {
+    invoiceGenerationEnabled: boolean;
+  };
 }
 
 function parseNodeEnv(value: string | undefined): AppConfig['nodeEnv'] {
@@ -39,6 +42,10 @@ function parseNodeEnv(value: string | undefined): AppConfig['nodeEnv'] {
     return value;
   }
   return 'development';
+}
+
+function parseBooleanFlag(value: string | undefined): boolean {
+  return value === 'true';
 }
 
 export const configuration = (): AppConfig => ({
@@ -77,5 +84,8 @@ export const configuration = (): AppConfig => ({
   },
   swagger: {
     enabled: process.env.NODE_ENV !== 'production',
+  },
+  features: {
+    invoiceGenerationEnabled: parseBooleanFlag(process.env.INVOICE_GENERATION_ENABLED),
   },
 });

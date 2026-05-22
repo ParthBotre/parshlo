@@ -239,7 +239,7 @@ export class OrderService {
     const trackingUrl = `${webBase}/dashboard/orders/${order.id}`;
     const adminUrl = `${webBase}/admin/orders`;
 
-    await Promise.allSettled([
+    const sideEffects: Promise<unknown>[] = [
       this.jobs.enqueueEmail({
         kind: 'ORDER_PLACED_BUYER',
         to: buyerEmail,
@@ -269,8 +269,13 @@ export class OrderService {
           adminUrl,
         },
       }),
-      this.jobs.enqueueInvoice({ orderId: order.id }),
-    ]);
+    ];
+
+    if (this.config.get<boolean>('features.invoiceGenerationEnabled') === true) {
+      sideEffects.push(this.jobs.enqueueInvoice({ orderId: order.id }));
+    }
+
+    await Promise.allSettled(sideEffects);
   }
 
   async getOrder(orderId: string, requesterId: string): Promise<OrderView> {

@@ -1,6 +1,8 @@
+import { LogOut } from 'lucide-react';
 import { redirect } from 'next/navigation';
 
 import { DashboardNav, type NavItem } from '@/components/dashboard/dashboard-nav';
+import { Button } from '@/components/ui/button';
 import { getSession } from '@/lib/auth/session';
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
@@ -38,6 +40,12 @@ export default async function AdminLayout({
             <p className="text-muted-foreground truncate text-xs">{session.user.email}</p>
           </div>
           <DashboardNav items={NAV} />
+          <Button asChild variant="outline" className="mt-4 w-full justify-start">
+            <a href="/api/auth/logout">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </a>
+          </Button>
         </aside>
         <div className="min-w-0">{children}</div>
       </div>

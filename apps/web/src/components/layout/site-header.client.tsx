@@ -33,6 +33,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
 
   const isAdmin = session?.user.roles.some((r) => ADMIN_ROLES.has(r)) ?? false;
   const dashboardHref = isAdmin ? '/admin' : '/dashboard';
+  const isProtectedApp = pathname.startsWith('/admin') || pathname.startsWith('/dashboard');
 
   const onLogout = (): void => {
     // Auth0 logout requires browser redirects (tenant logout + cookie clear).
@@ -72,7 +73,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
               <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign out
             </Button>
           </>
-        ) : (
+        ) : isProtectedApp ? null : (
           <>
             <Button asChild variant="ghost" size="sm">
               <Link href="/auth/sign-in">Sign in</Link>
@@ -124,7 +125,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
                     Sign out
                   </Button>
                 </>
-              ) : (
+              ) : isProtectedApp ? null : (
                 <>
                   <Button asChild variant="outline" size="sm">
                     <Link href="/auth/sign-in" onClick={() => setOpen(false)}>
