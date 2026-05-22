@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Package,
   PackageSearch,
+  ShieldCheck,
   ScrollText,
   ShoppingCart,
   Truck,
@@ -28,6 +29,7 @@ const ICONS = {
   catalog: PackageSearch,
   'place-order': ShoppingCart,
   logistics: Truck,
+  employees: ShieldCheck,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconKey = keyof typeof ICONS;

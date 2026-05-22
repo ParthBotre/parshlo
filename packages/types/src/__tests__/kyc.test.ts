@@ -5,6 +5,7 @@ import { B2BApplicationInputSchema, RegisterBusinessInput } from '../kyc.js';
 describe('RegisterBusinessInput', () => {
   const valid = {
     businessName: 'Apex Pharmacy Pvt Ltd',
+    ownerName: 'Rajesh Kumar',
     businessType: 'PHARMACY',
     gstin: '29AAFCA1234A1Z5',
     drugLicenseNumber: 'KA-BLR-20A-12345',

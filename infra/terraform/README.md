@@ -5,14 +5,14 @@ split into reusable modules with remote state in S3 + DynamoDB locks.
 
 ## What this provisions
 
-| Layer | Service | Module |
-| --- | --- | --- |
-| Network | VPC, public/private subnets across 3 AZs, NAT gateways | `modules/network` |
-| Compute | ECS Fargate cluster running `api`, `worker`, `web` services behind an ALB | `modules/ecs` |
-| Data | RDS PostgreSQL 16 Multi-AZ, ElastiCache Redis cluster, S3 buckets for KYC + invoices | `modules/data` |
-| Edge | CloudFront in front of the ALB + ACM cert via Route53 | `modules/edge` |
-| Identity | Auth0 tenants are managed out-of-band (manual / `auth0` provider optional) | n/a |
-| Observability | CloudWatch log groups, OpenTelemetry collector deployment, Sentry release on apply | `modules/observability` |
+| Layer         | Service                                                                              | Module                  |
+| ------------- | ------------------------------------------------------------------------------------ | ----------------------- |
+| Network       | VPC, public/private subnets across 3 AZs, NAT gateways                               | `modules/network`       |
+| Compute       | ECS Fargate cluster running `api`, `worker`, `web` services behind an ALB            | `modules/ecs`           |
+| Data          | RDS PostgreSQL 16 Multi-AZ, ElastiCache Redis cluster, S3 buckets for KYC + invoices | `modules/data`          |
+| Edge          | CloudFront in front of the ALB + ACM cert via Route53                                | `modules/edge`          |
+| Identity      | Auth0 tenants are managed out-of-band (manual / `auth0` provider optional)           | n/a                     |
+| Observability | CloudWatch log groups, OpenTelemetry collector deployment, Sentry release on apply   | `modules/observability` |
 
 ## State backend
 

@@ -16,7 +16,7 @@ export default function RegisterPage(): JSX.Element {
       <h1 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
         Request B2B Access
       </h1>
-      <p className="mt-3 max-w-2xl text-muted-foreground">
+      <p className="text-muted-foreground mt-3 max-w-2xl">
         Verified businesses can place wholesale orders, view pricing, and download GST invoices.
         Approval typically takes 24–48 hours after we receive your documents.
       </p>
@@ -25,7 +25,7 @@ export default function RegisterPage(): JSX.Element {
         <RegistrationForm />
       </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+      <p className="text-muted-foreground mt-6 text-center text-sm">
         Already approved?{' '}
         <Link href="/auth/sign-in" className="text-primary hover:underline">
           Sign in

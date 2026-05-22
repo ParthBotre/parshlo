@@ -4,14 +4,14 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 1. Identity & access
 
-| Control | Where |
-| --- | --- |
-| Auth0 (MFA required for B2B accounts) | tenant configuration |
-| RS256 JWTs validated via JWKS with key cache + rate limit | `apps/api/src/modules/auth/auth0-jwt.verifier.ts` |
-| `JwtAuthGuard` runs by default; `@Public()` opts-out | `apps/api/src/modules/auth/guards/jwt-auth.guard.ts` |
-| `RolesGuard` enforces `@RequireRoles(...)` | `apps/api/src/modules/auth/guards/roles.guard.ts` |
-| Permission set derived from roles (single source of truth) | `packages/types/src/auth.ts → ROLE_PERMISSIONS` |
-| `accountStatus` checked at every buyer-only endpoint | `ProductController.listForBuyer`, `OrderService.placeOrder` |
+| Control                                                    | Where                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------- |
+| Auth0 (MFA required for B2B accounts)                      | tenant configuration                                        |
+| RS256 JWTs validated via JWKS with key cache + rate limit  | `apps/api/src/modules/auth/auth0-jwt.verifier.ts`           |
+| `JwtAuthGuard` runs by default; `@Public()` opts-out       | `apps/api/src/modules/auth/guards/jwt-auth.guard.ts`        |
+| `RolesGuard` enforces `@RequireRoles(...)`                 | `apps/api/src/modules/auth/guards/roles.guard.ts`           |
+| Permission set derived from roles (single source of truth) | `packages/types/src/auth.ts → ROLE_PERMISSIONS`             |
+| `accountStatus` checked at every buyer-only endpoint       | `ProductController.listForBuyer`, `OrderService.placeOrder` |
 
 ## 2. Transport & network
 
@@ -53,14 +53,14 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 8. STRIDE threat model (excerpt)
 
-| Threat | Vector | Mitigation |
-| --- | --- | --- |
-| **S**poofing | Stolen/replayed JWT | Short-lived access tokens, Auth0 anomaly detection, `aud`/`iss` strictly validated, refresh tokens rotated. |
-| **T**ampering | Buyer modifies order body to lower price | Server snapshots `wholesalePricePaise` and `gstRate` at order time; client price never trusted. |
-| **R**epudiation | "I didn't place that order" | Immutable `AuditLog` with actor, IP, UA, request id; order status events with reviewer id. |
-| **I**nformation disclosure | Wholesale pricing leaks to public | Two distinct API surfaces: `/products/public` strips price/MOQ/inventory; only `/products/catalog` (auth + APPROVED) returns full view. |
-| **D**enial of service | Burst of registration / login attempts | Throttler tiers + Cloudflare/WAF + CAPTCHA on registration in production. |
-| **E**levation of privilege | Buyer hits admin route | `RolesGuard` denies; `RequireRoles` enumerates allowed roles; permission set derived in code. |
+| Threat                     | Vector                                   | Mitigation                                                                                                                              |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**poofing               | Stolen/replayed JWT                      | Short-lived access tokens, Auth0 anomaly detection, `aud`/`iss` strictly validated, refresh tokens rotated.                             |
+| **T**ampering              | Buyer modifies order body to lower price | Server snapshots `wholesalePricePaise` and `gstRate` at order time; client price never trusted.                                         |
+| **R**epudiation            | "I didn't place that order"              | Immutable `AuditLog` with actor, IP, UA, request id; order status events with reviewer id.                                              |
+| **I**nformation disclosure | Wholesale pricing leaks to public        | Two distinct API surfaces: `/products/public` strips price/MOQ/inventory; only `/products/catalog` (auth + APPROVED) returns full view. |
+| **D**enial of service      | Burst of registration / login attempts   | Throttler tiers + Cloudflare/WAF + CAPTCHA on registration in production.                                                               |
+| **E**levation of privilege | Buyer hits admin route                   | `RolesGuard` denies; `RequireRoles` enumerates allowed roles; permission set derived in code.                                           |
 
 ## 9. KYC + compliance
 

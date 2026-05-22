@@ -14,11 +14,16 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
   AdminCreateBuyerInputSchema,
+  AdminCreateEmployeeInputSchema,
+  AdminUpdateEmployeeInputSchema,
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
+  ProductWriteInput,
   UpdateCourierTrackingInput,
   UpdateOrderBeforeApprovalInput,
   type AdminCreateBuyerInput,
+  type AdminCreateEmployeeInput,
+  type AdminUpdateEmployeeInput,
   type AuthPrincipal,
   type OrderStatus,
   type OrderView,
@@ -34,6 +39,7 @@ import {
 } from '../../common/throttling/throttle.constants.js';
 import { OrderService } from '../order/order.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ProductService } from '../product/product.service.js';
 import { StorageService } from '../storage/storage.service.js';
 
 import { AdminService } from './admin.service.js';
@@ -46,6 +52,7 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly orderService: OrderService,
+    private readonly products: ProductService,
     private readonly storage: StorageService,
     private readonly prisma: PrismaService,
   ) {}
@@ -218,5 +225,98 @@ export class AdminController {
     body: AdminCreateBuyerInput,
   ): ReturnType<AdminService['createBuyer']> {
     return this.admin.createBuyer(body, user.userId);
+  }
+
+  @Get('employees')
+  @RequireRoles('SUPER_ADMIN')
+  employees(): ReturnType<AdminService['listEmployees']> {
+    return this.admin.listEmployees();
+  }
+
+  @Post('employees')
+  @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'employee.create',
+    resource: 'User',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+    metadata: (_req, result) => ({
+      email: (result as { email?: string }).email,
+      role: (result as { primaryRole?: string }).primaryRole,
+    }),
+  })
+  createEmployee(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(AdminCreateEmployeeInputSchema))
+    body: AdminCreateEmployeeInput,
+  ): ReturnType<AdminService['createEmployee']> {
+    return this.admin.createEmployee(body, user.userId);
+  }
+
+  @Patch('employees/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'employee.update',
+    resource: 'User',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+    metadata: (_req, result) => ({
+      email: (result as { email?: string }).email,
+      role: (result as { primaryRole?: string }).primaryRole,
+      accountStatus: (result as { accountStatus?: string }).accountStatus,
+    }),
+  })
+  updateEmployee(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(AdminUpdateEmployeeInputSchema))
+    body: AdminUpdateEmployeeInput,
+  ): ReturnType<AdminService['updateEmployee']> {
+    return this.admin.updateEmployee(id, body, user.userId);
+  }
+
+  @Get('products')
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  productsList(): ReturnType<ProductService['listForAdmin']> {
+    return this.products.listForAdmin();
+  }
+
+  @Post('products')
+  @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'product.create',
+    resource: 'Product',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+    metadata: (_req, result) => ({
+      name: (result as { name?: string }).name,
+      status: (result as { status?: string }).status,
+    }),
+  })
+  createProduct(
+    @Body(new ZodValidationPipe(ProductWriteInput)) body: ProductWriteInput,
+  ): ReturnType<ProductService['createAdminProduct']> {
+    return this.products.createAdminProduct(body);
+  }
+
+  @Patch('products/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'product.update',
+    resource: 'Product',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+    metadata: (_req, result) => ({
+      name: (result as { name?: string }).name,
+      status: (result as { status?: string }).status,
+    }),
+  })
+  updateProduct(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ProductWriteInput)) body: ProductWriteInput,
+  ): ReturnType<ProductService['updateAdminProduct']> {
+    return this.products.updateAdminProduct(id, body);
   }
 }

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 export default function NotFound(): JSX.Element {
   return (
     <div className="container flex min-h-[60vh] flex-col items-center justify-center text-center">
-      <p className="font-mono text-sm uppercase tracking-widest text-muted-foreground">404</p>
-      <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">Page not found</h1>
-      <p className="mt-2 max-w-md text-muted-foreground">
+      <p className="text-muted-foreground font-mono text-sm uppercase tracking-widest">404</p>
+      <h1 className="font-display mt-3 text-4xl font-semibold tracking-tight">Page not found</h1>
+      <p className="text-muted-foreground mt-2 max-w-md">
         The link you followed may be broken, or the page may have been moved.
       </p>
       <Button asChild className="mt-8">

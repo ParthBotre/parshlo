@@ -103,13 +103,13 @@ sequenceDiagram
 
 ## 3. Trust boundaries
 
-| Boundary | Trust direction | Controls |
-| --- | --- | --- |
-| Browser → Web | untrusted → semi-trusted | HTTPS, HSTS, CSP, XSS-safe RSC, CSRF tokens on Server Actions |
-| Web → API | semi-trusted → trusted | Bearer JWT from Auth0, CORS allowlist, no credentials forwarding |
-| API → DB | trusted → trusted | Connection pool, parameterized queries via Prisma, least-privileged role |
-| API → S3 | trusted → trusted | IAM role, presigned URLs only, SSE-KMS encryption, bucket policy denying public ACLs |
-| API → Auth0 | trusted → trusted | JWKS over HTTPS, cached + rate-limited |
+| Boundary      | Trust direction          | Controls                                                                             |
+| ------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| Browser → Web | untrusted → semi-trusted | HTTPS, HSTS, CSP, XSS-safe RSC, CSRF tokens on Server Actions                        |
+| Web → API     | semi-trusted → trusted   | Bearer JWT from Auth0, CORS allowlist, no credentials forwarding                     |
+| API → DB      | trusted → trusted        | Connection pool, parameterized queries via Prisma, least-privileged role             |
+| API → S3      | trusted → trusted        | IAM role, presigned URLs only, SSE-KMS encryption, bucket policy denying public ACLs |
+| API → Auth0   | trusted → trusted        | JWKS over HTTPS, cached + rate-limited                                               |
 
 ## 4. Data model summary
 
@@ -130,6 +130,7 @@ erDiagram
 ```
 
 Key invariants:
+
 - `BusinessProfile.gstin` is **globally unique**.
 - An order is uniquely identified by `(buyerId, idempotencyKey)`.
 - `OrderItem.productNameSnapshot` is immutable after creation so historical invoices remain accurate even if the product name changes.

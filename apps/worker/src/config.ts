@@ -11,6 +11,7 @@ const Schema = z.object({
   REDIS_URL: z.string().url(),
   EMAIL_TRANSPORT: z.enum(['mailhog', 'resend']).default('mailhog'),
   EMAIL_FROM: z.string().default('Parshlo <no-reply@parshlo.local>'),
+  EMAIL_NOTIFICATIONS_ENABLED: BooleanFlag,
   RESEND_API_KEY: z.string().optional(),
   MAILHOG_HOST: z.string().default('localhost'),
   MAILHOG_PORT: z.coerce.number().int().default(1025),

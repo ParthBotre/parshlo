@@ -4,12 +4,15 @@
 - **Date**: 2026-05-13
 
 ## Context
+
 We need a backend that handles 100% TypeScript, dependency injection, strong testability, OpenAPI generation, and patterns most senior engineers will recognise immediately.
 
 ## Decision
+
 **NestJS 10** with the **Fastify** adapter (instead of Express).
 
 ## Consequences
+
 - ✅ Decorator-driven modules + DI map naturally to features (auth, kyc, products, orders, admin).
 - ✅ Built-in support for guards (`JwtAuthGuard`, `RolesGuard`), interceptors (`AuditInterceptor`), and pipes (`ZodValidationPipe`).
 - ✅ `@nestjs/swagger` gives us OpenAPI for free.
@@ -18,6 +21,7 @@ We need a backend that handles 100% TypeScript, dependency injection, strong tes
 - ⚠️ NestJS has a learning curve for engineers used to bare Express. Mitigated by docs and examples in the repo.
 
 ## Alternatives considered
+
 - **Express + manual DI**: less ceremony, but every module reinvents auth/validation/errors → high drift risk.
 - **Hono / tRPC**: faster to ship for small teams; weaker fit for enterprise B2B with strict RBAC, audit, OpenAPI.
 - **Next.js route handlers as the only backend**: rejected because we have async workflows (orders, invoices, emails) that benefit from a dedicated long-lived service.

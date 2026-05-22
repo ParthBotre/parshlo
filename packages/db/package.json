@@ -26,9 +26,9 @@
     "generate": "dotenv -e ../../.env -- prisma generate",
     "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
-    "migrate:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
+    "migrate:reset": "dotenv -e ../../.env -- node ../../scripts/guard-dev-db.mjs migrate:reset && dotenv -e ../../.env -- prisma migrate reset --force",
     "studio": "dotenv -e ../../.env -- prisma studio",
-    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "seed": "dotenv -e ../../.env -- node ../../scripts/guard-dev-db.mjs seed && dotenv -e ../../.env -- tsx prisma/seed.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist .turbo"

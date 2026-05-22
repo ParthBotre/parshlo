@@ -11,11 +11,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-parshlo}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - parshlo-pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parshlo} -d ${POSTGRES_DB:-parshlo}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-parshlo} -d ${POSTGRES_DB:-parshlo}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,13 +24,13 @@ services:
     image: redis:7-alpine
     container_name: parshlo-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ['redis-server', '--appendonly', 'yes']
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - parshlo-redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -41,8 +41,8 @@ services:
     container_name: parshlo-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - '1025:1025'
+      - '8025:8025'
 
   # LocalStack: AWS-compatible S3 for dev/test
   localstack:
@@ -52,10 +52,10 @@ services:
     environment:
       SERVICES: s3
       DEFAULT_REGION: ap-south-1
-      DEBUG: "0"
-      PERSISTENCE: "1"
+      DEBUG: '0'
+      PERSISTENCE: '1'
     ports:
-      - "4566:4566"
+      - '4566:4566'
     volumes:
       - parshlo-localstack-data:/var/lib/localstack
       - ./infra/docker/localstack-init.sh:/etc/localstack/init/ready.d/init.sh:ro

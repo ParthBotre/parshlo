@@ -30,11 +30,11 @@ function main(): void {
   });
 
   const workers = [
-    createEmailWorker({ connection, prisma }),
+    ...(config.EMAIL_NOTIFICATIONS_ENABLED ? [createEmailWorker({ connection, prisma })] : []),
     ...(config.INVOICE_GENERATION_ENABLED
       ? [createInvoiceWorker({ connection, prisma, s3: createS3Client() })]
       : []),
-    createKycWorker({ connection, prisma }),
+    ...(config.EMAIL_NOTIFICATIONS_ENABLED ? [createKycWorker({ connection, prisma })] : []),
   ];
 
   workers.forEach((w) => {
@@ -60,10 +60,11 @@ function main(): void {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
   logger.info(
-    { invoiceGenerationEnabled: config.INVOICE_GENERATION_ENABLED },
-    config.INVOICE_GENERATION_ENABLED
-      ? 'Worker ready · queues: email, invoice, kyc'
-      : 'Worker ready · queues: email, kyc',
+    {
+      emailNotificationsEnabled: config.EMAIL_NOTIFICATIONS_ENABLED,
+      invoiceGenerationEnabled: config.INVOICE_GENERATION_ENABLED,
+    },
+    `Worker ready · queues: ${workers.map((w) => w.name).join(', ') || 'none enabled'}`,
   );
 }
 

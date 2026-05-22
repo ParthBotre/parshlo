@@ -1,8 +1,15 @@
 import {
+  AdminCreateEmployeeInputSchema,
+  AdminEmployeeView,
+  AdminProductView,
   ApiErrorResponse,
   OrderView,
+  ProductWriteInput,
+  type AdminCreateEmployeeInput,
   type AdminCreateBuyerInput,
+  type AdminUpdateEmployeeInput,
   type PlaceOrderOnBehalfInput,
+  type ProductWriteInput as ProductWriteInputType,
   type UpdateOrderBeforeApprovalInput,
 } from '@parshlo/types';
 import { z } from 'zod';
@@ -142,6 +149,9 @@ const AdminBuyerDetail = AdminBuyerRow.extend({
     }),
   ),
 });
+
+const AdminEmployeeList = z.array(AdminEmployeeView);
+const AdminProductList = z.array(AdminProductView);
 
 export function listPendingKyc(
   accessToken: string,
@@ -305,6 +315,85 @@ export function getAdminBuyer(
 }
 
 export type AdminBuyer = z.infer<typeof AdminBuyerRow>;
+
+export type AdminEmployee = z.infer<typeof AdminEmployeeView>;
+export type AdminProduct = z.infer<typeof AdminProductView>;
+
+export function listEmployees(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<AdminEmployee[]> {
+  return apiCall('/v1/admin/employees', AdminEmployeeList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function createEmployee(
+  accessToken: string,
+  input: AdminCreateEmployeeInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminEmployee> {
+  return apiCall('/v1/admin/employees', AdminEmployeeView, {
+    method: 'POST',
+    accessToken,
+    body: AdminCreateEmployeeInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function updateEmployee(
+  accessToken: string,
+  id: string,
+  input: AdminUpdateEmployeeInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminEmployee> {
+  return apiCall(`/v1/admin/employees/${encodeURIComponent(id)}`, AdminEmployeeView, {
+    method: 'PATCH',
+    accessToken,
+    body: input,
+    ...options,
+  });
+}
+
+export function listAdminProducts(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<AdminProduct[]> {
+  return apiCall('/v1/admin/products', AdminProductList, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function createAdminProduct(
+  accessToken: string,
+  input: ProductWriteInputType,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminProduct> {
+  return apiCall('/v1/admin/products', AdminProductView, {
+    method: 'POST',
+    accessToken,
+    body: ProductWriteInput.parse(input),
+    ...options,
+  });
+}
+
+export function updateAdminProduct(
+  accessToken: string,
+  id: string,
+  input: ProductWriteInputType,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminProduct> {
+  return apiCall(`/v1/admin/products/${encodeURIComponent(id)}`, AdminProductView, {
+    method: 'PATCH',
+    accessToken,
+    body: ProductWriteInput.parse(input),
+    ...options,
+  });
+}
 
 export function createBuyer(
   accessToken: string,

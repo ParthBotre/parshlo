@@ -23,6 +23,29 @@ import {
   ScheduleDrug,
 } from '@prisma/client';
 
+function assertDevelopmentSeedTarget(): void {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('Refusing to seed: DATABASE_URL is not set.');
+  }
+  const appEnv = (
+    process.env.APP_ENV ??
+    process.env.NODE_ENV ??
+    process.env.VERCEL_ENV ??
+    ''
+  ).toLowerCase();
+  if (['production', 'prod', 'staging', 'stage'].includes(appEnv)) {
+    throw new Error(`Refusing to seed ${appEnv}. Use migrations and admin UI instead.`);
+  }
+  const host = new URL(databaseUrl).hostname;
+  const localHosts = new Set(['localhost', '127.0.0.1', '::1', 'postgres', 'host.docker.internal']);
+  if (!localHosts.has(host) && process.env.ALLOW_DESTRUCTIVE_DB !== 'true') {
+    throw new Error(`Refusing to seed non-local database host "${host}".`);
+  }
+}
+
+assertDevelopmentSeedTarget();
+
 const prisma = new PrismaClient();
 
 // Fallback price tiers in paise (₹1 = 100 paise). Used only when a SKU is not
@@ -197,15 +220,15 @@ async function main(): Promise<void> {
 
   // ----- Platform owner (Auth0: sign in with same email; auth0Id linked on first login) -----
   const owner = await prisma.user.upsert({
-    where: { email: 'pbotre@ttu.edu' },
+    where: { email: 'parthbotre.51@gmail.com' },
     update: {
       fullName: 'Parth Botre',
       roles: [Role.SUPER_ADMIN],
       accountStatus: 'APPROVED',
     },
     create: {
-      auth0Id: 'pending|pbotre@ttu.edu',
-      email: 'pbotre@ttu.edu',
+      auth0Id: 'pending|parthbotre.51@gmail.com',
+      email: 'parthbotre.51@gmail.com',
       fullName: 'Parth Botre',
       roles: [Role.SUPER_ADMIN],
       accountStatus: 'APPROVED',

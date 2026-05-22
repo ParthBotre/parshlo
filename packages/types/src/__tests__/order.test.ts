@@ -26,7 +26,14 @@ describe('PlaceOrderInput', () => {
 
   it('accepts a minimal valid order', () => {
     expect(PlaceOrderInput.parse(validBase)).toEqual({
-      items: [{ productId: '11111111-1111-1111-1111-111111111111', quantity: 50 }],
+      items: [
+        {
+          productId: '11111111-1111-1111-1111-111111111111',
+          quantity: 50,
+          schemeFreeQuantity: 0,
+          discountPaise: 0,
+        },
+      ],
       idempotencyKey: '22222222-2222-2222-2222-222222222222',
     });
   });

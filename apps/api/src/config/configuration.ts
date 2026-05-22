@@ -33,7 +33,9 @@ export interface AppConfig {
     enabled: boolean;
   };
   features: {
+    emailNotificationsEnabled: boolean;
     invoiceGenerationEnabled: boolean;
+    storageEnabled: boolean;
   };
 }
 
@@ -72,8 +74,8 @@ export const configuration = (): AppConfig => ({
   aws: {
     region: process.env.AWS_REGION ?? 'ap-south-1',
     s3: {
-      kycBucket: process.env.S3_BUCKET_KYC ?? 'parshlo-kyc-dev',
-      invoicesBucket: process.env.S3_BUCKET_INVOICES ?? 'parshlo-invoices-dev',
+      kycBucket: process.env.S3_BUCKET_KYC ?? '',
+      invoicesBucket: process.env.S3_BUCKET_INVOICES ?? '',
       endpoint: process.env.S3_ENDPOINT,
     },
   },
@@ -86,6 +88,8 @@ export const configuration = (): AppConfig => ({
     enabled: process.env.NODE_ENV !== 'production',
   },
   features: {
+    emailNotificationsEnabled: parseBooleanFlag(process.env.EMAIL_NOTIFICATIONS_ENABLED),
     invoiceGenerationEnabled: parseBooleanFlag(process.env.INVOICE_GENERATION_ENABLED),
+    storageEnabled: parseBooleanFlag(process.env.STORAGE_ENABLED),
   },
 });

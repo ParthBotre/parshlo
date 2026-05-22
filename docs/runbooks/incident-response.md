@@ -2,12 +2,12 @@
 
 ## Severity definitions
 
-| Sev | Example | Response time |
-| --- | --- | --- |
-| **SEV-1** | Site down, data breach suspected, order ingestion failing | < 15 min |
-| **SEV-2** | Major feature broken (KYC submission, payments), elevated error rate | < 1 hour |
-| **SEV-3** | Minor degradation, single endpoint slow | < 4 hours (business) |
-| **SEV-4** | Cosmetic, single-user reports | next business day |
+| Sev       | Example                                                              | Response time        |
+| --------- | -------------------------------------------------------------------- | -------------------- |
+| **SEV-1** | Site down, data breach suspected, order ingestion failing            | < 15 min             |
+| **SEV-2** | Major feature broken (KYC submission, payments), elevated error rate | < 1 hour             |
+| **SEV-3** | Minor degradation, single endpoint slow                              | < 4 hours (business) |
+| **SEV-4** | Cosmetic, single-user reports                                        | next business day    |
 
 ## First 10 minutes (SEV-1 / SEV-2)
 

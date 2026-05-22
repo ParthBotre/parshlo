@@ -83,6 +83,13 @@ export const BuyerProductView = PublicProductView.extend({
 });
 export type BuyerProductView = z.infer<typeof BuyerProductView>;
 
+export const AdminProductView = BuyerProductView.extend({
+  hsnCode: z.string(),
+  imageKeys: z.array(z.string()),
+  deletedAt: IsoDateString.nullable(),
+});
+export type AdminProductView = z.infer<typeof AdminProductView>;
+
 /** Admin product mutation payload. */
 export const ProductWriteInput = z.object({
   name: z.string().trim().min(2).max(200),

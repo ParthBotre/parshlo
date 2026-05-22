@@ -38,8 +38,8 @@
 
 CI builds three images per release:
 
-| Image | Dockerfile |
-| --- | --- |
+| Image            | Dockerfile                       |
+| ---------------- | -------------------------------- |
 | `parshlo/api`    | `infra/docker/api.Dockerfile`    |
 | `parshlo/web`    | `infra/docker/web.Dockerfile`    |
 | `parshlo/worker` | `infra/docker/worker.Dockerfile` |

@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JobProducer } from '@parshlo/queue';
 import {
   type B2BApplicationInput,
@@ -23,6 +24,7 @@ export class KycService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobs: JobProducer,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -253,9 +255,11 @@ export class KycService {
       }),
     ]);
 
-    void this.jobs
-      .enqueueKycDecision({ applicationId, decision: 'APPROVED' })
-      .catch((err: unknown) => this.log.error({ err }, 'KYC approval enqueue failed'));
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      void this.jobs
+        .enqueueKycDecision({ applicationId, decision: 'APPROVED' })
+        .catch((err: unknown) => this.log.error({ err }, 'KYC approval enqueue failed'));
+    }
   }
 
   async reject(applicationId: string, reviewerId: string, input: KycRejectionInput): Promise<void> {
@@ -281,12 +285,14 @@ export class KycService {
       }),
     ]);
 
-    void this.jobs
-      .enqueueKycDecision({
-        applicationId,
-        decision: 'REJECTED',
-        reason: input.reason,
-      })
-      .catch((err: unknown) => this.log.error({ err }, 'KYC rejection enqueue failed'));
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      void this.jobs
+        .enqueueKycDecision({
+          applicationId,
+          decision: 'REJECTED',
+          reason: input.reason,
+        })
+        .catch((err: unknown) => this.log.error({ err }, 'KYC rejection enqueue failed'));
+    }
   }
 }

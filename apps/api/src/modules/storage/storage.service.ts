@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { S3_CLIENT } from './storage.tokens.js';
@@ -26,6 +31,15 @@ export class StorageService {
     private readonly config: ConfigService,
   ) {}
 
+  private ensureStorageEnabled(): void {
+    if (this.config.get<boolean>('features.storageEnabled', { infer: true }) !== true) {
+      throw new ServiceUnavailableException({
+        code: 'STORAGE_DISABLED',
+        message: 'File storage is disabled for this environment.',
+      });
+    }
+  }
+
   /**
    * Generate a short-lived presigned PUT URL for a KYC document upload.
    * Returns the URL, the S3 key the client must remember, and HTTP method.
@@ -42,6 +56,7 @@ export class StorageService {
     contentType: string;
     sizeBytes: number;
   }): Promise<{ url: string; bucket: string; key: string; method: 'PUT'; expiresIn: number }> {
+    this.ensureStorageEnabled();
     if (!ALLOWED_CONTENT_TYPES.has(opts.contentType)) {
       throw new BadRequestException({
         code: 'CONTENT_TYPE_NOT_ALLOWED',
@@ -54,7 +69,7 @@ export class StorageService {
         message: `Maximum upload size is ${String(MAX_BYTES / 1024 / 1024)} MB.`,
       });
     }
-    const bucket = this.config.get<string>('S3_BUCKET_KYC') ?? 'parshlo-kyc';
+    const bucket = this.config.get<string>('aws.s3.kycBucket', { infer: true }) ?? '';
     const key = `kyc/${opts.userId}/${opts.documentType.toLowerCase()}/${randomUUID()}-${Date.now()}`;
     const expiresIn = 15 * 60;
 
@@ -77,6 +92,7 @@ export class StorageService {
    * own invoice. Admins use the same endpoint with their RBAC scope.
    */
   async createInvoiceDownloadUrl(s3Key: string): Promise<{ url: string; expiresIn: number }> {
+    this.ensureStorageEnabled();
     const bucket = this.invoicesBucket();
     const expiresIn = 5 * 60;
     const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: bucket, Key: s3Key }), {
@@ -91,6 +107,7 @@ export class StorageService {
     contentType: string;
     sizeBytes: number;
   }): Promise<{ url: string; bucket: string; key: string; method: 'PUT'; expiresIn: number }> {
+    this.ensureStorageEnabled();
     if (!ALLOWED_CONTENT_TYPES.has(opts.contentType)) {
       throw new BadRequestException({
         code: 'CONTENT_TYPE_NOT_ALLOWED',
@@ -126,6 +143,7 @@ export class StorageService {
     bucket: string;
     key: string;
   }): Promise<{ url: string; expiresIn: number }> {
+    this.ensureStorageEnabled();
     this.assertCourierReceiptLocation(opts.bucket, opts.key);
     const expiresIn = 5 * 60;
     const url = await getSignedUrl(
@@ -137,6 +155,7 @@ export class StorageService {
   }
 
   assertCourierReceiptLocation(bucket: string, key: string, orderId?: string): void {
+    this.ensureStorageEnabled();
     if (bucket !== this.invoicesBucket()) {
       throw new BadRequestException({ code: 'INVALID_COURIER_RECEIPT_BUCKET' });
     }
@@ -152,6 +171,6 @@ export class StorageService {
   }
 
   invoicesBucket(): string {
-    return this.config.get<string>('S3_BUCKET_INVOICES') ?? 'parshlo-invoices-dev';
+    return this.config.get<string>('aws.s3.invoicesBucket', { infer: true }) ?? '';
   }
 }

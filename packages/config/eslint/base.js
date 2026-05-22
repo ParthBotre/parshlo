@@ -21,6 +21,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/generated/**',
       '**/*.config.{js,cjs,mjs,ts}',
+      '**/tsup.config.bundled_*.mjs',
     ],
   },
   js.configs.recommended,
@@ -81,10 +82,7 @@ export default tseslint.config(
       'security/detect-possible-timing-attacks': 'warn',
 
       // Unicorn
-      'unicorn/filename-case': [
-        'error',
-        { cases: { kebabCase: true, pascalCase: true } },
-      ],
+      'unicorn/filename-case': ['error', { cases: { kebabCase: true, pascalCase: true } }],
       'unicorn/prefer-node-protocol': 'error',
       'unicorn/no-null': 'off',
       'unicorn/prevent-abbreviations': 'off',

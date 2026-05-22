@@ -1,5 +1,17 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { type AdminCreateBuyerInput, type OrderStatus } from '@parshlo/types';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  type AdminCreateBuyerInput,
+  type AdminCreateEmployeeInput,
+  type AdminEmployeeView,
+  type AdminUpdateEmployeeInput,
+  type EmployeeRole,
+  type OrderStatus,
+} from '@parshlo/types';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -17,6 +29,8 @@ const ORDER_STATUSES: OrderStatus[] = [
 
 const BUYER_ANALYTICS_PERIODS = ['day', 'week', 'month', 'year'] as const;
 type BuyerAnalyticsPeriod = (typeof BUYER_ANALYTICS_PERIODS)[number];
+
+const EMPLOYEE_ROLES: EmployeeRole[] = ['SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
 
 interface BuyerPeriodSummary {
   orderCount: number;
@@ -71,6 +85,39 @@ interface BuyerDetail extends BuyerRow {
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toEmployeeView(user: {
+    id: string;
+    auth0Id: string;
+    email: string;
+    fullName: string;
+    roles: string[];
+    accountStatus: string;
+    suspendedAt: Date | null;
+    suspensionReason: string | null;
+    lastLoginAt: Date | null;
+    lastLoginIp: string | null;
+    createdAt: Date;
+  }): AdminEmployeeView {
+    const primaryRole = EMPLOYEE_ROLES.find((role) => user.roles.includes(role));
+    if (!primaryRole) {
+      throw new BadRequestException({ code: 'EMPLOYEE_ROLE_REQUIRED' });
+    }
+    return {
+      id: user.id,
+      auth0Id: user.auth0Id,
+      email: user.email,
+      fullName: user.fullName,
+      roles: user.roles as AdminEmployeeView['roles'],
+      primaryRole,
+      accountStatus: user.accountStatus as AdminEmployeeView['accountStatus'],
+      suspendedAt: user.suspendedAt?.toISOString() ?? null,
+      suspensionReason: user.suspensionReason,
+      lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+      lastLoginIp: user.lastLoginIp,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
 
   private emptyBuyerPeriodSummary(): BuyerPeriodSummary {
     return { orderCount: 0, totalPaise: 0, averageOrderPaise: 0 };
@@ -473,6 +520,108 @@ export class AdminService {
     });
 
     return this.toBuyerRow(user);
+  }
+
+  async listEmployees(): Promise<AdminEmployeeView[]> {
+    const employees = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        OR: EMPLOYEE_ROLES.map((role) => ({ roles: { has: role } })),
+      },
+      orderBy: [{ accountStatus: 'asc' }, { createdAt: 'desc' }],
+    });
+    return employees.map((employee) => this.toEmployeeView(employee));
+  }
+
+  async createEmployee(
+    input: AdminCreateEmployeeInput,
+    _actorId: string,
+  ): Promise<AdminEmployeeView> {
+    const email = input.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing && !existing.deletedAt) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message: 'A user with this email already exists.',
+      });
+    }
+    if (existing?.deletedAt) {
+      throw new ConflictException({
+        code: 'SOFT_DELETED_USER_EXISTS',
+        message: 'This email belongs to an archived user. Restore it manually before reusing it.',
+      });
+    }
+
+    const employee = await this.prisma.user.create({
+      data: {
+        auth0Id: `pending|${email}`,
+        email,
+        fullName: input.fullName.trim(),
+        roles: [input.role],
+        accountStatus: input.accountStatus,
+        suspendedAt: input.accountStatus === 'SUSPENDED' ? new Date() : null,
+      },
+    });
+    return this.toEmployeeView(employee);
+  }
+
+  async updateEmployee(
+    id: string,
+    input: AdminUpdateEmployeeInput,
+    actorId: string,
+  ): Promise<AdminEmployeeView> {
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        OR: EMPLOYEE_ROLES.map((role) => ({ roles: { has: role } })),
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'EMPLOYEE_NOT_FOUND' });
+    }
+
+    const nextRole = input.role ?? EMPLOYEE_ROLES.find((role) => existing.roles.includes(role));
+    if (!nextRole) {
+      throw new BadRequestException({ code: 'EMPLOYEE_ROLE_REQUIRED' });
+    }
+    const nextStatus = input.accountStatus ?? existing.accountStatus;
+    if (id === actorId && (nextStatus === 'SUSPENDED' || nextRole !== 'SUPER_ADMIN')) {
+      throw new BadRequestException({
+        code: 'CANNOT_REMOVE_OWN_ACCESS',
+        message: 'Use another super admin account to change your own access.',
+      });
+    }
+
+    if (existing.roles.includes('SUPER_ADMIN') && nextRole !== 'SUPER_ADMIN') {
+      const remainingSuperAdmins = await this.prisma.user.count({
+        where: {
+          id: { not: id },
+          deletedAt: null,
+          accountStatus: 'APPROVED',
+          roles: { has: 'SUPER_ADMIN' },
+        },
+      });
+      if (remainingSuperAdmins === 0) {
+        throw new BadRequestException({
+          code: 'LAST_SUPER_ADMIN',
+          message: 'At least one approved super admin must remain.',
+        });
+      }
+    }
+
+    const employee = await this.prisma.user.update({
+      where: { id },
+      data: {
+        fullName: input.fullName?.trim(),
+        roles: [nextRole],
+        accountStatus: nextStatus,
+        suspendedAt: nextStatus === 'SUSPENDED' ? (existing.suspendedAt ?? new Date()) : null,
+        suspensionReason:
+          nextStatus === 'SUSPENDED' ? (input.suspensionReason ?? existing.suspensionReason) : null,
+      },
+    });
+    return this.toEmployeeView(employee);
   }
 
   async listPendingKyc(): Promise<

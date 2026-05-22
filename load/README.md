@@ -12,10 +12,10 @@ concurrency. Two scenarios are provided:
 
 ## SLOs encoded in the scripts
 
-| Scenario | p95 latency | error rate |
-| --- | --- | --- |
-| Catalog read | < 250 ms | < 0.1 % |
-| Order placement | < 600 ms | < 0.5 % |
+| Scenario        | p95 latency | error rate |
+| --------------- | ----------- | ---------- |
+| Catalog read    | < 250 ms    | < 0.1 %    |
+| Order placement | < 600 ms    | < 0.5 %    |
 
 The thresholds cause the script to exit with a non-zero status when SLOs are
 breached, so this doubles as CI gate.

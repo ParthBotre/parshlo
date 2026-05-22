@@ -300,6 +300,7 @@ make help                 # full menu
 | [`docs/architecture.md`](./docs/architecture.md)                             | System overview, request flow, data model walkthrough   |
 | [`docs/security.md`](./docs/security.md)                                     | Security controls + STRIDE threat model                 |
 | [`docs/deploy.md`](./docs/deploy.md)                                         | Production deploy guide (Docker + Terraform + ECS)      |
+| [`docs/STAGING_PRODUCTION_README.md`](./docs/STAGING_PRODUCTION_README.md)   | Staging/prod operating model, users, products, backups  |
 | [`docs/demo-script.md`](./docs/demo-script.md)                               | 5-minute walkthrough script (great for Loom recordings) |
 | [`docs/release-process.md`](./docs/release-process.md)                       | Branching, tagging, hotfixes, rollback                  |
 | [`docs/adr/0001-monorepo.md`](./docs/adr/0001-monorepo.md)                   | Why pnpm + Turborepo                                    |
@@ -308,6 +309,7 @@ make help                 # full menu
 | [`docs/adr/0004-auth0.md`](./docs/adr/0004-auth0.md)                         | Why Auth0 over rolling our own                          |
 | [`docs/adr/0005-zod-shared-types.md`](./docs/adr/0005-zod-shared-types.md)   | Why Zod as the contract source                          |
 | [`docs/runbooks/incident-response.md`](./docs/runbooks/incident-response.md) | On-call response template                               |
+| [`docs/runbooks/backup-restore.md`](./docs/runbooks/backup-restore.md)       | Backup, restore, and restore-drill runbook              |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                       | Branch + commit + PR conventions                        |
 | [`SECURITY.md`](./SECURITY.md)                                               | Responsible disclosure                                  |
 

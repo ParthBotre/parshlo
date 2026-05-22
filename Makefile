@@ -34,6 +34,7 @@ db-seed: ## Seed the dev database.
 
 .PHONY: db-reset
 db-reset: ## Reset the dev DB and re-seed (destructive).
+	@echo "Guarded local-only reset. This will refuse non-local DATABASE_URL targets."
 	$(PNPM) --filter @parshlo/db migrate:reset
 
 .PHONY: dev

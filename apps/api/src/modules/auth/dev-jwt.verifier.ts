@@ -31,11 +31,7 @@ export class DevJwtVerifier {
       const userId = payload['https://parshlo.com/user_id'];
       const roles = payload['https://parshlo.com/roles'];
       const email = payload.email;
-      if (
-        typeof sub !== 'string' ||
-        typeof userId !== 'string' ||
-        !Array.isArray(roles)
-      ) {
+      if (typeof sub !== 'string' || typeof userId !== 'string' || !Array.isArray(roles)) {
         throw new Error('Invalid dev claims');
       }
       const r = roles as Role[];

@@ -16,23 +16,23 @@ export default function ContactPage(): JSX.Element {
           Talk to our partnerships team
         </h1>
         <p className="text-muted-foreground">
-          For wholesale orders, please request B2B access. For everything else —
-          partnerships, exports, or general inquiries — drop us a message.
+          For wholesale orders, please request B2B access. For everything else — partnerships,
+          exports, or general inquiries — drop us a message.
         </p>
 
         <ul className="space-y-4 text-sm">
           <li className="flex items-start gap-3">
-            <MapPin className="mt-0.5 h-4 w-4 text-primary" />
+            <MapPin className="text-primary mt-0.5 h-4 w-4" />
             <span>{site.contact.address}</span>
           </li>
           <li className="flex items-start gap-3">
-            <Mail className="mt-0.5 h-4 w-4 text-primary" />
+            <Mail className="text-primary mt-0.5 h-4 w-4" />
             <a className="hover:underline" href={`mailto:${site.contact.email}`}>
               {site.contact.email}
             </a>
           </li>
           <li className="flex items-start gap-3">
-            <Phone className="mt-0.5 h-4 w-4 text-primary" />
+            <Phone className="text-primary mt-0.5 h-4 w-4" />
             <a className="hover:underline" href={`tel:${site.contact.phone.replace(/\s/g, '')}`}>
               {site.contact.phone}
             </a>

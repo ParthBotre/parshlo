@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -239,37 +240,41 @@ export class OrderService {
     const trackingUrl = `${webBase}/dashboard/orders/${order.id}`;
     const adminUrl = `${webBase}/admin/orders`;
 
-    const sideEffects: Promise<unknown>[] = [
-      this.jobs.enqueueEmail({
-        kind: 'ORDER_PLACED_BUYER',
-        to: buyerEmail,
-        data: {
-          buyerName: buyerFullName.split(' ')[0] ?? buyerFullName,
-          orderNumber: order.orderNumber,
-          items: order.items.map((i) => ({
-            productName: i.productName,
-            quantity: i.quantity,
-            lineTotalPaise: i.lineTotalPaise,
-          })),
-          subtotalPaise: order.subtotalPaise,
-          gstPaise: order.gstPaise,
-          totalPaise: order.totalPaise,
-          trackingUrl,
-        },
-      }),
-      this.jobs.enqueueEmail({
-        kind: 'ORDER_PLACED_ADMIN',
-        to: process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@parshlo.local',
-        data: {
-          orderNumber: order.orderNumber,
-          buyerBusinessName: order.buyerBusinessName,
-          buyerGstin: order.buyerGstin,
-          totalPaise: order.totalPaise,
-          itemCount: order.items.length,
-          adminUrl,
-        },
-      }),
-    ];
+    const sideEffects: Promise<unknown>[] = [];
+
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      sideEffects.push(
+        this.jobs.enqueueEmail({
+          kind: 'ORDER_PLACED_BUYER',
+          to: buyerEmail,
+          data: {
+            buyerName: buyerFullName.split(' ')[0] ?? buyerFullName,
+            orderNumber: order.orderNumber,
+            items: order.items.map((i) => ({
+              productName: i.productName,
+              quantity: i.quantity,
+              lineTotalPaise: i.lineTotalPaise,
+            })),
+            subtotalPaise: order.subtotalPaise,
+            gstPaise: order.gstPaise,
+            totalPaise: order.totalPaise,
+            trackingUrl,
+          },
+        }),
+        this.jobs.enqueueEmail({
+          kind: 'ORDER_PLACED_ADMIN',
+          to: process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@parshlo.local',
+          data: {
+            orderNumber: order.orderNumber,
+            buyerBusinessName: order.buyerBusinessName,
+            buyerGstin: order.buyerGstin,
+            totalPaise: order.totalPaise,
+            itemCount: order.items.length,
+            adminUrl,
+          },
+        }),
+      );
+    }
 
     if (this.config.get<boolean>('features.invoiceGenerationEnabled') === true) {
       sideEffects.push(this.jobs.enqueueInvoice({ orderId: order.id }));
@@ -597,7 +602,13 @@ export class OrderService {
   }
 
   private assertCourierReceiptRef(orderId: string, receipt: CourierReceiptRef): void {
-    const bucket = this.config.get<string>('S3_BUCKET_INVOICES') ?? 'parshlo-invoices-dev';
+    if (this.config.get<boolean>('features.storageEnabled') !== true) {
+      throw new ServiceUnavailableException({
+        code: 'STORAGE_DISABLED',
+        message: 'File storage is disabled for this environment.',
+      });
+    }
+    const bucket = this.config.get<string>('aws.s3.invoicesBucket', { infer: true }) ?? '';
     if (receipt.bucket !== bucket) {
       throw new BadRequestException({ code: 'INVALID_COURIER_RECEIPT_BUCKET' });
     }

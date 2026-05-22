@@ -44,3 +44,31 @@ export const AdminUserView = PublicUser.extend({
   lastLoginIp: z.string().nullable(),
 });
 export type AdminUserView = z.infer<typeof AdminUserView>;
+
+export const EmployeeRole = Role.extract(['SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN']);
+export type EmployeeRole = z.infer<typeof EmployeeRole>;
+
+export const AdminEmployeeView = AdminUserView.extend({
+  primaryRole: EmployeeRole,
+});
+export type AdminEmployeeView = z.infer<typeof AdminEmployeeView>;
+
+export const AdminCreateEmployeeInputSchema = z.object({
+  email: z.string().trim().email().max(320),
+  fullName: z.string().trim().min(2).max(160),
+  role: EmployeeRole,
+  accountStatus: AccountStatus.extract(['APPROVED', 'SUSPENDED']).default('APPROVED'),
+});
+export type AdminCreateEmployeeInput = z.infer<typeof AdminCreateEmployeeInputSchema>;
+
+export const AdminUpdateEmployeeInputSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(160).optional(),
+    role: EmployeeRole.optional(),
+    accountStatus: AccountStatus.extract(['APPROVED', 'SUSPENDED']).optional(),
+    suspensionReason: z.string().trim().max(500).optional().nullable(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one employee field must be changed.',
+  });
+export type AdminUpdateEmployeeInput = z.infer<typeof AdminUpdateEmployeeInputSchema>;

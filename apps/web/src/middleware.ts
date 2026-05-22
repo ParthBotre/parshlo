@@ -106,6 +106,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
+  runtime: 'nodejs',
   matcher: [
     '/dashboard/:path*',
     '/admin/:path*',

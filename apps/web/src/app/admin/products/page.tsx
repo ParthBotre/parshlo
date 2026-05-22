@@ -1,9 +1,9 @@
 import { Package } from 'lucide-react';
 import { type Metadata } from 'next';
 
-import { AdminCatalogGrid } from '@/components/catalog/admin-catalog-grid';
+import { ProductManagement } from '@/components/admin/product-management';
 import { Card, CardContent } from '@/components/ui/card';
-import { listBuyerCatalog } from '@/lib/api/products';
+import { listAdminProducts } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
@@ -17,15 +17,20 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
   if (!session) {
     return <></>;
   }
-  let products: Awaited<ReturnType<typeof listBuyerCatalog>> = [];
+  const canManageProducts = session.user.roles.some(
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
+  );
+  let products: Awaited<ReturnType<typeof listAdminProducts>> = [];
   let error: string | null = null;
-  try {
-    products = await listBuyerCatalog(session.accessToken, { next: { revalidate: 30 } });
-  } catch (err) {
-    if (err instanceof ApiError) {
-      error = err.problem.detail ?? err.problem.title;
-    } else {
-      throw err;
+  if (canManageProducts) {
+    try {
+      products = await listAdminProducts(session.accessToken, { next: { revalidate: 0 } });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = err.problem.detail ?? err.problem.title;
+      } else {
+        throw err;
+      }
     }
   }
 
@@ -34,11 +39,15 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Products</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {products.length} SKUs listed. Editing UI ships in v2.1.
+          {products.length} SKUs listed. Add drafts, update rates, and disable old products safely.
         </p>
       </div>
 
-      {error ? (
+      {!canManageProducts ? (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+          Only admins and super admins can manage products.
+        </div>
+      ) : error ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
           {error}
         </div>
@@ -55,7 +64,7 @@ export default async function AdminProductsPage(): Promise<JSX.Element> {
           </CardContent>
         </Card>
       ) : !error ? (
-        <AdminCatalogGrid products={products} />
+        <ProductManagement products={products} />
       ) : null}
     </div>
   );
