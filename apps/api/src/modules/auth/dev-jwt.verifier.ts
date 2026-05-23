@@ -11,9 +11,13 @@ import { jwtVerify } from 'jose';
  */
 @Injectable()
 export class DevJwtVerifier {
-  private secret: Uint8Array;
+  private secret?: Uint8Array;
 
   constructor(config: ConfigService) {
+    const authMode = config.get<string>('AUTH_MODE') ?? process.env.AUTH_MODE ?? 'auth0';
+    if (authMode !== 'dev') {
+      return;
+    }
     const raw = config.get<string>('AUTH_DEV_SECRET') ?? process.env.AUTH_DEV_SECRET;
     if (!raw || raw.length < 32) {
       throw new Error('AUTH_DEV_SECRET missing or too short for dev auth mode.');
@@ -22,6 +26,9 @@ export class DevJwtVerifier {
   }
 
   async verify(token: string): Promise<AuthPrincipal> {
+    if (!this.secret) {
+      throw new UnauthorizedException({ code: 'DEV_AUTH_DISABLED' });
+    }
     try {
       const { payload } = await jwtVerify(token, this.secret, {
         issuer: 'parshlo-dev',
