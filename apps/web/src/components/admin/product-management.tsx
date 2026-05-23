@@ -72,7 +72,7 @@ export function ProductManagement({
     form: 'TABLET',
     packaging: '',
     description: '',
-    category: '',
+    category: 'Catalog',
     manufacturer: 'Parshlo',
     hsnCode: '3004',
     rateA: '',
@@ -131,7 +131,7 @@ export function ProductManagement({
       form: 'TABLET',
       packaging: '',
       description: '',
-      category: '',
+      category: 'Catalog',
       manufacturer: 'Parshlo',
       hsnCode: '3004',
       rateA: '',
@@ -181,16 +181,6 @@ export function ProductManagement({
                 value={draft.name}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, name: event.target.value }))
-                }
-                required
-              />
-            </Field>
-            <Field id="product-category" label="Category">
-              <Input
-                id="product-category"
-                value={draft.category}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, category: event.target.value }))
                 }
                 required
               />
@@ -414,7 +404,7 @@ function ProductRow({
       <td className="px-4 py-3">
         <p className="font-medium">{product.name}</p>
         <p className="text-muted-foreground text-xs">
-          {product.category} · {product.packaging} · HSN {product.hsnCode}
+          {product.packaging} · HSN {product.hsnCode}
         </p>
       </td>
       <td className="px-4 py-3">
