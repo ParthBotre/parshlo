@@ -11,7 +11,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-parshlo}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - parshlo-pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - parshlo-redis-data:/data
     healthcheck:
