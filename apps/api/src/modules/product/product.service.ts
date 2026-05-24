@@ -28,6 +28,8 @@ const GST_RATE_TO_PRISMA: Record<GstRate, PrismaGstRate> = {
   '28': 'TWENTYEIGHT',
 };
 
+const ADMIN_ONLY_PRODUCT_SLUGS = ['tremecya-tab', 'tremecya-d-tab'] as const;
+
 export function priceTierForBusinessType(businessType?: BusinessType | null): ProductPriceTier {
   return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
 }
@@ -130,7 +132,11 @@ export class ProductService {
 
   async listPublic(): Promise<PublicProductView[]> {
     const products = await this.prisma.product.findMany({
-      where: { status: 'ACTIVE', deletedAt: null },
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        slug: { notIn: [...ADMIN_ONLY_PRODUCT_SLUGS] },
+      },
       include: { category: true },
       orderBy: { name: 'asc' },
     });
@@ -153,8 +159,15 @@ export class ProductService {
   }
 
   async getPublicBySlug(slug: string): Promise<PublicProductView> {
+    if ((ADMIN_ONLY_PRODUCT_SLUGS as readonly string[]).includes(slug)) {
+      throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
+    }
     const p = await this.prisma.product.findFirst({
-      where: { slug, status: 'ACTIVE', deletedAt: null },
+      where: {
+        slug,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
       include: { category: true },
     });
     if (!p) {
@@ -178,10 +191,17 @@ export class ProductService {
     };
   }
 
-  async listForBuyer(businessType?: BusinessType | null): Promise<BuyerProductView[]> {
+  async listForBuyer(
+    businessType?: BusinessType | null,
+    options: { includeAdminOnly?: boolean } = {},
+  ): Promise<BuyerProductView[]> {
     const tier = priceTierForBusinessType(businessType);
     const products = await this.prisma.product.findMany({
-      where: { status: { in: ['ACTIVE', 'OUT_OF_STOCK'] }, deletedAt: null },
+      where: {
+        status: { in: ['ACTIVE', 'OUT_OF_STOCK'] },
+        deletedAt: null,
+        ...(options.includeAdminOnly ? {} : { slug: { notIn: [...ADMIN_ONLY_PRODUCT_SLUGS] } }),
+      },
       include: { category: true, inventory: true },
       orderBy: { name: 'asc' },
     });

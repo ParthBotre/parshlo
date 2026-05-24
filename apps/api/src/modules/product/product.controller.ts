@@ -40,7 +40,7 @@ export class ProductController {
   @Get('catalog')
   async listForBuyer(@CurrentUser() user: AuthPrincipal): Promise<BuyerProductView[]> {
     if (user.roles.some((role) => STAFF_ROLES.has(role))) {
-      return this.products.listForBuyer();
+      return this.products.listForBuyer(null, { includeAdminOnly: true });
     }
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.userId },

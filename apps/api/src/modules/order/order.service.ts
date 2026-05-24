@@ -601,6 +601,37 @@ export class OrderService {
     });
   }
 
+  async deleteOrder(orderId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { invoice: true },
+      });
+      if (!order) {
+        throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
+      }
+      if (order.invoice) {
+        throw new ConflictException({
+          code: 'ORDER_HAS_INVOICE',
+          message: 'Orders with generated invoices cannot be deleted.',
+        });
+      }
+
+      const logisticsEntry = await tx.adminConsignmentLog.findFirst({
+        where: { associatedOrderNumber: order.orderNumber },
+        select: { id: true },
+      });
+      if (logisticsEntry) {
+        throw new ConflictException({
+          code: 'ORDER_HAS_LOGISTICS_ENTRY',
+          message: 'Orders linked to logistics cannot be deleted.',
+        });
+      }
+
+      await tx.order.delete({ where: { id: orderId } });
+    });
+  }
+
   private assertCourierReceiptRef(orderId: string, receipt: CourierReceiptRef): void {
     if (this.config.get<boolean>('features.storageEnabled') !== true) {
       throw new ServiceUnavailableException({

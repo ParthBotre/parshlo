@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   NotFoundException,
@@ -122,6 +123,19 @@ export class AdminController {
     body: UpdateOrderBeforeApprovalInput,
   ): Promise<OrderView> {
     return this.orderService.updateBeforeApproval(orderId, user.roles, body);
+  }
+
+  @Delete('orders/:id')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'order.delete',
+    resource: 'Order',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  async deleteOrder(@Param('id') orderId: string): Promise<void> {
+    await this.orderService.deleteOrder(orderId);
   }
 
   @Post('orders/:id/courier-receipt/upload-url')
