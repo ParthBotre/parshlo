@@ -4,9 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { type Prisma } from '@parshlo/db';
 import {
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type AdminUpdateBuyerInput,
   type AdminEmployeeView,
   type AdminUpdateEmployeeInput,
   type EmployeeRole,
@@ -58,11 +60,18 @@ interface BuyerRow {
   accountStatus: string;
   businessName: string | null;
   gstin: string | null;
+  pan: string | null;
   mobile: string | null;
+  businessEmail: string | null;
   businessType: string | null;
   drugLicenseNumber: string | null;
+  pharmacyRegistrationNumber: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
   city: string | null;
   state: string | null;
+  pin: string | null;
+  country: string | null;
   createdAt: string;
   orderSummary: BuyerOrderSummary;
 }
@@ -85,6 +94,37 @@ interface BuyerDetail extends BuyerRow {
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeUpper(value: string): string {
+    return value.trim().toUpperCase();
+  }
+
+  private normalizeOptionalUpper(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed.toUpperCase() : null;
+  }
+
+  private normalizeEmail(value: string): string {
+    return value.trim().toLowerCase();
+  }
+
+  private async nextUnregisteredGstin(tx: Prisma.TransactionClient): Promise<string> {
+    const rows = await tx.$queryRaw<{ next_value: number | bigint }[]>`
+      SELECT COALESCE(MAX(CAST(REPLACE("gstin", 'UNREGISTERED-', '') AS INTEGER)), 0) + 1 AS next_value
+      FROM "BusinessProfile"
+      WHERE "gstin" ~ '^UNREGISTERED-[0-9]+$'
+    `;
+    const nextValue = Number(rows[0]?.next_value ?? 1);
+    return `UNREGISTERED-${String(nextValue).padStart(3, '0')}`;
+  }
+
+  private async resolveBuyerGstin(
+    tx: Prisma.TransactionClient,
+    rawGstin?: string,
+  ): Promise<string> {
+    const gstin = rawGstin?.trim().toUpperCase() ?? '';
+    return gstin.length > 0 ? gstin : this.nextUnregisteredGstin(tx);
+  }
 
   private toEmployeeView(user: {
     id: string;
@@ -153,11 +193,18 @@ export class AdminService {
       businessProfile: {
         businessName: string;
         gstin: string;
+        pan: string | null;
         mobile: string;
+        businessEmail: string;
         businessType: string;
         drugLicenseNumber: string;
+        pharmacyRegistrationNumber: string | null;
+        addressLine1: string;
+        addressLine2: string | null;
         city: string;
         state: string;
+        pin: string;
+        country: string;
       } | null;
     },
     orderSummary: BuyerOrderSummary = this.emptyBuyerOrderSummary(),
@@ -169,11 +216,18 @@ export class AdminService {
       accountStatus: user.accountStatus,
       businessName: user.businessProfile?.businessName ?? null,
       gstin: user.businessProfile?.gstin ?? null,
+      pan: user.businessProfile?.pan ?? null,
       mobile: user.businessProfile?.mobile ?? null,
+      businessEmail: user.businessProfile?.businessEmail ?? null,
       businessType: user.businessProfile?.businessType ?? null,
       drugLicenseNumber: user.businessProfile?.drugLicenseNumber ?? null,
+      pharmacyRegistrationNumber: user.businessProfile?.pharmacyRegistrationNumber ?? null,
+      addressLine1: user.businessProfile?.addressLine1 ?? null,
+      addressLine2: user.businessProfile?.addressLine2 ?? null,
       city: user.businessProfile?.city ?? null,
       state: user.businessProfile?.state ?? null,
+      pin: user.businessProfile?.pin ?? null,
+      country: user.businessProfile?.country ?? null,
       createdAt: user.createdAt.toISOString(),
       orderSummary,
     };
@@ -452,15 +506,17 @@ export class AdminService {
     input: AdminCreateBuyerInput,
     actorId: string,
   ): Promise<Awaited<ReturnType<AdminService['listBuyers']>>[number]> {
-    const email = input.businessEmail.trim().toLowerCase();
-    const gstin = input.gstin.trim().toUpperCase();
+    const email = this.normalizeEmail(input.businessEmail);
+    const requestedGstin = input.gstin?.trim().toUpperCase() ?? '';
 
     const [existingUser, existingProfile] = await Promise.all([
       this.prisma.user.findUnique({ where: { email } }),
-      this.prisma.businessProfile.findUnique({ where: { gstin } }),
+      requestedGstin
+        ? this.prisma.businessProfile.findUnique({ where: { gstin: requestedGstin } })
+        : Promise.resolve(null),
     ]);
 
-    if (existingUser && !existingUser.deletedAt) {
+    if (existingUser) {
       throw new ConflictException({
         code: 'EMAIL_ALREADY_REGISTERED',
         message: 'A user with this email already exists.',
@@ -475,26 +531,29 @@ export class AdminService {
     }
 
     const user = await this.prisma.$transaction(async (tx) => {
+      const gstin = await this.resolveBuyerGstin(tx, requestedGstin);
       const created = await tx.user.create({
         data: {
           auth0Id: `pending|${email}`,
           email,
-          fullName: input.ownerName,
+          fullName: this.normalizeUpper(input.ownerName),
           roles: ['BUYER'],
           accountStatus: input.accountStatus,
           businessProfile: {
             create: {
-              businessName: input.businessName,
+              businessName: this.normalizeUpper(input.businessName),
               businessType: input.businessType,
               gstin,
-              pan: input.pan?.trim() ? input.pan.trim().toUpperCase() : null,
-              drugLicenseNumber: input.drugLicenseNumber,
-              pharmacyRegistrationNumber: input.pharmacyRegistrationNumber ?? null,
+              pan: this.normalizeOptionalUpper(input.pan),
+              drugLicenseNumber: this.normalizeUpper(input.drugLicenseNumber),
+              pharmacyRegistrationNumber: this.normalizeOptionalUpper(
+                input.pharmacyRegistrationNumber,
+              ),
               mobile: input.mobile,
               businessEmail: email,
-              addressLine1: input.address.line1,
-              addressLine2: input.address.line2 ?? null,
-              city: input.address.city,
+              addressLine1: this.normalizeUpper(input.address.line1),
+              addressLine2: this.normalizeOptionalUpper(input.address.line2),
+              city: this.normalizeUpper(input.address.city),
               state: input.address.state,
               pin: input.address.pin,
               country: input.address.country,
@@ -520,6 +579,123 @@ export class AdminService {
     });
 
     return this.toBuyerRow(user);
+  }
+
+  async updateBuyer(
+    id: string,
+    input: AdminUpdateBuyerInput,
+  ): Promise<Awaited<ReturnType<AdminService['listBuyers']>>[number]> {
+    const current = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null, roles: { has: 'BUYER' } },
+      include: { businessProfile: true },
+    });
+
+    if (!current || !current.businessProfile) {
+      throw new NotFoundException({ code: 'BUYER_NOT_FOUND' });
+    }
+
+    const email =
+      typeof input.businessEmail === 'string'
+        ? this.normalizeEmail(input.businessEmail)
+        : undefined;
+    if (email && email !== current.email) {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing && existing.id !== id) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_REGISTERED',
+          message: 'A user with this email already exists.',
+        });
+      }
+    }
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      let gstin: string | undefined;
+      if (input.gstin !== undefined) {
+        gstin = await this.resolveBuyerGstin(tx, input.gstin);
+        if (gstin !== current.businessProfile?.gstin) {
+          const existingProfile = await tx.businessProfile.findUnique({ where: { gstin } });
+          if (existingProfile && existingProfile.userId !== id) {
+            throw new ConflictException({
+              code: 'GSTIN_ALREADY_REGISTERED',
+              message: 'A business with this GSTIN has already registered.',
+            });
+          }
+        }
+      }
+
+      return tx.user.update({
+        where: { id },
+        data: {
+          email,
+          fullName:
+            typeof input.ownerName === 'string' ? this.normalizeUpper(input.ownerName) : undefined,
+          accountStatus: input.accountStatus,
+          businessProfile: {
+            update: {
+              businessName:
+                typeof input.businessName === 'string'
+                  ? this.normalizeUpper(input.businessName)
+                  : undefined,
+              businessType: input.businessType,
+              gstin,
+              pan: input.pan !== undefined ? this.normalizeOptionalUpper(input.pan) : undefined,
+              drugLicenseNumber:
+                typeof input.drugLicenseNumber === 'string'
+                  ? this.normalizeUpper(input.drugLicenseNumber)
+                  : undefined,
+              pharmacyRegistrationNumber:
+                input.pharmacyRegistrationNumber !== undefined
+                  ? this.normalizeOptionalUpper(input.pharmacyRegistrationNumber)
+                  : undefined,
+              mobile: input.mobile,
+              businessEmail: email,
+              addressLine1:
+                typeof input.address?.line1 === 'string'
+                  ? this.normalizeUpper(input.address.line1)
+                  : undefined,
+              addressLine2:
+                input.address?.line2 !== undefined
+                  ? this.normalizeOptionalUpper(input.address.line2)
+                  : undefined,
+              city:
+                typeof input.address?.city === 'string'
+                  ? this.normalizeUpper(input.address.city)
+                  : undefined,
+              state: input.address?.state,
+              pin: input.address?.pin,
+              country: input.address?.country,
+            },
+          },
+        },
+        include: { businessProfile: true },
+      });
+    });
+
+    return this.toBuyerRow(user);
+  }
+
+  async deleteBuyer(id: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const buyer = await tx.user.findFirst({
+        where: { id, deletedAt: null, roles: { has: 'BUYER' } },
+        select: { id: true },
+      });
+      if (!buyer) {
+        throw new NotFoundException({ code: 'BUYER_NOT_FOUND' });
+      }
+
+      const orderCount = await tx.order.count({ where: { buyerId: id } });
+      if (orderCount > 0) {
+        throw new ConflictException({
+          code: 'BUYER_HAS_ORDERS',
+          message: 'Buyers with order history cannot be deleted.',
+        });
+      }
+
+      await tx.kycApplication.deleteMany({ where: { userId: id } });
+      await tx.businessProfile.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    });
   }
 
   async listEmployees(): Promise<AdminEmployeeView[]> {

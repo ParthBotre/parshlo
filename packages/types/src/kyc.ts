@@ -87,14 +87,24 @@ export const B2BApplicationInputSchema = RegisterBusinessInput.omit({ documents:
 export type B2BApplicationInput = z.infer<typeof B2BApplicationInputSchema>;
 
 /** Admin-created buyer account. Staff can approve immediately or leave pending. */
+export const AdminBuyerGstin = Gstin.or(z.literal('')).optional();
+const AdminBuyerAccountStatus = AccountStatus.extract([
+  'PENDING_VERIFICATION',
+  'UNDER_REVIEW',
+  'APPROVED',
+]);
+
 export const AdminCreateBuyerInputSchema = B2BApplicationInputSchema.extend({
-  accountStatus: AccountStatus.extract([
-    'PENDING_VERIFICATION',
-    'UNDER_REVIEW',
-    'APPROVED',
-  ]).default('APPROVED'),
+  gstin: AdminBuyerGstin,
+  accountStatus: AdminBuyerAccountStatus.default('APPROVED'),
 });
 export type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
+
+export const AdminUpdateBuyerInputSchema = B2BApplicationInputSchema.extend({
+  gstin: AdminBuyerGstin,
+  accountStatus: AdminBuyerAccountStatus,
+}).partial();
+export type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
 
 /** KYC document types we accept. */
 export const KycDocumentType = z.enum([

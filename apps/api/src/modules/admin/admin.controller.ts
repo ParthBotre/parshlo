@@ -16,6 +16,7 @@ import {
   AttachCourierReceiptInput,
   AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
+  AdminUpdateBuyerInputSchema,
   AdminUpdateEmployeeInputSchema,
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
@@ -24,6 +25,7 @@ import {
   UpdateOrderBeforeApprovalInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type AuthPrincipal,
   type OrderStatus,
@@ -226,7 +228,7 @@ export class AdminController {
   @Post('buyers')
   @HttpCode(201)
   @Throttle(THROTTLE_MUTATION)
-  @RequireRoles('ADMIN', 'SALES_MANAGER', 'SUPER_ADMIN')
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
   @Audit({
     action: 'buyer.create',
     resource: 'User',
@@ -239,6 +241,35 @@ export class AdminController {
     body: AdminCreateBuyerInput,
   ): ReturnType<AdminService['createBuyer']> {
     return this.admin.createBuyer(body, user.userId);
+  }
+
+  @Patch('buyers/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'buyer.update',
+    resource: 'User',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  updateBuyer(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(AdminUpdateBuyerInputSchema))
+    body: AdminUpdateBuyerInput,
+  ): ReturnType<AdminService['updateBuyer']> {
+    return this.admin.updateBuyer(id, body);
+  }
+
+  @Delete('buyers/:id')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  @Audit({
+    action: 'buyer.delete',
+    resource: 'User',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  async deleteBuyer(@Param('id') id: string): Promise<void> {
+    await this.admin.deleteBuyer(id);
   }
 
   @Get('employees')
