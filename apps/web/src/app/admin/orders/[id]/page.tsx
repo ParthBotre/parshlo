@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 
 // import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
 import { CourierTrackingForm } from '@/components/admin/courier-tracking-form';
+import { OrderDeleteButton } from '@/components/admin/order-delete-button';
 import { OrderEditForm } from '@/components/admin/order-edit-form';
 import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
@@ -93,6 +94,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
     (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
   );
   const canManageShipment = canApproveOrClose;
+  const canDeleteOrder = canApproveOrClose;
 
   return (
     <div className="space-y-6">
@@ -118,6 +120,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <Download className="h-4 w-4" /> CSV
             </a>
           </Button>
+          {canDeleteOrder ? <OrderDeleteButton orderId={order.id} /> : null}
           <Badge variant={statusBadgeVariant(order.status)}>{orderStatusLabel(order.status)}</Badge>
         </div>
       </div>

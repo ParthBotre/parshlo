@@ -269,6 +269,18 @@ export function updateAdminOrderBeforeApproval(
   });
 }
 
+export function deleteAdminOrder(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, z.void(), {
+    method: 'DELETE',
+    accessToken,
+    ...options,
+  });
+}
+
 export function getSalesAnalytics(
   accessToken: string,
   filters: { period?: string; anchor?: string } = {},
