@@ -2,6 +2,7 @@ import { type OrderStatus } from '@parshlo/types';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 
+import { BuyerManagementPanel } from '@/components/admin/buyer-management-panel';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getAdminBuyer } from '@/lib/api/admin';
@@ -305,6 +306,9 @@ export default async function BuyerDetailPage({
   const selectedPeriodContext = periodContextLabel(selectedPeriod, selectedAnchor);
   const inputConfig = periodInputConfig(selectedPeriod);
   const selectedWeekCalendar = selectedPeriod === 'week' ? weekCalendar(selectedAnchor) : null;
+  const canManageBuyer = session.user.roles.some(
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
+  );
 
   return (
     <div className="space-y-6">
@@ -326,6 +330,8 @@ export default async function BuyerDetailPage({
           </Badge>
         </div>
       </div>
+
+      {canManageBuyer ? <BuyerManagementPanel buyer={buyer} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card>

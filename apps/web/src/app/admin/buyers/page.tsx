@@ -36,7 +36,7 @@ export default async function BuyersPage(): Promise<JSX.Element> {
     }
   }
   const canCreateBuyer = session.user.roles.some(
-    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SALES_MANAGER',
+    (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
   );
   const totalOrders = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalOrders, 0);
   // const totalRevenuePaise = buyers.reduce((sum, buyer) => sum + buyer.orderSummary.totalPaise, 0);

@@ -74,7 +74,6 @@ export function ProductManagement({
     description: '',
     category: 'Catalog',
     manufacturer: 'Parshlo',
-    hsnCode: '3004',
     rateA: '',
     rateB: '',
     mrp: '',
@@ -107,7 +106,7 @@ export function ProductManagement({
       mrpPaise: rupeesToPaise(draft.mrp),
       gstRate: draft.gstRate as ProductWriteInputType['gstRate'],
       moq: Number(draft.moq || '1'),
-      hsnCode: draft.hsnCode,
+      hsnCode: '3004',
       status: draft.status as ProductWriteInputType['status'],
     };
 
@@ -133,7 +132,6 @@ export function ProductManagement({
       description: '',
       category: 'Catalog',
       manufacturer: 'Parshlo',
-      hsnCode: '3004',
       rateA: '',
       rateB: '',
       mrp: '',
@@ -302,16 +300,6 @@ export function ProductManagement({
                 ))}
               </select>
             </Field>
-            <Field id="product-hsn" label="HSN">
-              <Input
-                id="product-hsn"
-                value={draft.hsnCode}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, hsnCode: event.target.value }))
-                }
-                required
-              />
-            </Field>
             <Field id="product-moq" label="MOQ">
               <Input
                 id="product-moq"
@@ -403,9 +391,7 @@ function ProductRow({
     <tr>
       <td className="px-4 py-3">
         <p className="font-medium">{product.name}</p>
-        <p className="text-muted-foreground text-xs">
-          {product.packaging} · HSN {product.hsnCode}
-        </p>
+        <p className="text-muted-foreground text-xs">{product.packaging}</p>
       </td>
       <td className="px-4 py-3">
         <select

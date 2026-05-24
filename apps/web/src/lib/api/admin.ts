@@ -7,6 +7,7 @@ import {
   ProductWriteInput,
   type AdminCreateEmployeeInput,
   type AdminCreateBuyerInput,
+  type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type PlaceOrderOnBehalfInput,
   type ProductWriteInput as ProductWriteInputType,
@@ -94,11 +95,18 @@ const AdminBuyerRow = z.object({
   accountStatus: z.string(),
   businessName: z.string().nullable(),
   gstin: z.string().nullable(),
+  pan: z.string().nullable(),
   mobile: z.string().nullable(),
+  businessEmail: z.string().nullable(),
   businessType: z.string().nullable(),
   drugLicenseNumber: z.string().nullable(),
+  pharmacyRegistrationNumber: z.string().nullable(),
+  addressLine1: z.string().nullable(),
+  addressLine2: z.string().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
+  pin: z.string().nullable(),
+  country: z.string().nullable(),
   createdAt: z.string(),
   orderSummary: z.object({
     totalOrders: z.number(),
@@ -416,6 +424,32 @@ export function createBuyer(
     method: 'POST',
     accessToken,
     body: input,
+    ...options,
+  });
+}
+
+export function updateBuyer(
+  accessToken: string,
+  id: string,
+  input: AdminUpdateBuyerInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<AdminBuyer> {
+  return apiCall(`/v1/admin/buyers/${encodeURIComponent(id)}`, AdminBuyerRow, {
+    method: 'PATCH',
+    accessToken,
+    body: input,
+    ...options,
+  });
+}
+
+export function deleteBuyer(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  return apiCall(`/v1/admin/buyers/${encodeURIComponent(id)}`, z.void(), {
+    method: 'DELETE',
+    accessToken,
     ...options,
   });
 }

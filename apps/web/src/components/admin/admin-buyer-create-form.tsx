@@ -68,7 +68,7 @@ export function AdminBuyerCreateForm(): JSX.Element {
     const payload: AdminCreateBuyerInput = {
       ...parsed,
       businessEmail: parsed.businessEmail.trim().toLowerCase(),
-      gstin: parsed.gstin.trim().toUpperCase(),
+      gstin: parsed.gstin?.trim() ? parsed.gstin.trim().toUpperCase() : undefined,
       pan: parsed.pan?.trim() ? parsed.pan.trim().toUpperCase() : undefined,
       pharmacyRegistrationNumber: parsed.pharmacyRegistrationNumber?.trim()
         ? parsed.pharmacyRegistrationNumber.trim()
@@ -159,7 +159,12 @@ export function AdminBuyerCreateForm(): JSX.Element {
             </select>
           </Field>
           <Field id="buyer-gstin" label="GSTIN" error={errors.gstin?.message}>
-            <Input id="buyer-gstin" {...register('gstin')} className="uppercase tracking-wider" />
+            <Input
+              id="buyer-gstin"
+              {...register('gstin')}
+              className="tracking-wider"
+              placeholder="Leave blank for UNREGISTERED sequence"
+            />
           </Field>
           <Field id="buyer-pan" label="PAN (optional)" error={errors.pan?.message}>
             <Input id="buyer-pan" {...register('pan')} className="uppercase tracking-wider" />
