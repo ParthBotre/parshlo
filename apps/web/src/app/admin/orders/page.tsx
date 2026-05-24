@@ -168,7 +168,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
   const orderGroups = groupOrders(orders, period);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">Orders</h1>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -176,7 +176,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex max-w-full flex-wrap gap-2 overflow-x-auto">
         {STATUS_FILTERS.map((f) => {
           const active = status === f.value || (status === undefined && f.value === undefined);
           return (
@@ -211,7 +211,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                     {PERIOD_FILTERS.find((f) => f.value === period)?.label.toLowerCase()}
                   </p>
                 </div>
-                <div className="bg-secondary/50 inline-flex rounded-md p-1">
+                <div className="bg-secondary/50 flex max-w-full overflow-x-auto rounded-md p-1">
                   {PERIOD_FILTERS.map((f) => (
                     <Link
                       key={f.value}
@@ -240,7 +240,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                         {formatINR(group.totalPaise)}
                       </p>
                     </div>
-                    <div className="w-full overflow-x-auto">
+                    <div className="w-full max-w-full overflow-x-auto">
                       <table className="w-full min-w-[980px] text-sm">
                         <thead className="text-muted-foreground text-left text-xs uppercase tracking-wider">
                           <tr>

@@ -237,6 +237,7 @@ export class AdminService {
     {
       id: string;
       orderNumber: string;
+      buyerId: string;
       status: string;
       placedAt: string;
       buyerBusinessName: string;
@@ -269,6 +270,7 @@ export class AdminService {
     return orders.map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
+      buyerId: o.buyerId,
       status: o.status,
       placedAt: o.placedAt.toISOString(),
       buyerBusinessName: o.buyerBusinessName,

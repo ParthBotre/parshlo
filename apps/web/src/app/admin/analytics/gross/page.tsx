@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
+import { type ReactNode } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { getSalesAnalytics } from '@/lib/api/admin';
@@ -69,6 +70,11 @@ function inputType(period: Period): 'date' | 'month' | 'number' {
   return 'date';
 }
 
+function cityDetailHref(city: string, period: Period, anchor: string): string {
+  const params = new URLSearchParams({ city, period, anchor });
+  return `/admin/analytics/gross/location?${params.toString()}`;
+}
+
 export default async function GrossSalesByCityPage({
   searchParams,
 }: PageProps): Promise<JSX.Element> {
@@ -105,7 +111,7 @@ export default async function GrossSalesByCityPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
       <Link
         href="/admin"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
@@ -114,16 +120,18 @@ export default async function GrossSalesByCityPage({
       </Link>
 
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Sales analytics</h1>
+        <h1 className="font-display break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+          Sales analytics
+        </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Gross sales, product-wise sales, and city-wise sales for the selected period.
         </p>
       </div>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardContent className="space-y-4 p-5">
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <div className="bg-secondary/50 flex max-w-full overflow-x-auto rounded-md p-1">
+            <div className="bg-secondary/50 flex w-full max-w-full overflow-x-auto rounded-md p-1 sm:w-auto">
               {PERIODS.map((p) => (
                 <a
                   key={p.key}
@@ -138,7 +146,10 @@ export default async function GrossSalesByCityPage({
                 </a>
               ))}
             </div>
-            <form method="get" className="flex max-w-full flex-wrap items-end gap-2">
+            <form
+              method="get"
+              className="grid w-full max-w-full gap-2 sm:flex sm:flex-wrap sm:items-end"
+            >
               <input type="hidden" name="period" value={period} />
               {period === 'month' ? (
                 <>
@@ -151,7 +162,7 @@ export default async function GrossSalesByCityPage({
                       min="2000"
                       max="2100"
                       inputMode="numeric"
-                      className="border-input bg-background text-foreground h-9 w-28 rounded-md border px-3 text-sm"
+                      className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-28"
                     />
                   </label>
                   <label className="text-muted-foreground grid gap-1 text-xs font-medium">
@@ -159,7 +170,7 @@ export default async function GrossSalesByCityPage({
                     <select
                       name="monthNumber"
                       defaultValue={String(Number(selectedMonthNumber))}
-                      className="border-input bg-background text-foreground h-9 w-40 rounded-md border px-3 text-sm"
+                      className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-40"
                     >
                       {[
                         'January',
@@ -191,13 +202,13 @@ export default async function GrossSalesByCityPage({
                     defaultValue={anchor}
                     min={period === 'year' ? '2000' : undefined}
                     max={period === 'year' ? '2100' : undefined}
-                    className="border-input bg-background text-foreground h-9 w-44 rounded-md border px-3 text-sm"
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-44"
                   />
                 </label>
               )}
               <button
                 type="submit"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 rounded-md px-4 text-sm font-medium"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 w-full rounded-md px-4 text-sm font-medium sm:w-auto"
               >
                 Apply
               </button>
@@ -212,8 +223,8 @@ export default async function GrossSalesByCityPage({
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+      <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2">
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="p-5">
             <p className="text-muted-foreground text-xs uppercase tracking-wider">
               Gross sale {analytics ? `· ${analytics.label}` : ''}
@@ -223,7 +234,7 @@ export default async function GrossSalesByCityPage({
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="p-5">
             <p className="text-muted-foreground text-xs uppercase tracking-wider">Orders</p>
             <p className="font-display mt-1 text-2xl font-semibold">
@@ -233,7 +244,7 @@ export default async function GrossSalesByCityPage({
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid w-full min-w-0 gap-6 xl:grid-cols-2">
         <SalesTable
           title="Product-wise sales"
           empty="No product sales in this period."
@@ -252,7 +263,13 @@ export default async function GrossSalesByCityPage({
           empty="No city sales in this period."
           headers={['City', 'Orders', 'Gross', 'Share']}
           rows={(analytics?.regionRows ?? []).map((row) => [
-            row.region,
+            <Link
+              key={row.region}
+              href={cityDetailHref(row.region, period, anchor)}
+              className="text-primary break-words font-medium hover:underline"
+            >
+              {row.region}
+            </Link>,
             row.orderCount,
             formatINR(row.grossPaise),
             `${row.sharePercent}%`,
@@ -271,11 +288,11 @@ function SalesTable({
 }: {
   title: string;
   headers: string[];
-  rows: (string | number)[][];
+  rows: ReactNode[][];
   empty: string;
 }): JSX.Element {
   return (
-    <Card>
+    <Card className="min-w-0 overflow-hidden">
       <CardContent className="p-0">
         <div className="border-b p-5">
           <h2 className="font-display text-base font-semibold">{title}</h2>
@@ -283,8 +300,8 @@ function SalesTable({
         {rows.length === 0 ? (
           <p className="text-muted-foreground p-8 text-center text-sm">{empty}</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+          <div className="w-full max-w-full overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   {headers.map((header, index) => (

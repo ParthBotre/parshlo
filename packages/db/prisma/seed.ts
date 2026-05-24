@@ -362,7 +362,7 @@ async function main(): Promise<void> {
       composition: 'Calcium Citrate Maleate 1000mg + Vitamin D3 + Magnesium + Zinc',
       strength: '1000mg combo',
       form: ProductForm.TABLET,
-      packaging: '15 tablets/strip · 10 strips/box',
+      packaging: '10 tablets/strip · 10 strips/box',
       description:
         'Extended calcium formulation with magnesium and zinc for women, post-menopausal bone support and prenatal use.',
       manufacturer: MANUFACTURER,
@@ -419,7 +419,7 @@ async function main(): Promise<void> {
       composition: 'Calcitriol 0.25mcg + Calcium Carbonate 500mg + Zinc 7.5mg',
       strength: '0.25mcg combo',
       form: ProductForm.TABLET,
-      packaging: '10 tablets/strip · 10 strips/box',
+      packaging: '30 tablets/bottle',
       description:
         'Active Vitamin D3 (Calcitriol) with calcium and zinc for fracture recovery and metabolic bone disease.',
       manufacturer: MANUFACTURER,
@@ -458,7 +458,7 @@ async function main(): Promise<void> {
       composition: 'Methylsulfonylmethane (MSM) + Glucosamine Sulphate + Diacerein',
       strength: 'Combo',
       form: ProductForm.CAPSULE,
-      packaging: '10 capsules/strip · 10 strips/box',
+      packaging: '15 capsules/strip · 10 strips/box',
       description:
         'MSM + Glucosamine + Diacerein combination capsule for chronic joint pain and inflammation.',
       manufacturer: MANUFACTURER,
@@ -477,7 +477,7 @@ async function main(): Promise<void> {
       composition: 'Methylsulfonylmethane (MSM) + Glucosamine Sulphate + Diacerein',
       strength: 'Combo',
       form: ProductForm.TABLET,
-      packaging: '10 tablets/strip · 10 strips/box',
+      packaging: '15 tablets/strip · 10 strips/box',
       description:
         'MSM + Glucosamine + Diacerein combination tablet for chronic joint pain and inflammation.',
       manufacturer: MANUFACTURER,
@@ -496,7 +496,7 @@ async function main(): Promise<void> {
       composition: 'Methylsulfonylmethane (MSM) + Vitamin C + Undenatured Type II Collagen',
       strength: 'Combo',
       form: ProductForm.TABLET,
-      packaging: '10 tablets/strip · 10 strips/box',
+      packaging: '15 tablets/strip · 10 strips/box',
       description:
         'Vegetarian joint health support with MSM, Vitamin C and undenatured Type II collagen.',
       manufacturer: MANUFACTURER,
@@ -963,7 +963,7 @@ async function main(): Promise<void> {
       composition: 'Composition pending stakeholder confirmation',
       strength: 'Pending',
       form: ProductForm.TABLET,
-      packaging: '10 tablets/strip · 10 strips/box',
+      packaging: '15 tablets/strip · 10 strips/box',
       description: 'Product details pending stakeholder confirmation.',
       manufacturer: MANUFACTURER,
       hsnCode: '30049099',
@@ -1137,7 +1137,7 @@ async function main(): Promise<void> {
       composition: 'Whey Protein Concentrate + Vitamins/Minerals (Sugar-Free, unflavoured)',
       strength: '200g protein/kg',
       form: ProductForm.POWDER,
-      packaging: '500g tin',
+      packaging: '200g tin',
       description:
         'Sugar-free, unflavoured protein powder for adults preferring a neutral taste. Ideal for diabetics and calorie-conscious users.',
       manufacturer: MANUFACTURER,
@@ -1156,7 +1156,7 @@ async function main(): Promise<void> {
       composition: 'Whey Protein Concentrate + Vitamins/Minerals — Chocolate Flavour (Sugar-Free)',
       strength: '200g protein/kg',
       form: ProductForm.POWDER,
-      packaging: '500g tin',
+      packaging: '200g tin',
       description:
         'Sugar-free protein powder with rich chocolate flavour. Diabetic-friendly daily nutrition.',
       manufacturer: MANUFACTURER,
@@ -1176,7 +1176,7 @@ async function main(): Promise<void> {
         'Whey Protein Concentrate + Vitamins/Minerals — Kesar (Saffron) Flavour (Sugar-Free)',
       strength: '200g protein/kg',
       form: ProductForm.POWDER,
-      packaging: '500g tin',
+      packaging: '200g tin',
       description:
         'Sugar-free protein powder with traditional kesar flavour. Diabetic-friendly Indian taste profile.',
       manufacturer: MANUFACTURER,

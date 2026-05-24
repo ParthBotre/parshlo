@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { type ZodType, type ZodTypeDef } from 'zod';
 
 import { Badge } from '@/components/ui/badge';
@@ -8,15 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   type Consignment,
+  ConsignmentList,
   ConsignmentRow,
   type CourierPartner,
   type LogisticsStatement,
+  StatementList,
   StatementRow,
 } from '@/lib/api/admin';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
 type Statement = LogisticsStatement;
+type ConsignmentType = 'INCOMING' | 'OUTGOING';
 type ConsignmentPeriod = 'day' | 'week' | 'month' | 'year';
 
 const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
@@ -140,17 +143,12 @@ function billingYearOptions(): string[] {
   return Array.from({ length: 6 }, (_, index) => String(currentYear - index));
 }
 
-function isConsignmentInStatementWindow(consignment: Consignment, statement: Statement) {
-  const consignmentAt = new Date(consignment.consignmentDate).getTime();
-  return (
-    consignment.courierId === statement.courierId &&
-    consignmentAt >= new Date(statement.billingPeriodStart).getTime() &&
-    consignmentAt <= new Date(statement.billingPeriodEnd).getTime()
-  );
-}
-
 function displayConsignmentStatus(consignment: Consignment) {
   return consignment.statement?.status === 'PAID' ? 'PAID' : consignment.status;
+}
+
+function toConsignmentType(value: string): ConsignmentType {
+  return value === 'INCOMING' ? 'INCOMING' : 'OUTGOING';
 }
 
 function startOfWeek(date: Date) {
@@ -246,10 +244,22 @@ export default function LogisticsPageClient({
   const [dashboardCourierId, setDashboardCourierId] = useState('all');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingConsignmentId, setEditingConsignmentId] = useState<string | null>(null);
+  const [editingStatementId, setEditingStatementId] = useState<string | null>(null);
   const yearOptions = useMemo(() => billingYearOptions(), []);
 
   // Add Consignment form state
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    courierId: string;
+    type: ConsignmentType;
+    docketNumber: string;
+    consignmentDate: string;
+    amountRupees: string;
+    weightKg: string;
+    boxCount: string;
+    associatedOrderNumber: string;
+    associatedPoNumber: string;
+  }>({
     courierId: couriers[0]?.id ?? '',
     type: 'OUTGOING',
     docketNumber: '',
@@ -298,20 +308,48 @@ export default function LogisticsPageClient({
     return schema.parse(json);
   }
 
-  async function apiPatch<TOutput, TDef extends ZodTypeDef, TInput>(
+  async function apiGet<TOutput, TDef extends ZodTypeDef, TInput>(
     path: string,
     schema: ZodType<TOutput, TDef, TInput>,
   ): Promise<TOutput> {
     const res = await fetch(`${API_BASE}${path}`, {
-      method: 'PATCH',
       headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      throw new Error(await responseMessage(res));
+    }
+    const json: unknown = await res.json();
+    return schema.parse(json);
+  }
+
+  async function apiPatch<TOutput, TDef extends ZodTypeDef, TInput>(
+    path: string,
+    body: unknown,
+    schema: ZodType<TOutput, TDef, TInput>,
+  ): Promise<TOutput> {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'PATCH',
+      headers: {
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await responseMessage(res));
     const json: unknown = await res.json();
     return schema.parse(json);
   }
 
-  async function submitConsignment(e: React.FormEvent) {
+  async function refreshLogisticsData(): Promise<void> {
+    const [nextConsignments, nextStatements] = await Promise.all([
+      apiGet('/v1/admin/finance/logistics/consignments', ConsignmentList),
+      apiGet('/v1/admin/finance/logistics/statements', StatementList),
+    ]);
+    setConsignments(nextConsignments);
+    setStatements(nextStatements);
+  }
+
+  async function submitConsignment(e: FormEvent) {
     e.preventDefault();
     if (!canManageLogistics) {
       setError('Only admins and super admins can log consignments.');
@@ -320,62 +358,30 @@ export default function LogisticsPageClient({
     setError('');
     setSaving(true);
     try {
-      const created = await apiPost(
-        '/v1/admin/finance/logistics/consignments',
-        {
-          courierId: form.courierId,
-          type: form.type,
-          docketNumber: form.docketNumber,
-          consignmentDate: dateInputToBusinessIso(form.consignmentDate),
-          amountPaise: Math.round(parseFloat(form.amountRupees) * 100),
-          weightKg: form.weightKg ? parseFloat(form.weightKg) : undefined,
-          boxCount: parseInt(form.boxCount),
-          associatedOrderNumber: form.associatedOrderNumber || undefined,
-          associatedPoNumber: form.associatedPoNumber || undefined,
-        },
-        ConsignmentRow,
-      );
-      // Attach courier name for display
-      const courier = couriers.find((c) => c.id === form.courierId);
-      const createdWithCourier = { ...created, courier: { name: courier?.name ?? '' } };
-      if (created.statementId) {
-        setStatements((prev) =>
-          prev.map((statement) => {
-            if (statement.id !== created.statementId) return statement;
+      const body = {
+        courierId: form.courierId,
+        type: form.type,
+        docketNumber: form.docketNumber,
+        consignmentDate: dateInputToBusinessIso(form.consignmentDate),
+        amountPaise: Math.round(parseFloat(form.amountRupees) * 100),
+        weightKg: form.weightKg ? parseFloat(form.weightKg) : undefined,
+        boxCount: parseInt(form.boxCount),
+        associatedOrderNumber: form.associatedOrderNumber || null,
+        associatedPoNumber: form.associatedPoNumber || null,
+      };
 
-            const systemCalculatedTotalPaise = (
-              BigInt(statement.systemCalculatedTotalPaise) + BigInt(created.amountPaise)
-            ).toString();
-            const status =
-              systemCalculatedTotalPaise === String(statement.courierChargedTotalPaise)
-                ? 'RECONCILED'
-                : 'FLAGGED';
-
-            return {
-              ...statement,
-              systemCalculatedTotalPaise,
-              status,
-              _count: { consignments: statement._count.consignments + 1 },
-            };
-          }),
+      if (editingConsignmentId) {
+        await apiPatch(
+          `/v1/admin/finance/logistics/consignments/${editingConsignmentId}`,
+          body,
+          ConsignmentRow,
         );
-        const statementStatus = created.statement?.status ?? 'FLAGGED';
-        const consignmentStatus = statementStatus === 'RECONCILED' ? 'MATCHED' : 'DISCREPANCY';
-        setConsignments((prev) => [
-          createdWithCourier,
-          ...prev.map((consignment) =>
-            consignment.statementId === created.statementId
-              ? {
-                  ...consignment,
-                  status: consignmentStatus,
-                  statement: { status: statementStatus },
-                }
-              : consignment,
-          ),
-        ]);
       } else {
-        setConsignments((prev) => [createdWithCourier, ...prev]);
+        await apiPost('/v1/admin/finance/logistics/consignments', body, ConsignmentRow);
       }
+
+      await refreshLogisticsData();
+      setEditingConsignmentId(null);
       setForm((f) => ({
         ...f,
         docketNumber: '',
@@ -391,7 +397,7 @@ export default function LogisticsPageClient({
     }
   }
 
-  async function submitReconcile(e: React.FormEvent) {
+  async function submitReconcile(e: FormEvent) {
     e.preventDefault();
     if (!canManageLogistics) {
       setError('Only admins and super admins can create courier statements.');
@@ -405,30 +411,26 @@ export default function LogisticsPageClient({
         throw new Error('Select a valid billing month and year.');
       }
 
-      const created = await apiPost(
-        '/v1/admin/finance/logistics/statements/reconcile',
-        {
-          courierId: rForm.courierId,
-          statementInvoiceNumber: rForm.statementInvoiceNumber,
-          billingPeriodStart: billingPeriod.start,
-          billingPeriodEnd: billingPeriod.end,
-          courierChargedTotalPaise: Math.round(parseFloat(rForm.courierChargedRupees) * 100),
-        },
-        StatementRow,
-      );
-      setStatements((prev) => [created, ...prev]);
-      setConsignments((prev) =>
-        prev.map((c) =>
-          isConsignmentInStatementWindow(c, created)
-            ? {
-                ...c,
-                statementId: created.id,
-                statement: { status: created.status },
-                status: created.status === 'RECONCILED' ? 'MATCHED' : 'DISCREPANCY',
-              }
-            : c,
-        ),
-      );
+      const body = {
+        courierId: rForm.courierId,
+        statementInvoiceNumber: rForm.statementInvoiceNumber,
+        billingPeriodStart: billingPeriod.start,
+        billingPeriodEnd: billingPeriod.end,
+        courierChargedTotalPaise: Math.round(parseFloat(rForm.courierChargedRupees) * 100),
+      };
+
+      if (editingStatementId) {
+        await apiPatch(
+          `/v1/admin/finance/logistics/statements/${editingStatementId}`,
+          body,
+          StatementRow,
+        );
+      } else {
+        await apiPost('/v1/admin/finance/logistics/statements/reconcile', body, StatementRow);
+      }
+
+      await refreshLogisticsData();
+      setEditingStatementId(null);
       setRForm((f) => ({ ...f, statementInvoiceNumber: '', courierChargedRupees: '' }));
     } catch (err) {
       setError((err as Error).message);
@@ -445,6 +447,7 @@ export default function LogisticsPageClient({
     try {
       const paid = await apiPatch(
         `/v1/admin/finance/logistics/statements/${id}/mark-paid`,
+        undefined,
         StatementRow,
       );
       setStatements((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'PAID' } : s)));
@@ -464,13 +467,82 @@ export default function LogisticsPageClient({
       return;
     }
     try {
-      await apiPatch(`/v1/admin/finance/logistics/consignments/${id}/resolve`, ConsignmentRow);
-      setConsignments((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: 'MANUALLY_RESOLVED' } : c)),
+      await apiPatch(
+        `/v1/admin/finance/logistics/consignments/${id}/resolve`,
+        undefined,
+        ConsignmentRow,
       );
+      await refreshLogisticsData();
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  function cancelConsignmentEdit(): void {
+    setEditingConsignmentId(null);
+    setForm((current) => ({
+      ...current,
+      docketNumber: '',
+      amountRupees: '',
+      weightKg: '',
+      boxCount: '1',
+      associatedOrderNumber: '',
+      associatedPoNumber: '',
+    }));
+  }
+
+  function beginConsignmentEdit(consignment: Consignment): void {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can edit consignments.');
+      return;
+    }
+    if (displayConsignmentStatus(consignment) === 'PAID') {
+      setError('Consignments attached to paid statements are locked.');
+      return;
+    }
+    setTab('consignments');
+    setEditingConsignmentId(consignment.id);
+    setForm({
+      courierId: consignment.courierId,
+      type: toConsignmentType(consignment.type),
+      docketNumber: consignment.docketNumber,
+      consignmentDate: dateInputFromBusinessIso(consignment.consignmentDate),
+      amountRupees: String(Number(consignment.amountPaise) / 100),
+      weightKg: consignment.weightKg === null ? '' : String(consignment.weightKg),
+      boxCount: String(consignment.boxCount),
+      associatedOrderNumber: consignment.associatedOrderNumber ?? '',
+      associatedPoNumber: consignment.associatedPoNumber ?? '',
+    });
+  }
+
+  function cancelStatementEdit(): void {
+    setEditingStatementId(null);
+    setRForm((current) => ({
+      ...current,
+      statementInvoiceNumber: '',
+      courierChargedRupees: '',
+    }));
+  }
+
+  function beginStatementEdit(statement: Statement): void {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can edit courier statements.');
+      return;
+    }
+    if (statement.status === 'PAID') {
+      setError('Paid statements are locked.');
+      return;
+    }
+    const start = calendarParts(new Date(statement.billingPeriodStart));
+    setTab('statements');
+    setEditingStatementId(statement.id);
+    setRForm({
+      courierId: statement.courierId,
+      statementInvoiceNumber: statement.statementInvoiceNumber,
+      billingMonth: String(start.month),
+      billingYear: String(start.year),
+      courierChargedRupees: String(Number(statement.courierChargedTotalPaise) / 100),
+    });
   }
 
   function beginStatementLine(statement: Statement) {
@@ -576,7 +648,9 @@ export default function LogisticsPageClient({
           {canManageLogistics ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Log Consignment</CardTitle>
+                <CardTitle className="text-base">
+                  {editingConsignmentId ? 'Edit Consignment' : 'Log Consignment'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <form
@@ -609,7 +683,12 @@ export default function LogisticsPageClient({
                       id="consignment-type"
                       className={inputCls}
                       value={form.type}
-                      onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          type: toConsignmentType(e.target.value),
+                        }))
+                      }
                     >
                       <option value="OUTGOING">OUTGOING</option>
                       <option value="INCOMING">INCOMING</option>
@@ -714,9 +793,20 @@ export default function LogisticsPageClient({
                     />
                   </div>
                   <div className="sm:col-span-2 lg:col-span-3">
-                    <Button type="submit" disabled={saving}>
-                      {saving ? 'Saving…' : 'Log Consignment'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" disabled={saving}>
+                        {saving
+                          ? 'Saving…'
+                          : editingConsignmentId
+                            ? 'Update Consignment'
+                            : 'Log Consignment'}
+                      </Button>
+                      {editingConsignmentId ? (
+                        <Button type="button" variant="outline" onClick={cancelConsignmentEdit}>
+                          Cancel
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </form>
               </CardContent>
@@ -830,15 +920,26 @@ export default function LogisticsPageClient({
                                     {c.associatedOrderNumber ?? '—'}
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3">
-                                    {canManageLogistics && status === 'DISCREPANCY' && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => void resolveConsignment(c.id)}
-                                      >
-                                        Resolve
-                                      </Button>
-                                    )}
+                                    <div className="flex flex-wrap gap-2">
+                                      {canManageLogistics && status !== 'PAID' && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => beginConsignmentEdit(c)}
+                                        >
+                                          Edit
+                                        </Button>
+                                      )}
+                                      {canManageLogistics && status === 'DISCREPANCY' && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => void resolveConsignment(c.id)}
+                                        >
+                                          Resolve
+                                        </Button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -862,7 +963,9 @@ export default function LogisticsPageClient({
           {canManageLogistics ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Reconcile Monthly Bill</CardTitle>
+                <CardTitle className="text-base">
+                  {editingStatementId ? 'Edit Monthly Bill' : 'Reconcile Monthly Bill'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <form
@@ -959,9 +1062,20 @@ export default function LogisticsPageClient({
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button type="submit" disabled={saving}>
-                      {saving ? 'Processing…' : 'Run Reconciliation'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" disabled={saving}>
+                        {saving
+                          ? 'Processing…'
+                          : editingStatementId
+                            ? 'Update Statement'
+                            : 'Run Reconciliation'}
+                      </Button>
+                      {editingStatementId ? (
+                        <Button type="button" variant="outline" onClick={cancelStatementEdit}>
+                          Cancel
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </form>
               </CardContent>
@@ -1049,6 +1163,15 @@ export default function LogisticsPageClient({
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="flex flex-wrap gap-2">
+                              {canManageLogistics && s.status !== 'PAID' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => beginStatementEdit(s)}
+                                >
+                                  Edit
+                                </Button>
+                              )}
                               {canManageLogistics && s.status !== 'PAID' && (
                                 <Button
                                   size="sm"

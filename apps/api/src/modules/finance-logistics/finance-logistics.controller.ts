@@ -5,9 +5,13 @@ import {
   CreateConsignmentSchema,
   CreateCourierPartnerSchema,
   CreateMonthlyStatementSchema,
+  UpdateConsignmentSchema,
+  UpdateMonthlyStatementSchema,
   type CreateConsignmentInput,
   type CreateCourierPartnerInput,
   type CreateMonthlyStatementInput,
+  type UpdateConsignmentInput,
+  type UpdateMonthlyStatementInput,
 } from '@parshlo/types';
 
 import { RequireRoles } from '../../common/decorators/roles.decorator.js';
@@ -71,6 +75,16 @@ export class FinanceLogisticsController {
     return this.service.updateConsignmentStatus(id, 'MANUALLY_RESOLVED');
   }
 
+  @Patch('consignments/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  updateConsignment(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateConsignmentSchema)) body: UpdateConsignmentInput,
+  ): ReturnType<FinanceLogisticsService['updateConsignment']> {
+    return this.service.updateConsignment(id, body);
+  }
+
   // ─── Statements & Reconciliation ─────────────────────────────────────────────
 
   @ApiQuery({ name: 'courierId', required: false })
@@ -96,6 +110,16 @@ export class FinanceLogisticsController {
   @RequireRoles('ADMIN', 'SUPER_ADMIN')
   markPaid(@Param('id') id: string): ReturnType<FinanceLogisticsService['markStatementPaid']> {
     return this.service.markStatementPaid(id);
+  }
+
+  @Patch('statements/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  updateStatement(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateMonthlyStatementSchema)) body: UpdateMonthlyStatementInput,
+  ): ReturnType<FinanceLogisticsService['updateStatement']> {
+    return this.service.updateStatement(id, body);
   }
 
   @Get('statements/:id/discrepancies')

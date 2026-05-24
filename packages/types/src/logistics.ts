@@ -25,6 +25,22 @@ export const CreateConsignmentSchema = z.object({
 });
 export type CreateConsignmentInput = z.infer<typeof CreateConsignmentSchema>;
 
+export const UpdateConsignmentSchema = z.object({
+  courierId: z.string().cuid().optional(),
+  type: AdminLogisticsTypeEnum.optional(),
+  docketNumber: z.string().min(2).trim().optional(),
+  consignmentDate: z.coerce.date().optional(),
+  amountPaise: z
+    .union([z.bigint(), z.number().int()])
+    .transform((v) => BigInt(v))
+    .optional(),
+  weightKg: z.number().positive().nullable().optional(),
+  boxCount: z.number().int().positive().optional(),
+  associatedPoNumber: z.string().trim().nullable().optional(),
+  associatedOrderNumber: z.string().trim().nullable().optional(),
+});
+export type UpdateConsignmentInput = z.infer<typeof UpdateConsignmentSchema>;
+
 export const CreateMonthlyStatementSchema = z.object({
   courierId: z.string().cuid(),
   statementInvoiceNumber: z.string().min(2).trim(),
@@ -33,6 +49,15 @@ export const CreateMonthlyStatementSchema = z.object({
   courierChargedTotalPaise: z.coerce.bigint(),
 });
 export type CreateMonthlyStatementInput = z.infer<typeof CreateMonthlyStatementSchema>;
+
+export const UpdateMonthlyStatementSchema = z.object({
+  courierId: z.string().cuid().optional(),
+  statementInvoiceNumber: z.string().min(2).trim().optional(),
+  billingPeriodStart: z.coerce.date().optional(),
+  billingPeriodEnd: z.coerce.date().optional(),
+  courierChargedTotalPaise: z.coerce.bigint().optional(),
+});
+export type UpdateMonthlyStatementInput = z.infer<typeof UpdateMonthlyStatementSchema>;
 
 export const CreateCourierPartnerSchema = z.object({
   name: z.string().min(1).trim(),

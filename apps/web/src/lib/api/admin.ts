@@ -72,6 +72,7 @@ const AnalyticsSummary = z.object({
 const AdminOrderRow = z.object({
   id: z.string(),
   orderNumber: z.string(),
+  buyerId: z.string(),
   status: z.string(),
   placedAt: z.string(),
   buyerBusinessName: z.string(),
