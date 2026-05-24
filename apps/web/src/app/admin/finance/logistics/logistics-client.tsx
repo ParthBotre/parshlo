@@ -237,7 +237,7 @@ export default function LogisticsPageClient({
   consignments: initConsignments,
   statements: initStatements,
   canManageLogistics,
-}: Props) {
+}: Props): JSX.Element {
   const [tab, setTab] = useState<'consignments' | 'statements'>('consignments');
   const [couriers] = useState(initCouriers);
   const [consignments, setConsignments] = useState(initConsignments);
