@@ -406,7 +406,13 @@ export class AdminService {
       summary.latestOrderAt = order.placedAt.toISOString();
     }
 
-    return users.map((u) => this.toBuyerRow(u, summaries.get(u.id)));
+    return users
+      .map((u) => this.toBuyerRow(u, summaries.get(u.id)))
+      .sort((a, b) => {
+        const aName = (a.businessName ?? a.fullName).trim();
+        const bName = (b.businessName ?? b.fullName).trim();
+        return aName.localeCompare(bName, 'en-IN', { sensitivity: 'base' });
+      });
   }
 
   async getBuyer(
@@ -939,7 +945,7 @@ export class AdminService {
       where: { placedAt: { gte: range.start, lt: range.end } },
       include: {
         items: true,
-        buyer: { select: { businessProfile: { select: { state: true } } } },
+        buyer: { select: { businessProfile: { select: { city: true } } } },
       },
     });
 
@@ -961,7 +967,8 @@ export class AdminService {
     >();
 
     for (const order of orders) {
-      const region = order.buyer.businessProfile?.state.trim() ?? 'Unknown';
+      const city = order.buyer.businessProfile?.city.trim();
+      const region = city && city.length > 0 ? city : 'Unknown';
       const regionBucket = regionBuckets.get(region) ?? { region, orderCount: 0, grossPaise: 0 };
       regionBucket.orderCount += 1;
       regionBucket.grossPaise += Number(order.totalPaise);

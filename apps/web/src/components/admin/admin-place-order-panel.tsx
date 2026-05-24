@@ -29,7 +29,7 @@ function canPlaceForBuyer(b: AdminBuyer): boolean {
 }
 
 function priceTierForBusinessType(businessType?: string | null): BuyerProductView['priceTier'] {
-  return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
+  return businessType === 'PHARMACY' || businessType === 'HOSPITAL' ? 'RATE_B' : 'RATE_A';
 }
 
 export function AdminPlaceOrderPanel({

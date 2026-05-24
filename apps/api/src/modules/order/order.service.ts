@@ -51,7 +51,7 @@ const COURIER_PARTNER_NAMES: Record<
 const ADMIN_APPROVAL_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 function priceTierForBusinessType(businessType?: PrismaBusinessType | null): ProductPriceTier {
-  return businessType === 'PHARMACY' ? 'RATE_B' : 'RATE_A';
+  return businessType === 'PHARMACY' || businessType === 'HOSPITAL' ? 'RATE_B' : 'RATE_A';
 }
 
 @Injectable()

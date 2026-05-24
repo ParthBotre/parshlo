@@ -116,7 +116,7 @@ export default async function GrossSalesByCityPage({
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Sales analytics</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Gross sales, product-wise sales, and region-wise sales for the selected period.
+          Gross sales, product-wise sales, and city-wise sales for the selected period.
         </p>
       </div>
 
@@ -248,9 +248,9 @@ export default async function GrossSalesByCityPage({
           ])}
         />
         <SalesTable
-          title="Region-wise sales"
-          empty="No region sales in this period."
-          headers={['Region', 'Orders', 'Gross', 'Share']}
+          title="City-wise sales"
+          empty="No city sales in this period."
+          headers={['City', 'Orders', 'Gross', 'Share']}
           rows={(analytics?.regionRows ?? []).map((row) => [
             row.region,
             row.orderCount,

@@ -195,7 +195,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
         })}
       </div>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardContent className="p-0">
           {orders.length === 0 ? (
             <p className="text-muted-foreground p-10 text-center text-sm">No orders match.</p>
@@ -228,7 +228,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                 </div>
               </div>
 
-              <div className="divide-y">
+              <div className="min-w-0 divide-y">
                 {orderGroups.map((group) => (
                   <div key={group.key}>
                     <div className="bg-secondary/20 flex flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -240,8 +240,8 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                         {formatINR(group.totalPaise)}
                       </p>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                    <div className="w-full overflow-x-auto">
+                      <table className="w-full min-w-[980px] text-sm">
                         <thead className="text-muted-foreground text-left text-xs uppercase tracking-wider">
                           <tr>
                             <th className="whitespace-nowrap px-4 py-3">Order #</th>
@@ -264,7 +264,9 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                                   {o.orderNumber}
                                 </Link>
                               </td>
-                              <td className="whitespace-nowrap px-4 py-3">{o.buyerBusinessName}</td>
+                              <td className="max-w-[260px] px-4 py-3">
+                                <p className="break-words font-medium">{o.buyerBusinessName}</p>
+                              </td>
                               <td className="text-muted-foreground whitespace-nowrap px-4 py-3 font-mono text-xs">
                                 {o.buyerGstin}
                               </td>
