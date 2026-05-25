@@ -20,8 +20,8 @@ export const CreateConsignmentSchema = z.object({
   amountPaise: z.union([z.bigint(), z.number().int()]).transform((v) => BigInt(v)),
   weightKg: z.number().positive().optional(),
   boxCount: z.number().int().positive().default(1),
-  associatedPoNumber: z.string().optional(),
-  associatedOrderNumber: z.string().optional(),
+  associatedPoNumber: z.string().trim().nullable().optional(),
+  associatedOrderNumber: z.string().trim().nullable().optional(),
 });
 export type CreateConsignmentInput = z.infer<typeof CreateConsignmentSchema>;
 

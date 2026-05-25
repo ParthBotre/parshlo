@@ -92,7 +92,7 @@ export default function HomePage(): JSX.Element {
                 <Link href="/products">View Products</Link>
               </Button>
               <Button asChild size="xl" variant="outline">
-                <Link href="/auth/register">Request B2B Access</Link>
+                <Link href="/auth/sign-in">SIGN IN</Link>
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">

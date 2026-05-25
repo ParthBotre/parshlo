@@ -13,6 +13,19 @@ function csvCell(value: string | number | null | undefined): string {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function numericOrderNumber(orderNumber: string): string {
+  return orderNumber.replace(/\D/g, '').padStart(12, '0').slice(-12);
+}
+
+function csvDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
 export async function GET(_req: Request, { params }: RouteContext): Promise<Response> {
   const session = await getSession();
   if (!session) {
@@ -22,9 +35,12 @@ export async function GET(_req: Request, { params }: RouteContext): Promise<Resp
   const { id } = await params;
   try {
     const order = await getAdminOrder(session.accessToken, id, { next: { revalidate: 0 } });
+    const orderNo = numericOrderNumber(order.orderNumber);
+    const orderDate = csvDate(order.placedAt);
     const rows = [
       [
-        'Order Number',
+        'Order No',
+        'Date',
         'Buyer Name',
         'Products',
         'Quantity',
@@ -36,9 +52,10 @@ export async function GET(_req: Request, { params }: RouteContext): Promise<Resp
         'Total',
       ],
       ...order.items.map((item) => [
-        order.orderNumber,
+        orderNo,
+        orderDate,
         order.buyerBusinessName,
-        item.productName.toUpperCase(),
+        item.productName,
         item.quantity,
         item.schemeFreeQuantity,
         item.quantity + item.schemeFreeQuantity,
@@ -48,11 +65,11 @@ export async function GET(_req: Request, { params }: RouteContext): Promise<Resp
         (item.lineTotalPaise / 100).toFixed(2),
       ]),
     ];
-    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
+    const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`;
     return new Response(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${order.orderNumber}.csv"`,
+        'Content-Disposition': `attachment; filename="${orderNo}.csv"`,
       },
     });
   } catch (err) {

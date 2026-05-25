@@ -282,6 +282,19 @@ export default function LogisticsPageClient({
 
   async function responseMessage(res: Response): Promise<string> {
     const json: unknown = await res.json().catch(() => null);
+    if (json && typeof json === 'object' && 'details' in json) {
+      const details = (json as { details?: unknown }).details;
+      if (Array.isArray(details)) {
+        const first = details.find(
+          (detail): detail is { path?: unknown; message?: unknown } =>
+            detail !== null && typeof detail === 'object' && 'message' in detail,
+        );
+        if (first && typeof first.message === 'string') {
+          const path = typeof first.path === 'string' && first.path ? `${first.path}: ` : '';
+          return `${path}${first.message}`;
+        }
+      }
+    }
     if (json && typeof json === 'object' && 'message' in json) {
       const message = (json as { message?: unknown }).message;
       if (typeof message === 'string') {

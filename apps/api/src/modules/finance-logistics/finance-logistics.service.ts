@@ -250,8 +250,8 @@ export class FinanceLogisticsService {
     amountPaise: bigint;
     weightKg?: number;
     boxCount: number;
-    associatedPoNumber?: string;
-    associatedOrderNumber?: string;
+    associatedPoNumber?: string | null;
+    associatedOrderNumber?: string | null;
   }) {
     const courier = await this.prisma.courierPartner.findUnique({
       where: { id: dto.courierId },
