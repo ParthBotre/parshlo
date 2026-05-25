@@ -183,7 +183,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
             <Link
               key={f.label}
               href={ordersHref(f.value, period)}
-              className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border hover:bg-accent'

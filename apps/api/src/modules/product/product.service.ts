@@ -273,7 +273,6 @@ export class ProductService {
     const product = await this.prisma.product.update({
       where: { id },
       data: {
-        slug: await this.uniqueSlug(input.name, id),
         name: input.name.trim().toUpperCase(),
         composition: input.composition.trim(),
         strength: input.strength.trim(),
