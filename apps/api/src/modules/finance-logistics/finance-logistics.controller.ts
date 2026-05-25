@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -85,6 +85,16 @@ export class FinanceLogisticsController {
     return this.service.updateConsignment(id, body);
   }
 
+  @Delete('consignments/:id')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  deleteConsignment(
+    @Param('id') id: string,
+  ): ReturnType<FinanceLogisticsService['deleteConsignment']> {
+    return this.service.deleteConsignment(id);
+  }
+
   // ─── Statements & Reconciliation ─────────────────────────────────────────────
 
   @ApiQuery({ name: 'courierId', required: false })
@@ -120,6 +130,14 @@ export class FinanceLogisticsController {
     @Body(new ZodValidationPipe(UpdateMonthlyStatementSchema)) body: UpdateMonthlyStatementInput,
   ): ReturnType<FinanceLogisticsService['updateStatement']> {
     return this.service.updateStatement(id, body);
+  }
+
+  @Delete('statements/:id')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  deleteStatement(@Param('id') id: string): ReturnType<FinanceLogisticsService['deleteStatement']> {
+    return this.service.deleteStatement(id);
   }
 
   @Get('statements/:id/discrepancies')

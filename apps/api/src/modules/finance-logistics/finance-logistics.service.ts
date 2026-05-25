@@ -141,6 +141,7 @@ export class FinanceLogisticsService {
     const systemCalculated = aggregate._sum.amountPaise ?? 0n;
     const status =
       systemCalculated === statement.courierChargedTotalPaise ? 'RECONCILED' : 'FLAGGED';
+    const lineStatus = status === 'RECONCILED' ? 'MATCHED' : 'DISCREPANCY';
 
     await tx.courierLedgerStatement.update({
       where: { id: statementId },
@@ -151,7 +152,7 @@ export class FinanceLogisticsService {
     });
     await tx.adminConsignmentLog.updateMany({
       where: { statementId, status: { not: 'MANUALLY_RESOLVED' } },
-      data: { status: 'MATCHED' },
+      data: { status: lineStatus },
     });
   }
 
@@ -412,6 +413,28 @@ export class FinanceLogisticsService {
     return this.serializeConsignment(consignment);
   }
 
+  async deleteConsignment(id: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.adminConsignmentLog.findUnique({
+        where: { id },
+        include: { statement: { select: { status: true } } },
+      });
+      if (!existing) throw new NotFoundException({ code: 'CONSIGNMENT_NOT_FOUND' });
+      if (existing.statement?.status === 'PAID') {
+        throw new BadRequestException({
+          code: 'PAID_STATEMENT_LINE_LOCKED',
+          message: 'Consignments attached to paid statements are locked.',
+        });
+      }
+
+      await tx.adminConsignmentLog.delete({ where: { id } });
+
+      if (existing.statementId) {
+        await this.recalculateStatement(tx, existing.statementId);
+      }
+    });
+  }
+
   // ─── Reconciliation ──────────────────────────────────────────────────────────
 
   async listStatements(courierId?: string) {
@@ -484,7 +507,7 @@ export class FinanceLogisticsService {
         },
         data: {
           statementId: statement.id,
-          status: 'MATCHED',
+          status: isPerfectMatch ? 'MATCHED' : 'DISCREPANCY',
         },
       });
 
@@ -609,6 +632,25 @@ export class FinanceLogisticsService {
       include: { courier: true, _count: { select: { consignments: true } } },
     });
     return this.serializeStatement(statement);
+  }
+
+  async deleteStatement(id: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.courierLedgerStatement.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundException({ code: 'STATEMENT_NOT_FOUND' });
+      if (existing.status === 'PAID') {
+        throw new BadRequestException({
+          code: 'STATEMENT_ALREADY_PAID',
+          message: 'Paid statements are locked.',
+        });
+      }
+
+      await tx.adminConsignmentLog.updateMany({
+        where: { statementId: id },
+        data: { statementId: null, status: 'UNBILLED' },
+      });
+      await tx.courierLedgerStatement.delete({ where: { id } });
+    });
   }
 
   async discrepancyReport(statementId: string) {

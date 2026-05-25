@@ -353,6 +353,14 @@ export default function LogisticsPageClient({
     return schema.parse(json);
   }
 
+  async function apiDelete(path: string): Promise<void> {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error(await responseMessage(res));
+  }
+
   async function refreshLogisticsData(): Promise<void> {
     const [nextConsignments, nextStatements] = await Promise.all([
       apiGet('/v1/admin/finance/logistics/consignments', ConsignmentList),
@@ -485,6 +493,58 @@ export default function LogisticsPageClient({
         undefined,
         ConsignmentRow,
       );
+      await refreshLogisticsData();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function deleteConsignment(consignment: Consignment): Promise<void> {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can delete consignments.');
+      return;
+    }
+    if (displayConsignmentStatus(consignment) === 'PAID') {
+      setError('Consignments attached to paid statements are locked.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete consignment ${consignment.docketNumber}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      await apiDelete(`/v1/admin/finance/logistics/consignments/${consignment.id}`);
+      if (editingConsignmentId === consignment.id) {
+        cancelConsignmentEdit();
+      }
+      await refreshLogisticsData();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function deleteStatement(statement: Statement): Promise<void> {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can delete courier statements.');
+      return;
+    }
+    if (statement.status === 'PAID') {
+      setError('Paid statements are locked.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete statement ${statement.statementInvoiceNumber}? Linked consignments will move back to UNBILLED.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      await apiDelete(`/v1/admin/finance/logistics/statements/${statement.id}`);
+      if (editingStatementId === statement.id) {
+        cancelStatementEdit();
+      }
       await refreshLogisticsData();
     } catch (err) {
       setError((err as Error).message);
@@ -952,6 +1012,15 @@ export default function LogisticsPageClient({
                                           Resolve
                                         </Button>
                                       )}
+                                      {canManageLogistics && status !== 'PAID' && (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => void deleteConsignment(c)}
+                                        >
+                                          Delete
+                                        </Button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1201,6 +1270,15 @@ export default function LogisticsPageClient({
                                   onClick={() => void markPaid(s.id)}
                                 >
                                   Mark Paid
+                                </Button>
+                              )}
+                              {canManageLogistics && s.status !== 'PAID' && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => void deleteStatement(s)}
+                                >
+                                  Delete
                                 </Button>
                               )}
                             </div>
