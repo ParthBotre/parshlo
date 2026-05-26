@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants.js';
 
 /** @type {import('next').NextConfig} */
@@ -53,16 +54,39 @@ function withProductionWebpackWarningFilters(config) {
           module: /@auth0[\\/]nextjs-auth0[\\/]dist[\\/]utils[\\/]dpopUtils\.js/,
           message: /Critical dependency: the request of a dependency is an expression/,
         },
+        {
+          module: /require-in-the-middle/,
+          message: /Critical dependency: require function is used/,
+        },
       ];
       return webpackConfig;
     },
   };
 }
 
-export default function config(phase) {
-  if (phase === PHASE_PRODUCTION_BUILD) {
-    return withProductionWebpackWarningFilters(nextConfig);
+function withSentry(config) {
+  const enabled = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN);
+  if (!enabled) {
+    return config;
   }
 
-  return nextConfig;
+  return withSentryConfig(config, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: true,
+    webpack: {
+      treeshake: {
+        removeDebugLogging: true,
+      },
+    },
+  });
+}
+
+export default function config(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    return withSentry(withProductionWebpackWarningFilters(nextConfig));
+  }
+
+  return withSentry(nextConfig);
 }
