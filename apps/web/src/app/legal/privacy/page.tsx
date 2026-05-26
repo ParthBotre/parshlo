@@ -14,7 +14,7 @@ const SECTIONS = [
       'Account and KYC details, including name, business name, business email, mobile number, GSTIN, PAN when provided, drug license details, pharmacy registration details, and business address.',
       'Order and logistics details, including product selections, quantities, purchase order references, invoice records, courier partner details, docket numbers, and order status history.',
       'Technical information, including device, browser, IP address, session identifiers, security logs, and usage events needed to operate and secure the platform.',
-      'Support and inquiry information that you submit through contact forms, email, phone, or internal employee workflows.',
+      'Support and inquiry information that you submit through email, phone, or internal employee workflows.',
     ],
   },
   {

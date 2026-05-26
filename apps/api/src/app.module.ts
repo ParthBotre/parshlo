@@ -16,7 +16,6 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
 import { FinanceLogisticsModule } from './modules/finance-logistics/finance-logistics.module.js';
 import { HealthModule } from './modules/health/health.module.js';
-import { InquiryModule } from './modules/inquiry/inquiry.module.js';
 import { KycModule } from './modules/kyc/kyc.module.js';
 import { OrderModule } from './modules/order/order.module.js';
 import { PrismaModule } from './modules/prisma/prisma.module.js';
@@ -80,7 +79,6 @@ import { UserModule } from './modules/user/user.module.js';
     OrderModule,
     AdminModule,
     FinanceLogisticsModule,
-    InquiryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: IpThrottlerGuard },

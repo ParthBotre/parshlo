@@ -1,7 +1,9 @@
-import { Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowRight, Mail, MapPin, Phone, UserPlus } from 'lucide-react';
 import { type Metadata } from 'next';
+import Link from 'next/link';
 
-import { ContactForm } from '@/components/contact-form';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { site } from '@/lib/site';
 
 export const metadata: Metadata = {
@@ -16,8 +18,8 @@ export default function ContactPage(): JSX.Element {
           Talk to our partnerships team
         </h1>
         <p className="text-muted-foreground">
-          For wholesale orders, please request B2B access. For everything else — partnerships,
-          exports, or general inquiries — drop us a message.
+          For wholesale orders, please request B2B access. For partnerships, exports, and general
+          inquiries, email or call our team directly.
         </p>
 
         <ul className="space-y-4 text-sm">
@@ -40,7 +42,45 @@ export default function ContactPage(): JSX.Element {
         </ul>
       </div>
 
-      <ContactForm />
+      <Card>
+        <CardHeader>
+          <CardTitle>Reach the right team</CardTitle>
+          <CardDescription>
+            For account access, order support, partnerships, and exports, use the options below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button asChild size="lg" className="w-full justify-between">
+            <Link href="/auth/register">
+              <span className="inline-flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Request B2B access
+              </span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+
+          <Button asChild variant="outline" size="lg" className="w-full justify-between">
+            <a href={`mailto:${site.contact.email}`}>
+              <span className="inline-flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email Parshlo
+              </span>
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          </Button>
+
+          <Button asChild variant="secondary" size="lg" className="w-full justify-between">
+            <a href={`tel:${site.contact.phone.replace(/\s/g, '')}`}>
+              <span className="inline-flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Call {site.contact.phone}
+              </span>
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

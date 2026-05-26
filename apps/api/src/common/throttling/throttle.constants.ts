@@ -7,11 +7,6 @@ export const GLOBAL_THROTTLE_TIERS: ThrottlerOptions[] = [
   { name: 'long', ttl: 60_000, limit: 120 },
 ];
 
-/** Public contact form — strict anti-spam. */
-export const THROTTLE_CONTACT: Record<string, ThrottlerOptions> = {
-  short: { name: 'short', ttl: 60_000, limit: 3 },
-};
-
 /** Auth / registration surfaces. */
 export const THROTTLE_AUTH: Record<string, ThrottlerOptions> = {
   short: { name: 'short', ttl: 60_000, limit: 10 },
