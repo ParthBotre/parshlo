@@ -265,12 +265,11 @@ export function BuyerManagementPanel({ buyer }: { buyer: AdminBuyer }): JSX.Elem
               ))}
             </select>
           </Field>
-          <Field id="edit-buyer-pin" label="PIN">
+          <Field id="edit-buyer-pin" label="PIN (optional)">
             <Input
               id="edit-buyer-pin"
               value={values.pin}
               onChange={(event) => setField('pin', event.target.value)}
-              required
             />
           </Field>
           <Field id="edit-buyer-address" label="Address line 1" className="lg:col-span-2">

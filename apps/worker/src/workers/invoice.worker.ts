@@ -58,9 +58,11 @@ export function createInvoiceWorker({
         buyer: {
           businessName: bp.businessName,
           gstin: bp.gstin,
-          addressLines: [bp.addressLine1, bp.addressLine2 ?? '', `${bp.city} ${bp.pin}`].filter(
-            Boolean,
-          ),
+          addressLines: [
+            bp.addressLine1,
+            bp.addressLine2 ?? '',
+            [bp.city, bp.pin].filter(Boolean).join(' '),
+          ].filter(Boolean),
           state: bp.state,
         },
         items: order.items.map((i) => ({

@@ -30,7 +30,7 @@ export interface PendingKycApplication {
     line2: string | null;
     city: string;
     state: string;
-    pin: string;
+    pin: string | null;
   } | null;
 }
 
@@ -45,11 +45,8 @@ function formatAddress(address: PendingKycApplication['address']): string {
   if (!address) {
     return '—';
   }
-  const parts = [
-    address.line1,
-    address.line2,
-    `${address.city}, ${address.state} ${address.pin}`,
-  ].filter(Boolean);
+  const region = [address.state, address.pin].filter(Boolean).join(' ');
+  const parts = [address.line1, address.line2, `${address.city}, ${region}`].filter(Boolean);
   return parts.join(', ');
 }
 

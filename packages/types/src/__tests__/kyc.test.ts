@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { B2BApplicationInputSchema, RegisterBusinessInput } from '../kyc.js';
+import {
+  AdminCreateBuyerInputSchema,
+  AdminUpdateBuyerInputSchema,
+  B2BApplicationInputSchema,
+  RegisterBusinessInput,
+} from '../kyc.js';
+
+const validApplication = {
+  businessName: 'Apex Pharmacy Pvt Ltd',
+  ownerName: 'Rajesh Kumar',
+  businessType: 'PHARMACY' as const,
+  gstin: '29AAFCA1234A1Z5',
+  drugLicenseNumber: 'KA-BLR-20A-12345',
+  pharmacyRegistrationNumber: 'KSPC-2018-9876',
+  mobile: '9876543210',
+  businessEmail: 'orders@apex-pharmacy.local',
+  address: {
+    line1: '12, MG Road',
+    city: 'Bengaluru',
+    state: 'KA' as const,
+    pin: '560001',
+    country: 'IN' as const,
+  },
+};
 
 describe('RegisterBusinessInput', () => {
   const valid = {
@@ -51,21 +74,7 @@ describe('RegisterBusinessInput', () => {
 describe('B2BApplicationInput', () => {
   it('accepts registration without document keys', () => {
     const { documents: _documents, ...application } = {
-      businessName: 'Apex Pharmacy Pvt Ltd',
-      ownerName: 'Rajesh Kumar',
-      businessType: 'PHARMACY' as const,
-      gstin: '29AAFCA1234A1Z5',
-      drugLicenseNumber: 'KA-BLR-20A-12345',
-      pharmacyRegistrationNumber: 'KSPC-2018-9876',
-      mobile: '9876543210',
-      businessEmail: 'orders@apex-pharmacy.local',
-      address: {
-        line1: '12, MG Road',
-        city: 'Bengaluru',
-        state: 'KA' as const,
-        pin: '560001',
-        country: 'IN' as const,
-      },
+      ...validApplication,
       documents: {
         gstCertificateKey: 'kyc/x/gst.pdf',
         drugLicenseKey: 'kyc/x/drug.pdf',
@@ -74,5 +83,34 @@ describe('B2BApplicationInput', () => {
     };
     const parsed = B2BApplicationInputSchema.parse(application);
     expect(parsed.ownerName).toBe('Rajesh Kumar');
+  });
+
+  it('accepts applications without a PIN code', () => {
+    const parsed = B2BApplicationInputSchema.parse({
+      ...validApplication,
+      address: { ...validApplication.address, pin: '' },
+    });
+    expect(parsed.address.pin).toBe('');
+  });
+});
+
+describe('Admin buyer GSTIN input', () => {
+  it('allows admins to create buyers without a GSTIN', () => {
+    const parsed = AdminCreateBuyerInputSchema.parse({ ...validApplication, gstin: '' });
+    expect(parsed.gstin).toBe('');
+  });
+
+  it('allows existing unregistered GSTIN placeholders during admin edits', () => {
+    const parsed = AdminUpdateBuyerInputSchema.parse({ gstin: 'unregistered-001' });
+    expect(parsed.gstin).toBe('UNREGISTERED-001');
+  });
+
+  it('allows plain unregistered input so the API can allocate the next sequence', () => {
+    const parsed = AdminUpdateBuyerInputSchema.parse({ gstin: 'UNREGISTERED' });
+    expect(parsed.gstin).toBe('UNREGISTERED');
+  });
+
+  it('still rejects invalid GSTIN text for admin buyer edits', () => {
+    expect(() => AdminUpdateBuyerInputSchema.parse({ gstin: 'BAD-GST' })).toThrow();
   });
 });

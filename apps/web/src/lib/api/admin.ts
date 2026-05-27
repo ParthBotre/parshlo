@@ -22,7 +22,7 @@ const PendingKycAddress = z.object({
   line2: z.string().nullable(),
   city: z.string(),
   state: z.string(),
-  pin: z.string(),
+  pin: z.string().nullable(),
 });
 
 const PendingKyc = z.array(

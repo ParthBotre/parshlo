@@ -88,10 +88,10 @@ export default function HomePage(): JSX.Element {
               partners across India through a secure, audit-trailed ordering platform.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
-              <Button asChild size="xl">
+              <Button asChild size="xl" variant="outline">
                 <Link href="/products">View Products</Link>
               </Button>
-              <Button asChild size="xl" variant="outline">
+              <Button asChild size="xl">
                 <Link href="/auth/sign-in">SIGN IN</Link>
               </Button>
             </div>

@@ -24,7 +24,6 @@ export function AdminCartDrawer({
 }): JSX.Element | null {
   const cart = useAdminCart();
   const t = totals(cart.lines);
-  const [poNumber, setPoNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +36,6 @@ export function AdminCartDrawer({
     setSubmitting(true);
     try {
       await onCheckout({
-        purchaseOrderNumber: poNumber.trim() || undefined,
         notes: notes.trim() || undefined,
       });
     } catch (err) {
@@ -178,12 +176,6 @@ export function AdminCartDrawer({
 
         <div className="space-y-3 border-t p-4">
           <div className="space-y-2">
-            <input
-              className="border-input bg-background placeholder:text-muted-foreground flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="PO number (optional)"
-              value={poNumber}
-              onChange={(e) => setPoNumber(e.target.value)}
-            />
             <textarea
               className="border-input bg-background placeholder:text-muted-foreground min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
               placeholder="Notes for fulfilment (optional)"

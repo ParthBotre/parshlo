@@ -86,8 +86,14 @@ export const IndianMobile = z
 export type IndianMobile = z.infer<typeof IndianMobile>;
 
 /** Indian PIN (postal) code — 6 digits, first digit 1-9. */
-export const IndianPin = z
+const IndianPinPattern = /^[1-9][0-9]{5}$/;
+export const IndianPin = z.string().trim().regex(IndianPinPattern, 'Invalid PIN code');
+export type IndianPin = z.infer<typeof IndianPin>;
+
+/** Optional Indian PIN — accepts blank when address PIN is not available. */
+export const OptionalIndianPin = z
   .string()
   .trim()
-  .regex(/^[1-9][0-9]{5}$/, 'Invalid PIN code');
-export type IndianPin = z.infer<typeof IndianPin>;
+  .regex(/^$|^[1-9][0-9]{5}$/, 'Invalid PIN code')
+  .optional();
+export type OptionalIndianPin = z.infer<typeof OptionalIndianPin>;

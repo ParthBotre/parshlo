@@ -199,7 +199,7 @@ export function AdminBuyerCreateForm(): JSX.Element {
               ))}
             </select>
           </Field>
-          <Field id="buyer-pin" label="PIN" error={errors.address?.pin?.message}>
+          <Field id="buyer-pin" label="PIN (optional)" error={errors.address?.pin?.message}>
             <Input id="buyer-pin" {...register('address.pin')} placeholder="411009" />
           </Field>
           <Field

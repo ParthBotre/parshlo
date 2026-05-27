@@ -22,7 +22,6 @@ export function CartDrawer({
   const router = useRouter();
   const cart = useCart();
   const t = totals(cart.lines);
-  const [poNumber, setPoNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +40,6 @@ export function CartDrawer({
           schemeFreeQuantity: 0,
           discountPaise: 0,
         })),
-        purchaseOrderNumber: poNumber.trim() || undefined,
         notes: notes.trim() || undefined,
       });
       cart.clear();
@@ -114,12 +112,6 @@ export function CartDrawer({
 
         <div className="space-y-3 border-t p-4">
           <div className="space-y-2">
-            <input
-              className="border-input bg-background placeholder:text-muted-foreground flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="PO number (optional)"
-              value={poNumber}
-              onChange={(e) => setPoNumber(e.target.value)}
-            />
             <textarea
               className="border-input bg-background placeholder:text-muted-foreground min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
               placeholder="Notes for fulfilment (optional)"

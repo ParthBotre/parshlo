@@ -98,7 +98,7 @@ model BusinessProfile {
   addressLine2 String?
   city         String
   state        String  // ISO 3166-2:IN code, e.g. "KA"
-  pin          String
+  pin          String?
   country      String  @default("IN")
 
   createdAt DateTime @default(now())

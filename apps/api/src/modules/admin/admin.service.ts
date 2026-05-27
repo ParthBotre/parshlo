@@ -104,6 +104,11 @@ export class AdminService {
     return trimmed ? trimmed.toUpperCase() : null;
   }
 
+  private normalizeOptionalText(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+  }
+
   private normalizeEmail(value: string): string {
     return value.trim().toLowerCase();
   }
@@ -123,7 +128,7 @@ export class AdminService {
     rawGstin?: string,
   ): Promise<string> {
     const gstin = rawGstin?.trim().toUpperCase() ?? '';
-    return gstin.length > 0 ? gstin : this.nextUnregisteredGstin(tx);
+    return gstin.length > 0 && gstin !== 'UNREGISTERED' ? gstin : this.nextUnregisteredGstin(tx);
   }
 
   private toEmployeeView(user: {
@@ -203,7 +208,7 @@ export class AdminService {
         addressLine2: string | null;
         city: string;
         state: string;
-        pin: string;
+        pin: string | null;
         country: string;
       } | null;
     },
@@ -563,7 +568,7 @@ export class AdminService {
               addressLine2: this.normalizeOptionalUpper(input.address.line2),
               city: this.normalizeUpper(input.address.city),
               state: input.address.state,
-              pin: input.address.pin,
+              pin: this.normalizeOptionalText(input.address.pin),
               country: input.address.country,
             },
           },
@@ -670,7 +675,10 @@ export class AdminService {
                   ? this.normalizeUpper(input.address.city)
                   : undefined,
               state: input.address?.state,
-              pin: input.address?.pin,
+              pin:
+                input.address?.pin !== undefined
+                  ? this.normalizeOptionalText(input.address.pin)
+                  : undefined,
               country: input.address?.country,
             },
           },
@@ -829,7 +837,7 @@ export class AdminService {
         line2: string | null;
         city: string;
         state: string;
-        pin: string;
+        pin: string | null;
       } | null;
     }[]
   > {

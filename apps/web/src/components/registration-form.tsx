@@ -1,7 +1,14 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BusinessType, Gstin, IndianMobile, IndianPin, IndianStateCode, Pan } from '@parshlo/types';
+import {
+  BusinessType,
+  Gstin,
+  IndianMobile,
+  IndianStateCode,
+  OptionalIndianPin,
+  Pan,
+} from '@parshlo/types';
 import { CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -28,7 +35,7 @@ const Schema = z.object({
   addressLine1: z.string().trim().min(3, 'Address is required.'),
   city: z.string().trim().min(2, 'City is required.'),
   state: IndianStateCode,
-  pin: IndianPin,
+  pin: OptionalIndianPin,
 });
 type Values = z.infer<typeof Schema>;
 
@@ -60,7 +67,7 @@ export function RegistrationForm(): JSX.Element {
           line1: values.addressLine1,
           city: values.city,
           state: values.state,
-          pin: values.pin,
+          pin: values.pin?.trim() ?? '',
           country: 'IN',
         },
       });
@@ -200,7 +207,7 @@ export function RegistrationForm(): JSX.Element {
               <Field label="State (code)" error={errors.state?.message}>
                 <Input {...register('state')} placeholder="KA" className="uppercase" />
               </Field>
-              <Field label="PIN" error={errors.pin?.message}>
+              <Field label="PIN (optional)" error={errors.pin?.message}>
                 <Input {...register('pin')} placeholder="560001" />
               </Field>
             </div>

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { EntityId, Gstin, IndianMobile, IndianPin, IsoDateString, Pan } from './common.js';
+import { EntityId, Gstin, IndianMobile, IsoDateString, OptionalIndianPin, Pan } from './common.js';
 import { AccountStatus, BusinessType } from './user.js';
 
 /** Indian states & UTs (ISO-3166-2:IN codes). */
@@ -51,7 +51,7 @@ export const BusinessAddress = z.object({
   line2: z.string().trim().max(200).optional(),
   city: z.string().trim().min(1).max(100),
   state: IndianStateCode,
-  pin: IndianPin,
+  pin: OptionalIndianPin,
   country: z.literal('IN').default('IN'),
 });
 export type BusinessAddress = z.infer<typeof BusinessAddress>;
@@ -87,7 +87,12 @@ export const B2BApplicationInputSchema = RegisterBusinessInput.omit({ documents:
 export type B2BApplicationInput = z.infer<typeof B2BApplicationInputSchema>;
 
 /** Admin-created buyer account. Staff can approve immediately or leave pending. */
-export const AdminBuyerGstin = Gstin.or(z.literal('')).optional();
+const UnregisteredBuyerGstin = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^UNREGISTERED(?:-[0-9]+)?$/, 'Invalid GSTIN format');
+export const AdminBuyerGstin = Gstin.or(UnregisteredBuyerGstin).or(z.literal('')).optional();
 const AdminBuyerAccountStatus = AccountStatus.extract([
   'PENDING_VERIFICATION',
   'UNDER_REVIEW',

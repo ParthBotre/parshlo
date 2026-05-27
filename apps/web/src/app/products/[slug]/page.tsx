@@ -113,10 +113,10 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild>
-                  <Link href="/auth/register">Request access</Link>
+                  <Link href="/auth/sign-in">Sign in</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href="/auth/sign-in">Sign in</Link>
+                  <Link href="/auth/register">Request access</Link>
                 </Button>
               </div>
             </CardContent>

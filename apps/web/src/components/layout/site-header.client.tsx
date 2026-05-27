@@ -75,10 +75,10 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
           </>
         ) : isProtectedApp ? null : (
           <>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild size="sm">
               <Link href="/auth/sign-in">Sign in</Link>
             </Button>
-            <Button asChild size="sm">
+            <Button asChild variant="outline" size="sm">
               <Link href="/auth/register">Request B2B Access</Link>
             </Button>
           </>
@@ -127,12 +127,12 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
                 </>
               ) : isProtectedApp ? null : (
                 <>
-                  <Button asChild variant="outline" size="sm">
+                  <Button asChild size="sm">
                     <Link href="/auth/sign-in" onClick={() => setOpen(false)}>
                       Sign in
                     </Link>
                   </Button>
-                  <Button asChild size="sm">
+                  <Button asChild variant="outline" size="sm">
                     <Link href="/auth/register" onClick={() => setOpen(false)}>
                       Request B2B Access
                     </Link>

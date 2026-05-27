@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }): JSX.Elem
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       enableSystem
       disableTransitionOnChange={false}
       storageKey="parshlo-theme"

@@ -55,9 +55,14 @@ export default async function ProductsPage(): Promise<JSX.Element> {
         <p className="text-muted-foreground mt-2 text-sm">
           Get approved as a B2B partner to unlock pricing for all products.
         </p>
-        <Button asChild className="mt-6">
-          <Link href="/auth/register">Request B2B Access</Link>
-        </Button>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild>
+            <Link href="/auth/sign-in">Sign in</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/auth/register">Request B2B Access</Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

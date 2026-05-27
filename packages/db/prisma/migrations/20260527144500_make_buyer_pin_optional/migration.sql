@@ -1,0 +1,1 @@
+ALTER TABLE "BusinessProfile" ALTER COLUMN "pin" DROP NOT NULL;

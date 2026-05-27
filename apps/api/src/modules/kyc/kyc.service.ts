@@ -131,7 +131,7 @@ export class KycService {
           addressLine2: input.address.line2 ?? null,
           city: input.address.city,
           state: input.address.state,
-          pin: input.address.pin,
+          pin: input.address.pin?.trim() ? input.address.pin.trim() : null,
           country: input.address.country,
         },
         update: {
@@ -146,7 +146,7 @@ export class KycService {
           addressLine2: input.address.line2 ?? null,
           city: input.address.city,
           state: input.address.state,
-          pin: input.address.pin,
+          pin: input.address.pin?.trim() ? input.address.pin.trim() : null,
           country: input.address.country,
         },
       });
