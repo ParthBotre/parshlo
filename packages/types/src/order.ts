@@ -63,7 +63,7 @@ export const OrderItemView = z.object({
   schemeFreeQuantity: z.number().int().nonnegative().default(0),
   unitPricePaise: Paise,
   discountPaise: Paise.default(0),
-  priceTier: ProductPriceTier,
+  priceTier: ProductPriceTier.default('RATE_A'),
   gstRate: z.string(),
   lineSubtotalPaise: Paise,
   lineGstPaise: Paise,

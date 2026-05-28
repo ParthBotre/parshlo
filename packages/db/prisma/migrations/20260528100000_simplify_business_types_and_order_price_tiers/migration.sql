@@ -1,6 +1,11 @@
-CREATE TYPE "ProductPriceTier" AS ENUM ('RATE_A', 'RATE_B');
+DO $$
+BEGIN
+  CREATE TYPE "ProductPriceTier" AS ENUM ('RATE_A', 'RATE_B');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-ALTER TABLE "OrderItem" ADD COLUMN "priceTier" "ProductPriceTier";
+ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "priceTier" "ProductPriceTier";
 
 UPDATE "OrderItem" AS oi
 SET "priceTier" = CASE
@@ -14,10 +19,10 @@ SET "priceTier" = CASE
     THEN 'RATE_B'::"ProductPriceTier"
   ELSE 'RATE_A'::"ProductPriceTier"
 END
-FROM "Product" AS p
-JOIN "Order" AS o ON o.id = oi."orderId"
-JOIN "BusinessProfile" AS bp ON bp."userId" = o."buyerId"
-WHERE p.id = oi."productId";
+FROM "Product" AS p, "Order" AS o, "BusinessProfile" AS bp
+WHERE p.id = oi."productId"
+  AND o.id = oi."orderId"
+  AND bp."userId" = o."buyerId";
 
 UPDATE "OrderItem"
 SET "priceTier" = 'RATE_A'::"ProductPriceTier"
