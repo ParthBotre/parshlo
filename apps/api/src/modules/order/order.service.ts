@@ -51,7 +51,7 @@ const COURIER_PARTNER_NAMES: Record<
 const ADMIN_APPROVAL_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 function priceTierForBusinessType(businessType?: PrismaBusinessType | null): ProductPriceTier {
-  return businessType === 'PHARMACY' || businessType === 'HOSPITAL' ? 'RATE_B' : 'RATE_A';
+  return businessType === 'CHEMIST' ? 'RATE_B' : 'RATE_A';
 }
 
 @Injectable()
@@ -174,6 +174,7 @@ export class OrderService {
             productNameSnapshot: product.name.toUpperCase(),
             quantity: item.quantity,
             schemeFreeQuantity: freeQty,
+            priceTier: requestedTier,
             unitPricePaise: unit,
             discountPaise: discount,
             gstRate: product.gstRate,
@@ -519,10 +520,16 @@ export class OrderService {
       if (!order) {
         throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
       }
-      if (order.status !== 'RECEIVED' && order.status !== 'UNDER_REVIEW') {
+      const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+      const editableBeforeApproval = order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW';
+      const approvedRateEdit = order.status === 'APPROVED' && isSuperAdmin;
+      if (!editableBeforeApproval && !approvedRateEdit) {
         throw new BadRequestException({
-          code: 'ORDER_ALREADY_APPROVED',
-          message: 'Orders can be edited only before approval.',
+          code: 'ORDER_NOT_EDITABLE',
+          message:
+            order.status === 'APPROVED'
+              ? 'Only super admins can edit rates after approval.'
+              : 'Orders can be edited only before approval.',
         });
       }
       const businessProfile = order.buyer.businessProfile;
@@ -538,6 +545,30 @@ export class OrderService {
       });
       if (products.length !== productIds.length) {
         throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
+      }
+
+      if (approvedRateEdit) {
+        const existingByProductId = new Map(order.items.map((item) => [item.productId, item]));
+        if (existingByProductId.size !== input.items.length) {
+          throw new BadRequestException({
+            code: 'ORDER_APPROVED_RATE_ONLY',
+            message: 'Approved orders can only change existing item rate tiers.',
+          });
+        }
+        for (const item of input.items) {
+          const existing = existingByProductId.get(item.productId);
+          if (
+            !existing ||
+            existing.quantity !== item.quantity ||
+            existing.schemeFreeQuantity !== item.schemeFreeQuantity ||
+            existing.discountPaise !== BigInt(item.discountPaise)
+          ) {
+            throw new BadRequestException({
+              code: 'ORDER_APPROVED_RATE_ONLY',
+              message: 'Approved orders can only change existing item rate tiers.',
+            });
+          }
+        }
       }
 
       const defaultTier = priceTierForBusinessType(businessProfile.businessType);
@@ -573,6 +604,7 @@ export class OrderService {
           productNameSnapshot: product.name.toUpperCase(),
           quantity: item.quantity,
           schemeFreeQuantity: item.schemeFreeQuantity,
+          priceTier: requestedTier,
           unitPricePaise: unit,
           discountPaise: discount,
           gstRate: product.gstRate,
@@ -695,6 +727,7 @@ export class OrderService {
       unitPricePaise: bigint;
       schemeFreeQuantity: number;
       discountPaise: bigint;
+      priceTier: ProductPriceTier;
       gstRate: PrismaGstRate;
       lineSubtotalPaise: bigint;
       lineGstPaise: bigint;
@@ -708,6 +741,7 @@ export class OrderService {
       schemeFreeQuantity: i.schemeFreeQuantity,
       unitPricePaise: Number(i.unitPricePaise),
       discountPaise: Number(i.discountPaise),
+      priceTier: i.priceTier,
       gstRate: GST_RATE_MAP[i.gstRate],
       lineSubtotalPaise: Number(i.lineSubtotalPaise),
       lineGstPaise: Number(i.lineGstPaise),

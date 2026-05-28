@@ -43,12 +43,8 @@ enum AccountStatus {
 }
 
 enum BusinessType {
-  PHARMACY
   CHEMIST
   STOCKIST
-  DISTRIBUTOR
-  HOSPITAL
-  WHOLESALER
 }
 
 model User {
@@ -197,6 +193,11 @@ enum ProductStatus {
   OUT_OF_STOCK
 }
 
+enum ProductPriceTier {
+  RATE_A
+  RATE_B
+}
+
 enum GstRate {
   ZERO       // 0%
   FIVE       // 5%
@@ -238,9 +239,9 @@ model Product {
   /// Selected/base wholesale price retained for backwards-compatible clients.
   /// New pricing should prefer rateAPaise/rateBPaise.
   wholesalePricePaise BigInt
-  /// Rate A: PTS, used for chemists, stockists, wholesalers, distributors, and institutions.
+  /// Rate A: stockist rate.
   rateAPaise          BigInt @default(0)
-  /// Rate B: PTR, used for retail pharmacy buyers.
+  /// Rate B: chemist rate.
   rateBPaise          BigInt @default(0)
   mrpPaise            BigInt
   /// Display-only GST band. PTR/PTS already include GST.
@@ -370,6 +371,7 @@ model OrderItem {
   schemeFreeQuantity  Int    @default(0)
   unitPricePaise      BigInt
   discountPaise       BigInt @default(0)
+  priceTier           ProductPriceTier @default(RATE_A)
   gstRate             GstRate
   lineSubtotalPaise   BigInt
   lineGstPaise        BigInt

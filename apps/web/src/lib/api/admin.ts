@@ -82,6 +82,7 @@ const AdminOrderRow = z.object({
   buyerState: z.string().optional(),
   totalPaise: z.number(),
   itemCount: z.number(),
+  rateTierSummary: z.enum(['RATE_A', 'RATE_B', 'MIXED']),
   hasCourierReceipt: z.boolean().default(false),
   courierService: z.string().nullable().optional(),
   courierDocketNumber: z.string().nullable().optional(),

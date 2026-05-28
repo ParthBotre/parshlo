@@ -14,14 +14,7 @@ export const AccountStatus = z.enum([
 export type AccountStatus = z.infer<typeof AccountStatus>;
 
 /** Type of business entity registering as a B2B buyer. */
-export const BusinessType = z.enum([
-  'PHARMACY',
-  'CHEMIST',
-  'STOCKIST',
-  'DISTRIBUTOR',
-  'HOSPITAL',
-  'WHOLESALER',
-]);
+export const BusinessType = z.enum(['CHEMIST', 'STOCKIST']);
 export type BusinessType = z.infer<typeof BusinessType>;
 
 /** Public user profile (safe to expose). */

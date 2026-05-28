@@ -252,6 +252,7 @@ export class AdminService {
       buyerState: string;
       totalPaise: number;
       itemCount: number;
+      rateTierSummary: 'RATE_A' | 'RATE_B' | 'MIXED';
       hasCourierReceipt: boolean;
       courierService: string | null;
       courierDocketNumber: string | null;
@@ -264,6 +265,7 @@ export class AdminService {
       take: Math.min(filters.take ?? 500, 500),
       include: {
         _count: { select: { items: true } },
+        items: { select: { priceTier: true } },
         buyer: {
           select: {
             fullName: true,
@@ -272,24 +274,30 @@ export class AdminService {
         },
       },
     });
-    return orders.map((o) => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      buyerId: o.buyerId,
-      status: o.status,
-      placedAt: o.placedAt.toISOString(),
-      buyerBusinessName: o.buyerBusinessName,
-      buyerFullName: o.buyer.fullName,
-      buyerGstin: o.buyerGstin,
-      buyerCity: o.buyer.businessProfile?.city.trim() ?? 'Unknown',
-      buyerState: o.buyer.businessProfile?.state.trim() ?? 'Unknown',
-      totalPaise: Number(o.totalPaise),
-      itemCount: o._count.items,
-      hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
-      courierService: o.courierService,
-      courierDocketNumber: o.courierDocketNumber,
-      courierTrackingUpdatedAt: o.courierTrackingUpdatedAt?.toISOString() ?? null,
-    }));
+    return orders.map((o) => {
+      const tiers = new Set(o.items.map((item) => item.priceTier));
+      const rateTierSummary =
+        tiers.size === 1 && o.items[0] ? o.items[0].priceTier : ('MIXED' as const);
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        buyerId: o.buyerId,
+        status: o.status,
+        placedAt: o.placedAt.toISOString(),
+        buyerBusinessName: o.buyerBusinessName,
+        buyerFullName: o.buyer.fullName,
+        buyerGstin: o.buyerGstin,
+        buyerCity: o.buyer.businessProfile?.city.trim() ?? 'Unknown',
+        buyerState: o.buyer.businessProfile?.state.trim() ?? 'Unknown',
+        totalPaise: Number(o.totalPaise),
+        itemCount: o._count.items,
+        rateTierSummary,
+        hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
+        courierService: o.courierService,
+        courierDocketNumber: o.courierDocketNumber,
+        courierTrackingUpdatedAt: o.courierTrackingUpdatedAt?.toISOString() ?? null,
+      };
+    });
   }
 
   async listBuyers(): Promise<BuyerRow[]> {

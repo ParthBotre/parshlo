@@ -103,7 +103,7 @@ function ProductCard({ product }: { product: BuyerProductView }): JSX.Element {
             {product.form} · {product.packaging}
           </p>
           <Field
-            label={product.priceTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'}
+            label={product.priceTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'}
             value={formatINR(product.wholesalePricePaise)}
             mono
           />

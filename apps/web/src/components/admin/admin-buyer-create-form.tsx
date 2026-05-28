@@ -29,7 +29,7 @@ type BuyerFormValues = z.input<typeof FormSchema>;
 const DEFAULT_VALUES: BuyerFormValues = {
   businessName: '',
   ownerName: '',
-  businessType: 'PHARMACY',
+  businessType: 'CHEMIST',
   gstin: '',
   pan: '',
   drugLicenseNumber: '',

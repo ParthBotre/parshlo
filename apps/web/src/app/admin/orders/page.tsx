@@ -149,6 +149,12 @@ function ordersHref(status: string | undefined, period: OrderPeriod): string {
   return query ? `/admin/orders?${query}` : '/admin/orders';
 }
 
+function rateTierLabel(tier: AdminOrder['rateTierSummary']): string {
+  if (tier === 'RATE_A') return 'Rate A';
+  if (tier === 'RATE_B') return 'Rate B';
+  return 'Mixed';
+}
+
 export default async function AdminOrdersPage({ searchParams }: PageProps): Promise<JSX.Element> {
   const { status, period: rawPeriod } = await searchParams;
   const period = isOrderPeriod(rawPeriod) ? rawPeriod : 'month';
@@ -241,13 +247,14 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                       </p>
                     </div>
                     <div className="w-full max-w-full overflow-x-auto">
-                      <table className="w-full min-w-[980px] text-sm">
+                      <table className="w-full min-w-[1040px] text-sm">
                         <thead className="text-muted-foreground text-left text-xs uppercase tracking-wider">
                           <tr>
                             <th className="whitespace-nowrap px-4 py-3">Order #</th>
                             <th className="whitespace-nowrap px-4 py-3">Buyer</th>
                             <th className="whitespace-nowrap px-4 py-3">GSTIN</th>
                             <th className="whitespace-nowrap px-4 py-3">Status</th>
+                            <th className="whitespace-nowrap px-4 py-3">Rate</th>
                             <th className="whitespace-nowrap px-4 py-3">Placed</th>
                             <th className="whitespace-nowrap px-4 py-3 text-right">Total</th>
                             <th className="whitespace-nowrap px-4 py-3">Shipment</th>
@@ -274,6 +281,9 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                                 <Badge variant="secondary">
                                   {orderStatusLabel(o.status as OrderStatus)}
                                 </Badge>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                                {rateTierLabel(o.rateTierSummary)}
                               </td>
                               <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
                                 {formatCalendarDate(new Date(o.placedAt), {

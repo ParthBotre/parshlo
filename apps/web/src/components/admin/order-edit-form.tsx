@@ -1,6 +1,6 @@
 'use client';
 
-import { type OrderView } from '@parshlo/types';
+import { type OrderView, type ProductPriceTier } from '@parshlo/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -8,46 +8,64 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatINR } from '@/lib/utils';
 
+interface EditableOrderItem {
+  productId: string;
+  productName: string;
+  quantity: string;
+  schemeFreeQuantity: string;
+  discountRupees: string;
+  priceTier: ProductPriceTier;
+  unitPricePaise: number;
+  gstRate: string;
+}
+
+function rateTierLabel(tier: ProductPriceTier): string {
+  return tier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)';
+}
+
 export function OrderEditForm({
   order,
   canEdit,
+  canEditApprovedRates,
 }: {
   order: OrderView;
   canEdit: boolean;
+  canEditApprovedRates: boolean;
 }): JSX.Element {
   const router = useRouter();
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(order.purchaseOrderNumber ?? '');
   const [notes, setNotes] = useState(order.notes ?? '');
-  const [items, setItems] = useState(
+  const [items, setItems] = useState<EditableOrderItem[]>(
     order.items.map((item) => ({
       productId: item.productId,
       productName: item.productName,
       quantity: String(item.quantity),
       schemeFreeQuantity: String(item.schemeFreeQuantity),
       discountRupees: (item.discountPaise / 100).toFixed(2),
+      priceTier: item.priceTier,
       unitPricePaise: item.unitPricePaise,
       gstRate: item.gstRate,
     })),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const editable = canEdit && (order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW');
+  const editableBeforeApproval =
+    canEdit && (order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW');
+  const approvedRateOnly = canEditApprovedRates && order.status === 'APPROVED';
+  const editable = editableBeforeApproval || approvedRateOnly;
 
   if (!editable) {
     return (
       <p className="text-muted-foreground text-sm">
-        Orders can be edited by admins only before approval.
+        Orders can be edited by admins before approval. Approved order rates can be changed by super
+        admins only.
       </p>
     );
   }
 
-  const updateItem = (
-    productId: string,
-    field: 'quantity' | 'schemeFreeQuantity' | 'discountRupees',
-    value: string,
-  ): void => {
+  const updateItem = (productId: string, patch: Partial<EditableOrderItem>): void => {
     setItems((current) =>
-      current.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
+      current.map((item) => (item.productId === productId ? { ...item, ...patch } : item)),
     );
   };
 
@@ -63,6 +81,7 @@ export function OrderEditForm({
           quantity: Number.parseInt(item.quantity, 10),
           schemeFreeQuantity: Number.parseInt(item.schemeFreeQuantity || '0', 10),
           discountPaise: Math.round(Number.parseFloat(item.discountRupees || '0') * 100),
+          priceTier: item.priceTier,
         })),
       };
       const res = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
@@ -114,7 +133,8 @@ export function OrderEditForm({
               <th className="px-4 py-3 text-right">Paid qty</th>
               <th className="px-4 py-3 text-right">Free</th>
               <th className="px-4 py-3 text-right">Discount</th>
-              <th className="px-4 py-3 text-right">Rate</th>
+              <th className="px-4 py-3">Rate tier</th>
+              <th className="px-4 py-3 text-right">Current unit</th>
               <th className="px-4 py-3 text-right">GST Rate</th>
             </tr>
           </thead>
@@ -130,8 +150,9 @@ export function OrderEditForm({
                     min={1}
                     inputMode="numeric"
                     value={item.quantity}
+                    disabled={approvedRateOnly}
                     onChange={(event) =>
-                      updateItem(item.productId, 'quantity', event.currentTarget.value)
+                      updateItem(item.productId, { quantity: event.currentTarget.value })
                     }
                     className="border-input bg-background ml-auto h-9 w-24 rounded-md border px-2 text-right font-mono"
                   />
@@ -142,8 +163,9 @@ export function OrderEditForm({
                     min={0}
                     inputMode="numeric"
                     value={item.schemeFreeQuantity}
+                    disabled={approvedRateOnly}
                     onChange={(event) =>
-                      updateItem(item.productId, 'schemeFreeQuantity', event.currentTarget.value)
+                      updateItem(item.productId, { schemeFreeQuantity: event.currentTarget.value })
                     }
                     className="border-input bg-background ml-auto h-9 w-24 rounded-md border px-2 text-right font-mono"
                   />
@@ -155,11 +177,26 @@ export function OrderEditForm({
                     step="0.01"
                     inputMode="decimal"
                     value={item.discountRupees}
+                    disabled={approvedRateOnly}
                     onChange={(event) =>
-                      updateItem(item.productId, 'discountRupees', event.currentTarget.value)
+                      updateItem(item.productId, { discountRupees: event.currentTarget.value })
                     }
                     className="border-input bg-background ml-auto h-9 w-28 rounded-md border px-2 text-right font-mono"
                   />
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={item.priceTier}
+                    onChange={(event) =>
+                      updateItem(item.productId, {
+                        priceTier: event.currentTarget.value === 'RATE_B' ? 'RATE_B' : 'RATE_A',
+                      })
+                    }
+                    className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                  >
+                    <option value="RATE_A">{rateTierLabel('RATE_A')}</option>
+                    <option value="RATE_B">{rateTierLabel('RATE_B')}</option>
+                  </select>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
                   {formatINR(item.unitPricePaise)}
@@ -179,9 +216,16 @@ export function OrderEditForm({
         </p>
       ) : null}
 
+      {approvedRateOnly ? (
+        <p className="text-muted-foreground text-xs">
+          Approved orders allow rate-tier changes only. Quantities, free units, and discounts stay
+          locked.
+        </p>
+      ) : null}
+
       <Button onClick={() => void submit()} disabled={submitting}>
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Save order edits
+        {approvedRateOnly ? 'Save rate changes' : 'Save order edits'}
       </Button>
     </div>
   );

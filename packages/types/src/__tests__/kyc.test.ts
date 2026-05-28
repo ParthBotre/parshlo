@@ -10,7 +10,7 @@ import {
 const validApplication = {
   businessName: 'Apex Pharmacy Pvt Ltd',
   ownerName: 'Rajesh Kumar',
-  businessType: 'PHARMACY' as const,
+  businessType: 'CHEMIST' as const,
   gstin: '29AAFCA1234A1Z5',
   drugLicenseNumber: 'KA-BLR-20A-12345',
   pharmacyRegistrationNumber: 'KSPC-2018-9876',
@@ -29,7 +29,7 @@ describe('RegisterBusinessInput', () => {
   const valid = {
     businessName: 'Apex Pharmacy Pvt Ltd',
     ownerName: 'Rajesh Kumar',
-    businessType: 'PHARMACY',
+    businessType: 'CHEMIST',
     gstin: '29AAFCA1234A1Z5',
     drugLicenseNumber: 'KA-BLR-20A-12345',
     pharmacyRegistrationNumber: 'KSPC-2018-9876',
@@ -60,7 +60,7 @@ describe('RegisterBusinessInput', () => {
 
   it('rejects unknown business types', () => {
     expect(() =>
-      RegisterBusinessInput.parse({ ...valid, businessType: 'GROCERY' as unknown as 'PHARMACY' }),
+      RegisterBusinessInput.parse({ ...valid, businessType: 'GROCERY' as never }),
     ).toThrow();
   });
 

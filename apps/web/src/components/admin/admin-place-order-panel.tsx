@@ -29,7 +29,7 @@ function canPlaceForBuyer(b: AdminBuyer): boolean {
 }
 
 function priceTierForBusinessType(businessType?: string | null): BuyerProductView['priceTier'] {
-  return businessType === 'PHARMACY' || businessType === 'HOSPITAL' ? 'RATE_B' : 'RATE_A';
+  return businessType === 'CHEMIST' ? 'RATE_B' : 'RATE_A';
 }
 
 export function AdminPlaceOrderPanel({
@@ -241,8 +241,9 @@ function AdminProductCard({
           {product.form} · {product.packaging}
         </p>
         <p className="text-muted-foreground text-xs">
-          {formatINR(defaultPrice)} · {defaultTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} ·
-          GST Rate ({product.gstRate}%) included in price
+          {formatINR(defaultPrice)} ·{' '}
+          {defaultTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'} · GST Rate (
+          {product.gstRate}%) included in price
         </p>
         <div className="mt-auto pt-1">
           {inCart ? (

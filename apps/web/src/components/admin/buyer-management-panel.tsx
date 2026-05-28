@@ -42,7 +42,7 @@ function initialState(buyer: AdminBuyer): BuyerFormState {
   return {
     businessName: buyer.businessName ?? '',
     ownerName: buyer.fullName,
-    businessType: buyer.businessType ?? 'PHARMACY',
+    businessType: buyer.businessType ?? 'CHEMIST',
     accountStatus: buyer.accountStatus,
     gstin: buyer.gstin ?? '',
     pan: buyer.pan ?? '',

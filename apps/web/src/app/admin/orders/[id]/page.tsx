@@ -93,6 +93,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
   const canApproveOrClose = session.user.roles.some(
     (role) => role === 'ADMIN' || role === 'SUPER_ADMIN',
   );
+  const canEditApprovedRates = session.user.roles.includes('SUPER_ADMIN');
   const canManageShipment = canApproveOrClose;
   const canDeleteOrder = canApproveOrClose;
 
@@ -130,9 +131,13 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
           <Card>
             <CardContent className="space-y-4 p-6">
               <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
-                Edit order before approval
+                Edit order
               </h2>
-              <OrderEditForm order={order} canEdit={canApproveOrClose} />
+              <OrderEditForm
+                order={order}
+                canEdit={canApproveOrClose}
+                canEditApprovedRates={canEditApprovedRates}
+              />
             </CardContent>
           </Card>
           <Card>
@@ -233,6 +238,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                   <th className="whitespace-nowrap px-5 py-3">Product</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Qty</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Free</th>
+                  <th className="whitespace-nowrap px-5 py-3">Rate</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Discount</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">GST Rate</th>
@@ -250,6 +256,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {line.schemeFreeQuantity}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-xs font-semibold">
+                      {line.priceTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.unitPricePaise)}

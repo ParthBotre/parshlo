@@ -94,8 +94,8 @@ export function AdminCartDrawer({
                       <p className="truncate text-sm font-medium">{line.name.toUpperCase()}</p>
                       <p className="text-muted-foreground text-xs">
                         {formatINR(line.unitPricePaise)} each ·{' '}
-                        {line.priceTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} · GST GST
-                        Rate ({line.gstRate}%) included in price
+                        {line.priceTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'} ·
+                        GST Rate ({line.gstRate}%) included in price
                       </p>
                     </div>
                     <Button
@@ -125,10 +125,10 @@ export function AdminCartDrawer({
                       className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
                     >
                       <option value="RATE_A">
-                        Rate A (PTS) · {formatINR(line.rateAPaise ?? line.unitPricePaise)}
+                        Rate A (Stockist) · {formatINR(line.rateAPaise ?? line.unitPricePaise)}
                       </option>
                       <option value="RATE_B">
-                        Rate B (PTR) · {formatINR(line.rateBPaise ?? line.unitPricePaise)}
+                        Rate B (Chemist) · {formatINR(line.rateBPaise ?? line.unitPricePaise)}
                       </option>
                     </select>
                   </label>

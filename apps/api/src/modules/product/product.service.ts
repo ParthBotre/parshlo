@@ -31,7 +31,7 @@ const GST_RATE_TO_PRISMA: Record<GstRate, PrismaGstRate> = {
 const ADMIN_ONLY_PRODUCT_SLUGS = ['tremecya-tab', 'tremecya-d-tab'] as const;
 
 export function priceTierForBusinessType(businessType?: BusinessType | null): ProductPriceTier {
-  return businessType === 'PHARMACY' || businessType === 'HOSPITAL' ? 'RATE_B' : 'RATE_A';
+  return businessType === 'CHEMIST' ? 'RATE_B' : 'RATE_A';
 }
 
 @Injectable()

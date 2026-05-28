@@ -86,8 +86,8 @@ export function CartDrawer({
                       <p className="truncate text-sm font-medium">{line.name.toUpperCase()}</p>
                       <p className="text-muted-foreground text-xs">
                         {formatINR(line.unitPricePaise)} each ·{' '}
-                        {line.priceTier === 'RATE_B' ? 'Rate B (PTR)' : 'Rate A (PTS)'} · GST GST
-                        Rate ({line.gstRate}%) included in price
+                        {line.priceTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'} ·
+                        GST Rate ({line.gstRate}%) included in price
                       </p>
                     </div>
                     <Button

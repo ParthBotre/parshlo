@@ -245,7 +245,7 @@ export function ProductManagement({
                 required
               />
             </Field>
-            <Field id="product-rate-a" label="Rate A PTS (₹)">
+            <Field id="product-rate-a" label="Rate A Stockist (₹)">
               <Input
                 id="product-rate-a"
                 type="number"
@@ -258,7 +258,7 @@ export function ProductManagement({
                 required
               />
             </Field>
-            <Field id="product-rate-b" label="Rate B PTR (₹)">
+            <Field id="product-rate-b" label="Rate B Chemist (₹)">
               <Input
                 id="product-rate-b"
                 type="number"
@@ -356,8 +356,8 @@ export function ProductManagement({
             <tr>
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Rate A</th>
-              <th className="px-4 py-3">Rate B</th>
+              <th className="px-4 py-3">Rate A Stockist</th>
+              <th className="px-4 py-3">Rate B Chemist</th>
               <th className="px-4 py-3">MRP</th>
               <th className="px-4 py-3">GST</th>
               <th className="px-4 py-3">Action</th>
