@@ -147,6 +147,18 @@ function displayConsignmentStatus(consignment: Consignment) {
   return consignment.statement?.status === 'PAID' ? 'PAID' : consignment.status;
 }
 
+function isPendingShipmentAmount(consignment: Consignment): boolean {
+  return (
+    consignment.type === 'OUTGOING' &&
+    Boolean(consignment.associatedOrderNumber) &&
+    BigInt(consignment.amountPaise) === 0n
+  );
+}
+
+function consignmentAmountLabel(consignment: Consignment): string {
+  return isPendingShipmentAmount(consignment) ? 'Pending' : paise(consignment.amountPaise);
+}
+
 function toConsignmentType(value: string): ConsignmentType {
   return value === 'INCOMING' ? 'INCOMING' : 'OUTGOING';
 }
@@ -580,7 +592,9 @@ export default function LogisticsPageClient({
       type: toConsignmentType(consignment.type),
       docketNumber: consignment.docketNumber,
       consignmentDate: dateInputFromBusinessIso(consignment.consignmentDate),
-      amountRupees: String(Number(consignment.amountPaise) / 100),
+      amountRupees: isPendingShipmentAmount(consignment)
+        ? ''
+        : String(Number(consignment.amountPaise) / 100),
       weightKg: consignment.weightKg === null ? '' : String(consignment.weightKg),
       boxCount: String(consignment.boxCount),
       associatedOrderNumber: consignment.associatedOrderNumber ?? '',
@@ -974,7 +988,7 @@ export default function LogisticsPageClient({
                                     {c.docketNumber}
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
-                                    {paise(c.amountPaise)}
+                                    {consignmentAmountLabel(c)}
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-3 text-right">
                                     {c.weightKg ?? '—'}

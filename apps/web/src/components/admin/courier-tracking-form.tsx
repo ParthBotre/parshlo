@@ -17,8 +17,11 @@ import {
 } from '@/lib/courier-services';
 import { courierTrackingDateLabel } from '@/lib/courier-tracking-dates';
 
-function rupeesToPaise(input: string): number | null {
+function optionalRupeesToPaise(input: string): number | null | undefined {
   const trimmed = input.trim();
+  if (!trimmed) {
+    return undefined;
+  }
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
     return null;
   }
@@ -67,9 +70,9 @@ export function CourierTrackingForm({
       setError('Enter a docket number.');
       return;
     }
-    const freightAmountPaise = rupeesToPaise(freightAmount);
-    if (freightAmountPaise == null) {
-      setError('Enter a valid cost/price with up to two decimal places.');
+    const freightAmountPaise = optionalRupeesToPaise(freightAmount);
+    if (freightAmountPaise === null) {
+      setError('Enter a valid courier amount with up to two decimal places, or leave it blank.');
       return;
     }
     const parsedWeightKg = weightKg.trim() ? parsePositiveDecimal(weightKg) : undefined;
@@ -99,7 +102,7 @@ export function CourierTrackingForm({
         body: JSON.stringify({
           courierService: service,
           docketNumber: trimmed,
-          freightAmountPaise,
+          ...(freightAmountPaise === undefined ? {} : { freightAmountPaise }),
           weightKg: parsedWeightKg,
           boxCount: parsedBoxCount,
         }),
@@ -203,11 +206,11 @@ export function CourierTrackingForm({
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="courier-freight">Cost/Price</Label>
+              <Label htmlFor="courier-freight">Courier amount (optional)</Label>
               <Input
                 id="courier-freight"
                 inputMode="decimal"
-                placeholder="100.49"
+                placeholder="Leave blank until billed"
                 value={freightAmount}
                 disabled={busy}
                 onChange={(e) => setFreightAmount(e.target.value)}

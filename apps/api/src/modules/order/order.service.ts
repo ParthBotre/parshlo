@@ -352,7 +352,7 @@ export class OrderService {
     input: {
       courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA';
       docketNumber: string;
-      freightAmountPaise: number;
+      freightAmountPaise?: number;
       weightKg?: number;
       boxCount: number;
     },
@@ -400,6 +400,8 @@ export class OrderService {
 
       const trackingSetAt = order.courierTrackingSetAt ?? now;
       const consignmentDate = order.dispatchedAt ?? trackingSetAt;
+      const freightAmountPaise =
+        input.freightAmountPaise === undefined ? undefined : BigInt(input.freightAmountPaise);
 
       if (existingForOrder) {
         await tx.adminConsignmentLog.update({
@@ -408,7 +410,7 @@ export class OrderService {
             courierId: courier.id,
             docketNumber: input.docketNumber,
             consignmentDate,
-            amountPaise: BigInt(input.freightAmountPaise),
+            amountPaise: freightAmountPaise ?? existingForOrder.amountPaise,
             weightKg: input.weightKg,
             boxCount: input.boxCount,
             associatedPoNumber: order.purchaseOrderNumber,
@@ -421,7 +423,7 @@ export class OrderService {
             type: 'OUTGOING',
             docketNumber: input.docketNumber,
             consignmentDate,
-            amountPaise: BigInt(input.freightAmountPaise),
+            amountPaise: freightAmountPaise ?? 0n,
             weightKg: input.weightKg,
             boxCount: input.boxCount,
             associatedOrderNumber: order.orderNumber,
