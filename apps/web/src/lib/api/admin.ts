@@ -1,16 +1,22 @@
 import {
   AdminCreateEmployeeInputSchema,
   AdminEmployeeView,
+  CreateLeaveRequestInputSchema,
+  EmployeeLeaveDashboardView,
+  EmployeeLeaveRequestView,
   AdminProductView,
   ApiErrorResponse,
   OrderView,
   ProductWriteInput,
+  ReviewLeaveRequestInputSchema,
   type AdminCreateEmployeeInput,
   type AdminCreateBuyerInput,
+  type CreateLeaveRequestInput,
   type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type PlaceOrderOnBehalfInput,
   type ProductWriteInput as ProductWriteInputType,
+  type ReviewLeaveRequestInput,
   type UpdateOrderBeforeApprovalInput,
 } from '@parshlo/types';
 import { z } from 'zod';
@@ -162,6 +168,7 @@ const AdminBuyerDetail = AdminBuyerRow.extend({
 
 const AdminEmployeeList = z.array(AdminEmployeeView);
 const AdminProductList = z.array(AdminProductView);
+const LeaveDashboard = EmployeeLeaveDashboardView;
 
 export function listPendingKyc(
   accessToken: string,
@@ -340,6 +347,8 @@ export type AdminBuyer = z.infer<typeof AdminBuyerRow>;
 
 export type AdminEmployee = z.infer<typeof AdminEmployeeView>;
 export type AdminProduct = z.infer<typeof AdminProductView>;
+export type EmployeeLeaveDashboard = z.infer<typeof EmployeeLeaveDashboardView>;
+export type EmployeeLeaveRequest = z.infer<typeof EmployeeLeaveRequestView>;
 
 export function listEmployees(
   accessToken: string,
@@ -377,6 +386,48 @@ export function updateEmployee(
     body: input,
     ...options,
   });
+}
+
+export function getLeaveDashboard(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<EmployeeLeaveDashboard> {
+  return apiCall('/v1/admin/leave-requests', LeaveDashboard, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function createLeaveRequest(
+  accessToken: string,
+  input: CreateLeaveRequestInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<EmployeeLeaveRequest> {
+  return apiCall('/v1/admin/leave-requests', EmployeeLeaveRequestView, {
+    method: 'POST',
+    accessToken,
+    body: CreateLeaveRequestInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function reviewLeaveRequest(
+  accessToken: string,
+  id: string,
+  input: ReviewLeaveRequestInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<EmployeeLeaveRequest> {
+  return apiCall(
+    `/v1/admin/leave-requests/${encodeURIComponent(id)}/review`,
+    EmployeeLeaveRequestView,
+    {
+      method: 'PATCH',
+      accessToken,
+      body: ReviewLeaveRequestInputSchema.parse(input),
+      ...options,
+    },
+  );
 }
 
 export function listAdminProducts(

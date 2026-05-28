@@ -16,20 +16,24 @@ import {
   AttachCourierReceiptInput,
   AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
+  CreateLeaveRequestInputSchema,
   AdminUpdateBuyerInputSchema,
   AdminUpdateEmployeeInputSchema,
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
   ProductWriteInput,
+  ReviewLeaveRequestInputSchema,
   UpdateCourierTrackingInput,
   UpdateOrderBeforeApprovalInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type CreateLeaveRequestInput,
   type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type AuthPrincipal,
   type OrderStatus,
   type OrderView,
+  type ReviewLeaveRequestInput,
 } from '@parshlo/types';
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
@@ -319,6 +323,44 @@ export class AdminController {
     body: AdminUpdateEmployeeInput,
   ): ReturnType<AdminService['updateEmployee']> {
     return this.admin.updateEmployee(id, body, user.userId);
+  }
+
+  @Get('leave-requests')
+  leaveRequests(@CurrentUser() user: AuthPrincipal): ReturnType<AdminService['leaveDashboard']> {
+    return this.admin.leaveDashboard(user.userId, user.roles);
+  }
+
+  @Post('leave-requests')
+  @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
+  @Audit({
+    action: 'leave.request.create',
+    resource: 'EmployeeLeaveRequest',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+  })
+  createLeaveRequest(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(CreateLeaveRequestInputSchema))
+    body: CreateLeaveRequestInput,
+  ): ReturnType<AdminService['createLeaveRequest']> {
+    return this.admin.createLeaveRequest(user.userId, user.roles, body);
+  }
+
+  @Patch('leave-requests/:id/review')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'leave.request.review',
+    resource: 'EmployeeLeaveRequest',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  reviewLeaveRequest(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ReviewLeaveRequestInputSchema))
+    body: ReviewLeaveRequestInput,
+  ): ReturnType<AdminService['reviewLeaveRequest']> {
+    return this.admin.reviewLeaveRequest(id, user.userId, body);
   }
 
   @Get('products')

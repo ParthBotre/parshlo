@@ -8,11 +8,16 @@ import { type Prisma } from '@parshlo/db';
 import {
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type CreateLeaveRequestInput,
   type AdminUpdateBuyerInput,
   type AdminEmployeeView,
   type AdminUpdateEmployeeInput,
   type EmployeeRole,
+  type EmployeeLeaveBalanceView,
+  type EmployeeLeaveDashboardView,
+  type EmployeeLeaveRequestView,
   type OrderStatus,
+  type ReviewLeaveRequestInput,
 } from '@parshlo/types';
 
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -33,6 +38,7 @@ const BUYER_ANALYTICS_PERIODS = ['day', 'week', 'month', 'year'] as const;
 type BuyerAnalyticsPeriod = (typeof BUYER_ANALYTICS_PERIODS)[number];
 
 const EMPLOYEE_ROLES: EmployeeRole[] = ['SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
+const EMPLOYEE_LEAVE_ENTITLEMENT_DAYS = 30;
 
 interface BuyerPeriodSummary {
   orderCount: number;
@@ -74,6 +80,27 @@ interface BuyerRow {
   country: string | null;
   createdAt: string;
   orderSummary: BuyerOrderSummary;
+}
+
+function parseDateOnly(value: string): Date {
+  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10));
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function formatDateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function inclusiveDayCount(start: Date, end: Date): number {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1;
+}
+
+function yearBounds(year: number): { start: Date; end: Date } {
+  return {
+    start: new Date(Date.UTC(year, 0, 1)),
+    end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
+  };
 }
 
 interface BuyerRecentOrder {
@@ -822,6 +849,254 @@ export class AdminService {
       },
     });
     return this.toEmployeeView(employee);
+  }
+
+  async leaveDashboard(actorId: string, actorRoles: string[]): Promise<EmployeeLeaveDashboardView> {
+    const canReview = actorRoles.includes('SUPER_ADMIN');
+    const year = new Date().getUTCFullYear();
+    const requests = await this.prisma.employeeLeaveRequest.findMany({
+      where: canReview ? {} : { employeeId: actorId },
+      include: {
+        employee: { select: { id: true, fullName: true, email: true } },
+        reviewedBy: { select: { id: true, fullName: true } },
+      },
+      orderBy: [{ status: 'asc' }, { startDate: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    return {
+      currentUserId: actorId,
+      canReview,
+      balance: await this.leaveBalance(actorId, year),
+      requests: requests.map((request) => this.toLeaveRequestView(request)),
+    };
+  }
+
+  async createLeaveRequest(
+    actorId: string,
+    actorRoles: string[],
+    input: CreateLeaveRequestInput,
+  ): Promise<EmployeeLeaveRequestView> {
+    this.assertEmployeeRole(actorRoles);
+
+    const startDate = parseDateOnly(input.startDate);
+    const endDate = parseDateOnly(input.endDate);
+    const year = startDate.getUTCFullYear();
+    if (endDate.getUTCFullYear() !== year) {
+      throw new BadRequestException({
+        code: 'LEAVE_SINGLE_YEAR_REQUIRED',
+        message: 'Leave requests must stay within one calendar year.',
+      });
+    }
+
+    const dayCount = inclusiveDayCount(startDate, endDate);
+    if (dayCount <= 0) {
+      throw new BadRequestException({ code: 'LEAVE_DATE_RANGE_INVALID' });
+    }
+
+    const balance = await this.leaveBalance(actorId, year);
+    if (dayCount > balance.remainingDays) {
+      throw new BadRequestException({
+        code: 'LEAVE_BALANCE_EXCEEDED',
+        message: `Only ${balance.remainingDays} PTO day(s) are available for ${year}.`,
+      });
+    }
+
+    const overlapping = await this.prisma.employeeLeaveRequest.count({
+      where: {
+        employeeId: actorId,
+        status: { in: ['PENDING', 'APPROVED'] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+    });
+    if (overlapping > 0) {
+      throw new ConflictException({
+        code: 'LEAVE_REQUEST_OVERLAPS',
+        message: 'This leave overlaps an existing pending or approved request.',
+      });
+    }
+
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.employeeLeaveRequest.create({
+        data: {
+          employeeId: actorId,
+          startDate,
+          endDate,
+          dayCount,
+          reason: input.reason?.trim() ?? null,
+        },
+        include: {
+          employee: { select: { id: true, fullName: true, email: true } },
+          reviewedBy: { select: { id: true, fullName: true } },
+        },
+      });
+
+      await tx.notificationLog.create({
+        data: {
+          channel: 'EMAIL',
+          kind: 'leave.request.created',
+          recipient: 'SUPER_ADMIN',
+          status: 'PENDING',
+          metadata: {
+            leaveRequestId: created.id,
+            employeeId: actorId,
+            employeeName: created.employee.fullName,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            dayCount,
+          },
+        },
+      });
+
+      return created;
+    });
+
+    return this.toLeaveRequestView(request);
+  }
+
+  async reviewLeaveRequest(
+    id: string,
+    actorId: string,
+    input: ReviewLeaveRequestInput,
+  ): Promise<EmployeeLeaveRequestView> {
+    const now = new Date();
+    const existing = await this.prisma.employeeLeaveRequest.findUnique({
+      where: { id },
+      include: {
+        employee: { select: { id: true, fullName: true, email: true } },
+        reviewedBy: { select: { id: true, fullName: true } },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'LEAVE_REQUEST_NOT_FOUND' });
+    }
+    if (existing.status !== 'PENDING') {
+      throw new BadRequestException({
+        code: 'LEAVE_REQUEST_ALREADY_REVIEWED',
+        message: 'Only pending leave requests can be approved or rejected.',
+      });
+    }
+
+    if (input.status === 'APPROVED') {
+      const balance = await this.leaveBalance(
+        existing.employeeId,
+        existing.startDate.getUTCFullYear(),
+      );
+      if (existing.dayCount > balance.entitlementDays - balance.approvedDays) {
+        throw new BadRequestException({
+          code: 'LEAVE_BALANCE_EXCEEDED',
+          message: `Only ${balance.remainingDays} PTO day(s) are available.`,
+        });
+      }
+    }
+
+    const request = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.employeeLeaveRequest.update({
+        where: { id },
+        data: {
+          status: input.status,
+          reviewedById: actorId,
+          reviewedAt: now,
+          reviewerNote: input.reviewerNote?.trim() ?? null,
+        },
+        include: {
+          employee: { select: { id: true, fullName: true, email: true } },
+          reviewedBy: { select: { id: true, fullName: true } },
+        },
+      });
+
+      await tx.notificationLog.create({
+        data: {
+          channel: 'EMAIL',
+          kind: input.status === 'APPROVED' ? 'leave.request.approved' : 'leave.request.rejected',
+          recipient: updated.employee.email,
+          status: 'PENDING',
+          metadata: {
+            leaveRequestId: updated.id,
+            employeeId: updated.employeeId,
+            employeeName: updated.employee.fullName,
+            status: input.status,
+            startDate: formatDateOnly(updated.startDate),
+            endDate: formatDateOnly(updated.endDate),
+            dayCount: updated.dayCount,
+          },
+        },
+      });
+
+      return updated;
+    });
+
+    return this.toLeaveRequestView(request);
+  }
+
+  private assertEmployeeRole(roles: string[]): void {
+    if (!roles.some((role) => EMPLOYEE_ROLES.includes(role as EmployeeRole))) {
+      throw new BadRequestException({ code: 'EMPLOYEE_ROLE_REQUIRED' });
+    }
+  }
+
+  private async leaveBalance(employeeId: string, year: number): Promise<EmployeeLeaveBalanceView> {
+    const bounds = yearBounds(year);
+    const requests = await this.prisma.employeeLeaveRequest.findMany({
+      where: {
+        employeeId,
+        startDate: { gte: bounds.start },
+        endDate: { lte: bounds.end },
+        status: { in: ['PENDING', 'APPROVED'] },
+      },
+      select: { status: true, dayCount: true },
+    });
+
+    const approvedDays = requests
+      .filter((request) => request.status === 'APPROVED')
+      .reduce((total, request) => total + request.dayCount, 0);
+    const pendingDays = requests
+      .filter((request) => request.status === 'PENDING')
+      .reduce((total, request) => total + request.dayCount, 0);
+
+    return {
+      employeeId,
+      year,
+      entitlementDays: EMPLOYEE_LEAVE_ENTITLEMENT_DAYS,
+      approvedDays,
+      pendingDays,
+      remainingDays: Math.max(0, EMPLOYEE_LEAVE_ENTITLEMENT_DAYS - approvedDays - pendingDays),
+    };
+  }
+
+  private toLeaveRequestView(request: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string; email: string };
+    startDate: Date;
+    endDate: Date;
+    dayCount: number;
+    reason: string | null;
+    status: string;
+    reviewedById: string | null;
+    reviewedBy: { fullName: string } | null;
+    reviewedAt: Date | null;
+    reviewerNote: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): EmployeeLeaveRequestView {
+    return {
+      id: request.id,
+      employeeId: request.employeeId,
+      employeeName: request.employee.fullName,
+      employeeEmail: request.employee.email,
+      startDate: formatDateOnly(request.startDate),
+      endDate: formatDateOnly(request.endDate),
+      dayCount: request.dayCount,
+      reason: request.reason,
+      status: request.status as EmployeeLeaveRequestView['status'],
+      reviewedById: request.reviewedById,
+      reviewedByName: request.reviewedBy?.fullName ?? null,
+      reviewedAt: request.reviewedAt?.toISOString() ?? null,
+      reviewerNote: request.reviewerNote,
+      createdAt: request.createdAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+    };
   }
 
   async listPendingKyc(): Promise<

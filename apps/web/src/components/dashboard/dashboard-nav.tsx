@@ -2,6 +2,7 @@
 
 import {
   BadgeCheck,
+  CalendarDays,
   LayoutDashboard,
   type LucideIcon,
   Package,
@@ -30,6 +31,7 @@ const ICONS = {
   'place-order': ShoppingCart,
   logistics: Truck,
   employees: ShieldCheck,
+  holidays: CalendarDays,
 } as const satisfies Record<string, LucideIcon>;
 
 export type NavIconKey = keyof typeof ICONS;

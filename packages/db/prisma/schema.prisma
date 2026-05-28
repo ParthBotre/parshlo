@@ -42,6 +42,13 @@ enum AccountStatus {
   SUSPENDED
 }
 
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum BusinessType {
   CHEMIST
   STOCKIST
@@ -71,6 +78,8 @@ model User {
   auditEvents      AuditLog[]         @relation("AuditActor")
   kycReviewed      KycApplication[]   @relation("KycReviewer")
   inquiries        ContactInquiry[]
+  leaveRequests    EmployeeLeaveRequest[] @relation("LeaveEmployee")
+  leaveReviewed    EmployeeLeaveRequest[] @relation("LeaveReviewer")
 
   @@index([accountStatus])
   @@index([createdAt])
@@ -422,6 +431,35 @@ model NotificationLog {
 
   @@index([createdAt])
   @@index([recipient])
+}
+
+// -----------------------------------------------------------------------------
+// EMPLOYEE HOLIDAYS / PTO
+// -----------------------------------------------------------------------------
+
+model EmployeeLeaveRequest {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("LeaveEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  startDate DateTime
+  endDate   DateTime
+  dayCount  Int
+  reason    String?
+
+  status LeaveRequestStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewerNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId, startDate])
+  @@index([status, startDate])
+  @@index([reviewedById])
 }
 
 // -----------------------------------------------------------------------------
