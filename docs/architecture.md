@@ -1,6 +1,8 @@
 # Architecture
 
-This document walks through how Parshlo is put together: the request flow, the data model, and the trust boundaries.
+This document walks through how Parshlo is put together today: the request flow, the data model, and the trust boundaries.
+
+Current staging runs the web app on Vercel and the API on a DigitalOcean droplet behind Caddy. The worker, email sender, document storage, and Terraform AWS stack are present as foundations/plans, but they are not required for the current staging website.
 
 ## 1. High-level diagram
 
@@ -13,11 +15,11 @@ flowchart LR
   end
 
   subgraph Edge
-    CDN[CDN + WAF]
+    CDN[Cloudflare<br/>DNS + proxy]
   end
 
   subgraph Frontend
-    Web[apps/web<br/>Next.js 15<br/>RSC + Server Actions]
+    Web[Vercel<br/>apps/web<br/>Next.js 15]
   end
 
   subgraph Identity
@@ -25,35 +27,27 @@ flowchart LR
   end
 
   subgraph Backend
-    API[apps/api<br/>NestJS + Fastify]
-    Worker[Background workers<br/>BullMQ]
+    Caddy[Caddy<br/>staging-api.parshlo.com]
+    API[Droplet Docker<br/>apps/api<br/>NestJS + Fastify]
   end
 
   subgraph Data
-    PG[(Postgres 16)]
-    Redis[(Redis 7)]
-    S3[(S3)]
+    PG[(Postgres 16<br/>Docker)]
+    Redis[(Redis 7<br/>Docker)]
   end
 
   subgraph 3rdParty
-    Resend[Resend]
     Sentry[Sentry]
-    OTel[OTel collector]
   end
 
   Public & Buyer & Admin -->|HTTPS| CDN --> Web
   Web -->|Bearer JWT| API
   Web -->|OIDC redirect| Auth0
+  CDN --> Caddy --> API
   API -->|JWKS verify| Auth0
   API --> PG
   API --> Redis
-  API --> S3
-  API -->|enqueue| Worker
-  Worker --> Resend
-  Worker --> PG
-  Worker --> S3
   API & Web --> Sentry
-  API & Web --> OTel
 ```
 
 ## 2. Request lifecycle
@@ -103,13 +97,14 @@ sequenceDiagram
 
 ## 3. Trust boundaries
 
-| Boundary      | Trust direction          | Controls                                                                             |
-| ------------- | ------------------------ | ------------------------------------------------------------------------------------ |
-| Browser → Web | untrusted → semi-trusted | HTTPS, HSTS, CSP, XSS-safe RSC, CSRF tokens on Server Actions                        |
-| Web → API     | semi-trusted → trusted   | Bearer JWT from Auth0, CORS allowlist, no credentials forwarding                     |
-| API → DB      | trusted → trusted        | Connection pool, parameterized queries via Prisma, least-privileged role             |
-| API → S3      | trusted → trusted        | IAM role, presigned URLs only, SSE-KMS encryption, bucket policy denying public ACLs |
-| API → Auth0   | trusted → trusted        | JWKS over HTTPS, cached + rate-limited                                               |
+| Boundary         | Trust direction          | Controls                                                         |
+| ---------------- | ------------------------ | ---------------------------------------------------------------- |
+| Browser → Web    | untrusted → semi-trusted | HTTPS, HSTS, CSP, XSS-safe RSC, CSRF-aware server routes         |
+| Web → API        | semi-trusted → trusted   | Bearer JWT from Auth0, CORS allowlist, no credentials forwarding |
+| API → DB         | trusted → trusted        | Connection pool, parameterized queries via Prisma                |
+| API → Redis      | trusted → trusted        | Private Docker network in staging; private network in prod       |
+| API → Auth0      | trusted → trusted        | JWKS over HTTPS, cached + rate-limited                           |
+| API/Web → Sentry | trusted → SaaS           | DSNs only, environment tags, no secrets in event payloads        |
 
 ## 4. Data model summary
 
@@ -127,6 +122,11 @@ erDiagram
   ORDER ||--|{ ORDER_ITEM : has
   ORDER ||--o| INVOICE : has
   ORDER ||--o{ ORDER_STATUS_EVENT : transitions
+  ORDER ||--o{ ADMIN_CONSIGNMENT_LOG : has
+  COURIER ||--o{ ADMIN_CONSIGNMENT_LOG : handles
+  COURIER ||--o{ COURIER_LEDGER_STATEMENT : reports
+  USER ||--o{ EMPLOYEE_LEAVE_REQUEST : requests
+  USER ||--o{ NOTIFICATION_LOG : receives
 ```
 
 Key invariants:
@@ -134,6 +134,8 @@ Key invariants:
 - `BusinessProfile.gstin` is **globally unique**.
 - An order is uniquely identified by `(buyerId, idempotencyKey)`.
 - `OrderItem.productNameSnapshot` is immutable after creation so historical invoices remain accurate even if the product name changes.
+- Approved order items keep their historical price snapshots; pre-approval order edits can recalculate current pricing.
+- Employee leave requests count pending and approved days against the 30-day yearly allowance.
 - Money is stored as `BigInt` paise; never as floats.
 
 ## 5. Where to add things
@@ -142,4 +144,5 @@ Key invariants:
 - **A new endpoint** → new module in `apps/api/src/modules/<domain>/` with controller + service.
 - **A shared UI primitive** → `apps/web/src/components/ui/` (until split into a `packages/ui`).
 - **A reusable Zod schema** → `packages/types/src/<domain>.ts`.
-- **A background job** → new BullMQ queue under `apps/api/src/modules/queues/` (planned).
+- **A notification event** → write a `NotificationLog` row now; connect email/browser delivery later.
+- **A background job** → add a typed queue contract in `packages/queue` and a worker handler once the worker is deployed.

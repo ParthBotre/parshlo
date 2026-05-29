@@ -9,7 +9,7 @@ We need a backend that handles 100% TypeScript, dependency injection, strong tes
 
 ## Decision
 
-**NestJS 10** with the **Fastify** adapter (instead of Express).
+**NestJS** with the **Fastify** adapter (instead of Express). The project currently runs NestJS 11.
 
 ## Consequences
 

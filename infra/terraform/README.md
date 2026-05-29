@@ -1,7 +1,8 @@
 # Terraform — Parshlo AWS infrastructure
 
-Production-grade IaC for deploying Parshlo on AWS. The configuration is
-split into reusable modules with remote state in S3 + DynamoDB locks.
+Future production-grade IaC for deploying Parshlo on AWS. This is not the current staging deployment path. Current staging uses Vercel for `apps/web` and a DigitalOcean droplet for `apps/api`, Postgres, and Redis.
+
+The configuration is split into reusable modules with remote state in S3 + DynamoDB locks.
 
 ## What this provisions
 
@@ -48,5 +49,5 @@ terraform apply
 ## What's intentionally not Terraformed
 
 - Auth0 tenant configuration (managed in the Auth0 console + exported as JSON).
-- Resend domain verification (one-time DNS records).
+- Email provider domain verification (provider TBD; one-time DNS records).
 - DataDog dashboards (versioned separately in `infra/datadog/`).

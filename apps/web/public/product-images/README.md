@@ -16,16 +16,15 @@ The component will auto-resolve the URL for each product. If an image is
 missing the UI falls back to the gradient + pill icon placeholder, so you can
 add images incrementally.
 
-## Seeded products (current slugs)
+## Current catalog slugs
 
-| Slug                 | Product                    | Drop file as             |
-| -------------------- | -------------------------- | ------------------------ |
-| `amoxicillin-500`    | Amoxicillin 500 mg         | `amoxicillin-500.jpg`    |
-| `paracetamol-650`    | Paracetamol 650 mg         | `paracetamol-650.jpg`    |
-| `metformin-500`      | Metformin HCl 500 mg       | `metformin-500.jpg`      |
-| `salbutamol-inhaler` | Salbutamol Inhaler 100 mcg | `salbutamol-inhaler.jpg` |
-| `pantoprazole-40`    | Pantoprazole 40 mg         | `pantoprazole-40.jpg`    |
-| `amlodipine-5`       | Amlodipine 5 mg            | `amlodipine-5.jpg`       |
+The live catalog is database-driven. Do not use `seed.ts` to change staging or production products.
+
+To confirm a live product slug, check the product in the admin portal or query the API/database. The expected image file is:
+
+```
+apps/web/public/product-images/<product-slug>.jpg
+```
 
 ## Recommended specs
 
@@ -37,13 +36,15 @@ add images incrementally.
 - **Color**: white or neutral background works best with the cream card UI.
 - **Naming**: lowercase, hyphens only, no spaces, no special characters.
 
-## Adding a new product
+## Adding or changing a product image
 
-When a new product is seeded, just drop `<new-slug>.jpg` in this folder. No
-code change is required — the component re-resolves on every render.
+1. Create or edit the product in the admin portal/database first.
+2. Confirm the product slug.
+3. Drop `<slug>.jpg` in this folder.
+4. Deploy the web app.
+
+No API deploy is required for static product image changes unless the product record itself also changed through code/migrations.
 
 ## Going to production
 
-For prod, replace this static folder with S3-presigned URLs returned by the
-API (`Product.imageKeys`). The `<ProductImage />` component will accept those
-URLs unchanged — only the resolution helper needs to switch.
+Static images are acceptable for the first production launch. A future image manager can move product assets to S3/R2 or another object store and have the API return image URLs. The `<ProductImage />` component is intentionally isolated so that switch stays small.

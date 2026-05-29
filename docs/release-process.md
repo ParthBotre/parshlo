@@ -1,10 +1,11 @@
 # Release process
 
-We use **trunk-based development** with semver-tagged releases.
+Parshlo currently uses `staging` for employee testing and `main` as the future production release line. Staging web deploys through Vercel automatically after pushes to `staging`; the staging API is deployed manually on the DigitalOcean droplet.
 
 ## Branch model
 
-- `main` is always deployable; protected, requires PR + green CI + 1 approval.
+- `staging` is the active testing branch for employee staging.
+- `main` should remain production-ready; protected, requires PR + green CI + review before production launch.
 - Feature branches: `feat/<short-description>` or `fix/<short-description>`.
 - Hotfix branches: `hotfix/<incident-id>` — fast-track approval allowed.
 
@@ -19,46 +20,76 @@ fix(kyc): reject duplicate GSTIN with 409
 docs(deploy): refresh terraform variable matrix
 ```
 
-## Versioning
+## Current Staging Release
 
-Every merge to `main` increments a build number; **releases** are cut by
-tagging `vYYYY.MM.DD-N` where N is the count of releases that day.
+1. Land the code on `staging`.
+2. Vercel builds and deploys `apps/web`.
+3. SSH into the staging droplet and deploy the API:
 
 ```bash
-git tag -a v2026.05.13-1 -m "release"
-git push origin v2026.05.13-1
+cd /opt/parshlo
+git pull origin staging
+
+docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
+
+docker run --rm \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  --entrypoint sh \
+  parshlo-api:staging \
+  -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
+
+docker rm -f parshlo-api
+docker run -d \
+  --name parshlo-api \
+  --restart unless-stopped \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  -p 127.0.0.1:4000:4000 \
+  parshlo-api:staging
+
+sleep 10
+curl http://127.0.0.1:4000/v1/health
+curl http://127.0.0.1:4000/v1/health/ready
+curl https://staging-api.parshlo.com/v1/health
 ```
 
-The release tag triggers:
+Migration rule: every staging API deploy should run `prisma migrate deploy`. If no schema changes exist, Prisma reports no pending migrations.
+
+## Future Production Versioning
+
+Before launch, cut production releases from `main` with tags like `vYYYY.MM.DD-N`, where `N` is the count of releases that day.
+
+```bash
+git tag -a v2026.06.01-1 -m "production release"
+git push origin v2026.06.01-1
+```
+
+The future production release tag should trigger:
 
 1. `release.yml` GitHub Actions workflow.
-2. Multi-arch Docker image builds for `api`, `web`, `worker`.
-3. ECR push.
-4. Terraform `apply` against `staging` (auto), then `prod` (manual approval).
-5. DB migration job in ECS.
-6. Smoke tests via Playwright against the staging URL.
-7. Sentry release record + release notes auto-generated from commits.
+2. Docker image builds for `api` and any deployed worker services.
+3. Registry push.
+4. Production infrastructure deploy against the selected provider.
+5. DB migration job against the production database cluster.
+6. Smoke tests against production health endpoints.
+7. Sentry release record and release notes from commits.
 
 ## Rollback
 
-```bash
-gh workflow run rollback.yml -f version=v2026.05.12-1 -f env=prod
-```
+For staging, prefer fix-forward or a small revert commit on `staging`, then redeploy. Database migrations are forward-only; do not reset staging data to undo a code issue.
 
-The rollback workflow:
-
-1. Reverts the ECS task definitions to the prior revision.
-2. **Does not** roll back DB migrations (forward-only).
-3. Posts an incident timeline to the #parshlo-ops Slack channel.
+For future production, rollback should revert the application runtime to a prior image/revision while leaving migrations forward-only. If a migration caused data damage, stop writes first, take a fresh backup, and restore/fix under a written incident plan.
 
 ## Hotfixes
 
 For critical issues:
 
-1. Branch from `main`: `git checkout -b hotfix/SEC-123`.
-2. Land the fix; cut a `vYYYY.MM.DD-Nh` tag.
-3. The release pipeline gates on smoke tests but not the full suite — log
-   the deviation in the incident doc.
+1. Branch from the affected release branch.
+2. Land the smallest safe fix.
+3. Run the focused build/test checks.
+4. Deploy to staging first when possible, then production.
+5. Log any skipped checks in the incident notes.
 
 ## Release notes
 

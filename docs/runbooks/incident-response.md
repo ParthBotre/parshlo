@@ -17,9 +17,11 @@
    - Communications lead
    - Engineering lead
 3. **Check status pages** and dashboards in order:
-   - APM dashboard
    - Sentry error feed (filter: last 30 min)
-   - Auth0 status, AWS health, Cloudflare status
+   - Vercel deployment/runtime logs for `apps/web`
+   - Droplet/Caddy/API logs for `apps/api`
+   - Auth0 status, Cloudflare status, DigitalOcean status
+   - AWS health only for environments using the future AWS stack
 4. **Mitigate first, root-cause later.** If a recent deploy is suspected, **roll back immediately** — do not pause to diagnose.
 5. **Communicate** every 15 minutes to stakeholders even with "no update".
 
@@ -39,16 +41,17 @@
 
 ### C. KYC document upload failing
 
-- Confirm S3 / LocalStack reachable.
-- Check IAM permissions on the upload role.
-- Confirm content-type/length policy on presigned URL matches client request.
+- Confirm `STORAGE_ENABLED=true`; current staging usually has storage disabled.
+- Confirm the configured object store is reachable.
+- Check IAM/API-token permissions on the upload role.
+- Confirm content-type/length policy on the presigned URL matches the client request.
 
 ### D. Suspected data breach
 
 - Page Security on-call immediately.
 - Freeze deployments.
-- Rotate Auth0 application secrets, AWS keys, database passwords (in this order).
-- Preserve logs (CloudWatch + Postgres `AuditLog`) — do not delete or rotate retention.
+- Rotate Auth0 application secrets, Sentry tokens/DSNs if exposed, object-storage credentials, and database passwords.
+- Preserve logs (Sentry, Vercel, droplet/Caddy/API logs, and Postgres `AuditLog`) — do not delete or rotate retention.
 - Engage external counsel per the incident playbook.
 
 ## Post-incident

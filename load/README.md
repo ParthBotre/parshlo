@@ -29,7 +29,7 @@ breached, so this doubles as CI gate.
 make load-smoke
 
 # Stress (ramps to 10k VUs)
-API_BASE_URL=https://api.staging.parshlo.com make load-stress
+API_BASE_URL=https://staging-api.parshlo.com make load-stress
 ```
 
 > Run against staging, never directly against prod.

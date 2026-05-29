@@ -26,15 +26,12 @@ pnpm dev
 2. Dashboard overview loads — stats are real, computed from the DB.
 3. Open **Catalog** — wholesale prices, MOQ, GST, and live stock are now
    visible. Add a couple of products to the cart.
-4. Open the cart drawer, enter a PO number and a note, and **Place order**.
+4. Open the cart drawer, review quantities, add an optional note if needed, and **Place order**.
 5. Land on the order detail page — show the **state machine progress bar**.
-6. Open the terminal to point out three side-effect lines from the API:
-   - `email queued: ORDER_PLACED_BUYER`
-   - `email queued: ORDER_PLACED_ADMIN`
-   - `invoice queued`
-7. Open **http://localhost:8025** (MailHog) — the two emails are there.
-8. Open **http://localhost:4566/parshlo-invoices?list-type=2** — the PDF is
-   archived in LocalStack S3.
+6. Open the terminal to point out structured API logs and `NotificationLog`
+   rows for workflows that will later connect to email/browser notifications.
+7. Email, invoice PDF, and object-storage delivery are deferred unless the
+   local worker/storage flags are intentionally enabled.
 
 ## 3. Admin journey (1m 30s)
 
@@ -45,6 +42,8 @@ pnpm dev
    notification queued via BullMQ.
 4. **Orders** — click around the status filter tabs.
 5. **Buyers** — show the registered businesses with KYC status badges.
+6. **Holidays** — submit a PTO request as an employee and approve/reject it as
+   a super admin.
 
 ## 4. The engineering bits (1 minute)
 

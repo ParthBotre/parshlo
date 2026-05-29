@@ -119,6 +119,29 @@ To remove an employee:
 
 Do not hard-delete users with orders, KYC reviews, approvals, or audit events.
 
+## Employee Holidays / PTO
+
+Internal employees manage PTO from `/admin/holidays`.
+
+Current rules:
+
+- Every employee role (`SALES_MANAGER`, `ADMIN`, `SUPER_ADMIN`) receives 30 PTO days per calendar year.
+- Employees choose a start date and end date from date inputs and submit a leave request.
+- Pending and approved requests reduce the displayed available balance.
+- Overlapping pending/approved requests are rejected.
+- Requests must stay inside one calendar year.
+- Only `SUPER_ADMIN` users can approve or reject requests.
+- Approval/rejection keeps reviewer, review time, and optional note.
+
+Notification foundation:
+
+- Creating a request writes `NotificationLog.kind = leave.request.created`.
+- Approving writes `NotificationLog.kind = leave.request.approved`.
+- Rejecting writes `NotificationLog.kind = leave.request.rejected`.
+- These rows are intentionally queued as `status = PENDING` so a later email worker/provider can send internal emails without changing the PTO workflow.
+
+Deploy note: this feature requires the `20260528143000_employee_leave_requests` Prisma migration before the page can work against staging/production API.
+
 ## Buyers
 
 Buyers are created through registration or admin/manager-created buyer forms. A buyer should be allowed to order only when:
@@ -188,6 +211,7 @@ Never use dummy AWS, email, database, or Auth0 production secrets. Missing servi
    - Place order
    - Manager order requires admin approval
    - Admin approval/status transitions
+   - Holiday request submit + super-admin approve/reject
    - Product add/disable
    - Employee suspend/update role
    - Logistics admin-only controls
@@ -208,6 +232,47 @@ Never use dummy AWS, email, database, or Auth0 production secrets. Missing servi
    - triggers configured deploy hooks; worker deploy is skipped unless `WORKER_DEPLOY_HOOK_URL` is set
 5. Smoke test production.
 6. Watch logs, Sentry, API errors, and queue failures.
+
+## Current Staging Droplet Deploy Flow
+
+The current staging API runs as a Docker container on the droplet, while the web frontend deploys from Vercel.
+
+For API/backend changes:
+
+```bash
+cd /opt/parshlo
+git pull origin staging
+
+docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
+
+docker run --rm \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  --entrypoint sh \
+  parshlo-api:staging \
+  -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
+
+docker rm -f parshlo-api
+docker run -d \
+  --name parshlo-api \
+  --restart unless-stopped \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  -p 127.0.0.1:4000:4000 \
+  parshlo-api:staging
+
+sleep 10
+curl http://127.0.0.1:4000/v1/health
+curl http://127.0.0.1:4000/v1/health/ready
+curl https://staging-api.parshlo.com/v1/health
+```
+
+Important:
+
+- Run migrations before restarting into code that expects new tables/columns.
+- A first curl immediately after container start can fail while Nest is still booting; wait a few seconds and retry.
+- `https://staging-api.parshlo.com/` returning 404 is normal because the API root is not a website. Use `/v1/health`.
+- If Docker reports no space left on device, check `df -h` and `docker system df`; prune stopped containers and unused images, but do not remove Postgres volumes.
 
 ## Shipping Updates After Launch
 
