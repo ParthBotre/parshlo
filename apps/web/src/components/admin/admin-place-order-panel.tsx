@@ -60,16 +60,18 @@ export function AdminPlaceOrderPanel({
   );
 
   const selectedBuyer = sortedBuyers.find((b) => b.id === buyerId) ?? null;
-  const visibleBuyers = useMemo(() => {
+  const buyerSearchResults = useMemo(() => {
     const needle = buyerQuery.trim().toLowerCase();
     if (!needle) {
-      return sortedBuyers;
+      return [];
     }
-    return sortedBuyers.filter((b) =>
-      [b.businessName, b.fullName, b.email, b.gstin, b.mobile, b.city, b.state, b.businessType]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle)),
-    );
+    return sortedBuyers
+      .filter((b) =>
+        [b.businessName, b.fullName, b.email, b.gstin, b.mobile, b.city, b.state, b.businessType]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle)),
+      )
+      .slice(0, 8);
   }, [buyerQuery, sortedBuyers]);
   const catalogEnabled = Boolean(selectedBuyer && canPlaceForBuyer(selectedBuyer));
   const visibleProducts = useMemo(() => {
@@ -87,6 +89,14 @@ export function AdminPlaceOrderPanel({
   const onBuyerChange = (nextId: string): void => {
     setBuyerId(nextId);
     cart.clear();
+  };
+
+  const selectBuyerFromSearch = (buyer: AdminBuyer): void => {
+    if (!canPlaceForBuyer(buyer)) {
+      return;
+    }
+    onBuyerChange(buyer.id);
+    setBuyerQuery(buyerLabel(buyer));
   };
 
   return (
@@ -108,16 +118,46 @@ export function AdminPlaceOrderPanel({
               placeholder="Search buyer by business, contact, GSTIN, city..."
               className="border-input bg-background placeholder:text-muted-foreground focus:border-primary h-11 w-full rounded-md border px-3 text-base outline-none transition-colors sm:text-sm"
             />
+            {buyerQuery.trim().length > 0 ? (
+              <div className="bg-background overflow-hidden rounded-md border">
+                {buyerSearchResults.length === 0 ? (
+                  <p className="text-muted-foreground px-3 py-2 text-sm">No matching buyers.</p>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto">
+                    {buyerSearchResults.map((b) => {
+                      const disabled = !canPlaceForBuyer(b);
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => selectBuyerFromSearch(b)}
+                          className={`block w-full px-3 py-2 text-left text-sm transition-colors ${
+                            buyerId === b.id
+                              ? 'bg-primary/10 text-primary'
+                              : 'hover:bg-accent text-foreground'
+                          } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                        >
+                          <span className="font-medium">{buyerLabel(b)}</span>
+                          <span className="text-muted-foreground mt-0.5 block text-xs">
+                            {b.city ? `${b.city} · ` : ''}
+                            {b.gstin ?? 'No GSTIN'}
+                            {disabled ? ` · ${b.accountStatus.replace(/_/g, ' ')}` : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
             <select
               className="border-input bg-background flex h-11 w-full rounded-md border px-3 text-sm"
               value={buyerId}
               onChange={(e) => onBuyerChange(e.target.value)}
             >
               <option value="">Choose a buyer…</option>
-              {selectedBuyer && !visibleBuyers.some((b) => b.id === selectedBuyer.id) ? (
-                <option value={selectedBuyer.id}>{buyerLabel(selectedBuyer)}</option>
-              ) : null}
-              {visibleBuyers.map((b) => (
+              {sortedBuyers.map((b) => (
                 <option key={b.id} value={b.id} disabled={!canPlaceForBuyer(b)}>
                   {buyerLabel(b)}
                   {!canPlaceForBuyer(b) ? ` (${b.accountStatus.replace(/_/g, ' ')})` : ''}
