@@ -1097,6 +1097,13 @@ export class AdminService {
   }
 
   private async getSuperAdminEmails(): Promise<string | string[]> {
+    const configured =
+      process.env.LEAVE_NOTIFICATION_EMAIL?.trim() ??
+      process.env.SUPER_ADMIN_NOTIFICATION_EMAIL?.trim();
+    if (configured) {
+      return configured;
+    }
+
     const users = await this.prisma.user.findMany({
       where: {
         deletedAt: null,
