@@ -49,14 +49,15 @@ export function OrderEditForm({
   const [error, setError] = useState<string | null>(null);
   const editableBeforeApproval =
     canEdit && (order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW');
-  const approvedRateOnly = canEditApprovedRates && order.status === 'APPROVED';
-  const editable = editableBeforeApproval || approvedRateOnly;
+  const superAdminEditableAfterApproval =
+    canEditApprovedRates && (order.status === 'APPROVED' || order.status === 'PREPARING');
+  const editable = editableBeforeApproval || superAdminEditableAfterApproval;
 
   if (!editable) {
     return (
       <p className="text-muted-foreground text-sm">
         Orders can be edited by admins before approval. Approved order rates can be changed by super
-        admins only.
+        admins before dispatch.
       </p>
     );
   }
@@ -147,7 +148,6 @@ export function OrderEditForm({
                     min={0}
                     inputMode="numeric"
                     value={item.quantity}
-                    disabled={approvedRateOnly}
                     onChange={(event) =>
                       updateItem(item.productId, { quantity: event.currentTarget.value })
                     }
@@ -160,7 +160,6 @@ export function OrderEditForm({
                     min={0}
                     inputMode="numeric"
                     value={item.schemeFreeQuantity}
-                    disabled={approvedRateOnly}
                     onChange={(event) =>
                       updateItem(item.productId, { schemeFreeQuantity: event.currentTarget.value })
                     }
@@ -199,15 +198,16 @@ export function OrderEditForm({
         </p>
       ) : null}
 
-      {approvedRateOnly ? (
+      {superAdminEditableAfterApproval ? (
         <p className="text-muted-foreground text-xs">
-          Approved orders allow rate-tier changes only. Quantities and free units stay locked.
+          Super admins can edit paid quantity, free quantity, and rate tier until the order is
+          dispatched. Product lines stay fixed after approval.
         </p>
       ) : null}
 
       <Button onClick={() => void submit()} disabled={submitting}>
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {approvedRateOnly ? 'Save rate changes' : 'Save order edits'}
+        {superAdminEditableAfterApproval ? 'Save super admin edits' : 'Save order edits'}
       </Button>
     </div>
   );

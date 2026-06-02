@@ -555,14 +555,15 @@ export class OrderService {
       }
       const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
       const editableBeforeApproval = order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW';
-      const approvedRateEdit = order.status === 'APPROVED' && isSuperAdmin;
-      if (!editableBeforeApproval && !approvedRateEdit) {
+      const superAdminEditableAfterApproval =
+        isSuperAdmin && (order.status === 'APPROVED' || order.status === 'PREPARING');
+      if (!editableBeforeApproval && !superAdminEditableAfterApproval) {
         throw new BadRequestException({
           code: 'ORDER_NOT_EDITABLE',
           message:
-            order.status === 'APPROVED'
-              ? 'Only super admins can edit rates after approval.'
-              : 'Orders can be edited only before approval.',
+            order.status === 'APPROVED' || order.status === 'PREPARING'
+              ? 'Only super admins can edit approved orders before dispatch.'
+              : 'Orders can be edited only before dispatch.',
         });
       }
       const businessProfile = order.buyer.businessProfile;
@@ -580,25 +581,20 @@ export class OrderService {
         throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
       }
 
-      if (approvedRateEdit) {
+      if (superAdminEditableAfterApproval) {
         const existingByProductId = new Map(order.items.map((item) => [item.productId, item]));
         if (existingByProductId.size !== input.items.length) {
           throw new BadRequestException({
-            code: 'ORDER_APPROVED_RATE_ONLY',
-            message: 'Approved orders can only change existing item rate tiers.',
+            code: 'ORDER_APPROVED_ITEMS_FIXED',
+            message: 'Approved orders can only edit existing product lines before dispatch.',
           });
         }
         for (const item of input.items) {
           const existing = existingByProductId.get(item.productId);
-          if (
-            !existing ||
-            existing.quantity !== item.quantity ||
-            existing.schemeFreeQuantity !== item.schemeFreeQuantity ||
-            existing.discountPaise !== BigInt(item.discountPaise)
-          ) {
+          if (!existing || existing.discountPaise !== BigInt(item.discountPaise)) {
             throw new BadRequestException({
-              code: 'ORDER_APPROVED_RATE_ONLY',
-              message: 'Approved orders can only change existing item rate tiers.',
+              code: 'ORDER_APPROVED_ITEMS_FIXED',
+              message: 'Approved orders can only edit existing product lines before dispatch.',
             });
           }
         }
