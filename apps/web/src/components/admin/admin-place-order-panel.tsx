@@ -309,7 +309,7 @@ function AdminProductCard({
           {product.gstRate}%) included in price
         </p>
         <div className="mt-auto space-y-3 pt-1">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-muted-foreground grid gap-1 text-xs font-medium">
               Paid qty
               <input
@@ -319,7 +319,7 @@ function AdminProductCard({
                 value={paidQtyValue}
                 disabled={disabled}
                 onChange={(event) => updatePaidQty(event.currentTarget.value)}
-                className="border-input bg-background text-foreground h-10 rounded-md border px-3 text-sm"
+                className="border-input bg-background text-foreground h-10 w-full rounded-md border px-3 text-sm"
               />
             </label>
             <label className="text-muted-foreground grid gap-1 text-xs font-medium">
@@ -331,7 +331,7 @@ function AdminProductCard({
                 value={freeQtyValue}
                 disabled={disabled}
                 onChange={(event) => updateFreeQty(event.currentTarget.value)}
-                className="border-input bg-background text-foreground h-10 rounded-md border px-3 text-sm"
+                className="border-input bg-background text-foreground h-10 w-full rounded-md border px-3 text-sm"
               />
             </label>
           </div>
