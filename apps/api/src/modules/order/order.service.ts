@@ -244,6 +244,7 @@ export class OrderService {
     const sideEffects: Promise<unknown>[] = [];
 
     if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      const adminRecipients = await this.getOrderNotificationRecipients();
       sideEffects.push(
         this.jobs.enqueueEmail({
           kind: 'ORDER_PLACED_BUYER',
@@ -264,7 +265,7 @@ export class OrderService {
         }),
         this.jobs.enqueueEmail({
           kind: 'ORDER_PLACED_ADMIN',
-          to: process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@parshlo.local',
+          to: adminRecipients,
           data: {
             orderNumber: order.orderNumber,
             buyerBusinessName: order.buyerBusinessName,
@@ -282,6 +283,22 @@ export class OrderService {
     }
 
     await Promise.allSettled(sideEffects);
+  }
+
+  private async getOrderNotificationRecipients(): Promise<string | string[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        accountStatus: 'APPROVED',
+        roles: { hasSome: ['ADMIN', 'SUPER_ADMIN'] },
+      },
+      select: { email: true },
+    });
+    const emails = Array.from(new Set(users.map((user) => user.email).filter(Boolean)));
+    if (emails.length > 0) {
+      return emails;
+    }
+    return process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@parshlo.local';
   }
 
   async getOrder(orderId: string, requesterId: string): Promise<OrderView> {

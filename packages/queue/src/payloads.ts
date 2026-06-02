@@ -15,6 +15,9 @@ export const EmailKind = z.enum([
   'KYC_APPROVED',
   'KYC_REJECTED',
   'ORDER_STATUS_CHANGED',
+  'LEAVE_REQUEST_CREATED',
+  'LEAVE_REQUEST_APPROVED',
+  'LEAVE_REQUEST_REJECTED',
 ]);
 export type EmailKind = z.infer<typeof EmailKind>;
 

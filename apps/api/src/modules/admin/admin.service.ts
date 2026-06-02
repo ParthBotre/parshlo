@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type Prisma } from '@parshlo/db';
+import { JobProducer } from '@parshlo/queue';
 import {
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
@@ -120,7 +122,11 @@ interface BuyerDetail extends BuyerRow {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: JobProducer,
+    private readonly config: ConfigService,
+  ) {}
 
   private normalizeUpper(value: string): string {
     return value.trim().toUpperCase();
@@ -951,6 +957,8 @@ export class AdminService {
       return created;
     });
 
+    void this.dispatchLeaveRequestCreatedEmail(request).catch(() => undefined);
+
     return this.toLeaveRequestView(request);
   }
 
@@ -1026,7 +1034,82 @@ export class AdminService {
       return updated;
     });
 
+    void this.dispatchLeaveRequestReviewedEmail(request).catch(() => undefined);
+
     return this.toLeaveRequestView(request);
+  }
+
+  private async dispatchLeaveRequestCreatedEmail(request: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string; email: string };
+    startDate: Date;
+    endDate: Date;
+    dayCount: number;
+    reason: string | null;
+  }): Promise<void> {
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') !== true) {
+      return;
+    }
+
+    const recipients = await this.getSuperAdminEmails();
+    await this.jobs.enqueueEmail({
+      kind: 'LEAVE_REQUEST_CREATED',
+      to: recipients,
+      data: {
+        employeeName: request.employee.fullName,
+        startDate: formatDateOnly(request.startDate),
+        endDate: formatDateOnly(request.endDate),
+        dayCount: request.dayCount,
+        reason: request.reason ?? undefined,
+        adminUrl: `${process.env.WEB_BASE_URL ?? 'http://localhost:3000'}/admin/holidays`,
+      },
+    });
+  }
+
+  private async dispatchLeaveRequestReviewedEmail(request: {
+    employee: { fullName: string; email: string };
+    startDate: Date;
+    endDate: Date;
+    dayCount: number;
+    status: string;
+    reviewerNote: string | null;
+  }): Promise<void> {
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') !== true) {
+      return;
+    }
+    if (request.status !== 'APPROVED' && request.status !== 'REJECTED') {
+      return;
+    }
+
+    await this.jobs.enqueueEmail({
+      kind: request.status === 'APPROVED' ? 'LEAVE_REQUEST_APPROVED' : 'LEAVE_REQUEST_REJECTED',
+      to: request.employee.email,
+      data: {
+        employeeName: request.employee.fullName,
+        startDate: formatDateOnly(request.startDate),
+        endDate: formatDateOnly(request.endDate),
+        dayCount: request.dayCount,
+        status: request.status,
+        reviewerNote: request.reviewerNote ?? undefined,
+      },
+    });
+  }
+
+  private async getSuperAdminEmails(): Promise<string | string[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        accountStatus: 'APPROVED',
+        roles: { has: 'SUPER_ADMIN' },
+      },
+      select: { email: true },
+    });
+    const emails = Array.from(new Set(users.map((user) => user.email).filter(Boolean)));
+    if (emails.length > 0) {
+      return emails;
+    }
+    return process.env.ADMIN_NOTIFICATION_EMAIL ?? 'admin@parshlo.local';
   }
 
   private assertEmployeeRole(roles: string[]): void {

@@ -5,6 +5,8 @@ import { config } from '../config.js';
 
 export interface EmailMessage {
   to: string | string[];
+  from?: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text: string;
@@ -21,11 +23,12 @@ class ResendTransport implements EmailTransport {
   }
   async send(msg: EmailMessage): Promise<void> {
     const { error } = await this.client.emails.send({
-      from: config.EMAIL_FROM,
+      from: msg.from ?? config.EMAIL_FROM_DEFAULT ?? config.EMAIL_FROM,
       to: Array.isArray(msg.to) ? msg.to : [msg.to],
       subject: msg.subject,
       html: msg.html,
       text: msg.text,
+      replyTo: msg.replyTo ?? config.EMAIL_REPLY_TO,
     });
     if (error) {
       throw new Error(`Resend error: ${error.message}`);
@@ -46,6 +49,7 @@ class SmtpTransport implements EmailTransport {
   async send(msg: EmailMessage): Promise<void> {
     await this.transport.sendMail({
       from: config.EMAIL_FROM,
+      replyTo: msg.replyTo ?? config.EMAIL_REPLY_TO,
       to: msg.to,
       subject: msg.subject,
       html: msg.html,

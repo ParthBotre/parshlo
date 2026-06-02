@@ -164,3 +164,54 @@ export function renderKycRejected(d: KycDecisionData): Rendered {
     text: `Your Parshlo application for ${d.businessName} was not approved.${d.reason ? ` Reason: ${d.reason}` : ''}`,
   };
 }
+
+export interface LeaveRequestData {
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  dayCount: number;
+  reason?: string;
+  status?: 'APPROVED' | 'REJECTED';
+  reviewerNote?: string;
+  adminUrl?: string;
+}
+
+export function renderLeaveRequestCreated(d: LeaveRequestData): Rendered {
+  const body = `
+    <p><strong>${d.employeeName}</strong> submitted a holiday request.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
+      <tr><td style="padding:6px 0;color:#6b7480">Dates</td><td style="padding:6px 0;text-align:right">${d.startDate} to ${d.endDate}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7480">Days</td><td style="padding:6px 0;text-align:right">${String(d.dayCount)}</td></tr>
+      ${d.reason ? `<tr><td style="padding:6px 0;color:#6b7480">Reason</td><td style="padding:6px 0;text-align:right">${d.reason}</td></tr>` : ''}
+    </table>
+  `;
+  return {
+    subject: `[Action] Holiday request from ${d.employeeName}`,
+    html: shell({
+      title: 'Holiday request submitted',
+      preheader: `${d.employeeName} requested ${String(d.dayCount)} day(s) off`,
+      body,
+      cta: d.adminUrl ? { href: d.adminUrl, label: 'Review request' } : undefined,
+    }),
+    text: `${d.employeeName} requested holiday from ${d.startDate} to ${d.endDate} (${String(d.dayCount)} day(s)).`,
+  };
+}
+
+export function renderLeaveRequestReviewed(d: LeaveRequestData): Rendered {
+  const status = d.status ?? 'APPROVED';
+  const approved = status === 'APPROVED';
+  const body = `
+    <p>Hi ${d.employeeName},</p>
+    <p>Your holiday request for <strong>${d.startDate} to ${d.endDate}</strong> (${String(d.dayCount)} day(s)) was <strong>${approved ? 'approved' : 'rejected'}</strong>.</p>
+    ${d.reviewerNote ? `<p style="margin-top:12px;padding:12px;border-left:3px solid #0e4733;background:#eef8f3;color:#0e4733"><strong>Note:</strong> ${d.reviewerNote}</p>` : ''}
+  `;
+  return {
+    subject: `Holiday request ${approved ? 'approved' : 'rejected'}`,
+    html: shell({
+      title: `Holiday request ${approved ? 'approved' : 'rejected'}`,
+      preheader: `${d.startDate} to ${d.endDate}`,
+      body,
+    }),
+    text: `Your holiday request for ${d.startDate} to ${d.endDate} was ${approved ? 'approved' : 'rejected'}.${d.reviewerNote ? ` Note: ${d.reviewerNote}` : ''}`,
+  };
+}

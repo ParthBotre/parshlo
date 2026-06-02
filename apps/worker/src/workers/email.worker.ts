@@ -7,14 +7,27 @@ import { type Redis } from 'ioredis';
 import { config } from '../config.js';
 import {
   type KycDecisionData,
+  type LeaveRequestData,
   type OrderPlacedAdminData,
   type OrderPlacedBuyerData,
   renderKycApproved,
   renderKycRejected,
+  renderLeaveRequestCreated,
+  renderLeaveRequestReviewed,
   renderOrderPlacedAdmin,
   renderOrderPlacedBuyer,
 } from '../email/templates.js';
 import { createEmailTransport, type EmailTransport } from '../email/transport.js';
+
+function senderForKind(kind: SendEmailJob['kind']): string {
+  if (kind.startsWith('ORDER_')) {
+    return config.EMAIL_FROM_ORDERS ?? config.EMAIL_FROM_DEFAULT ?? config.EMAIL_FROM;
+  }
+  if (kind.startsWith('LEAVE_REQUEST_')) {
+    return config.EMAIL_FROM_HOLIDAYS ?? config.EMAIL_FROM_DEFAULT ?? config.EMAIL_FROM;
+  }
+  return config.EMAIL_FROM_DEFAULT ?? config.EMAIL_FROM;
+}
 
 export function createEmailWorker({
   connection,
@@ -49,11 +62,24 @@ export function createEmailWorker({
               html: `<p>${JSON.stringify(data.data)}</p>`,
               text: JSON.stringify(data.data),
             };
+          case 'LEAVE_REQUEST_CREATED':
+            return renderLeaveRequestCreated(data.data as unknown as LeaveRequestData);
+          case 'LEAVE_REQUEST_APPROVED':
+          case 'LEAVE_REQUEST_REJECTED':
+            return renderLeaveRequestReviewed(data.data as unknown as LeaveRequestData);
+          default:
+            return {
+              subject: data.subjectOverride ?? 'Parshlo notification',
+              html: `<p>${JSON.stringify(data.data)}</p>`,
+              text: JSON.stringify(data.data),
+            };
         }
       })();
 
       await send.send({
         to: data.to,
+        from: senderForKind(data.kind),
+        replyTo: config.EMAIL_REPLY_TO,
         subject: data.subjectOverride ?? rendered.subject,
         html: rendered.html,
         text: rendered.text,
