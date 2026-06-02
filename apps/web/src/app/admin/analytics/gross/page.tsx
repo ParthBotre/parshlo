@@ -28,8 +28,6 @@ interface PageProps {
   searchParams: Promise<{
     period?: string;
     anchor?: string;
-    monthYear?: string;
-    monthNumber?: string;
   }>;
 }
 
@@ -49,26 +47,44 @@ function defaultAnchor(period: Period): string {
   return today;
 }
 
-function normalizeAnchor(
-  period: Period,
-  anchor: string | undefined,
-  monthYear: string | undefined,
-  monthNumber: string | undefined,
-): string {
-  if (period === 'month') {
-    const year = monthYear?.match(/^\d{4}$/) ? monthYear : undefined;
-    const month = Number(monthNumber);
-    if (year && Number.isInteger(month) && month >= 1 && month <= 12) {
-      return `${year}-${String(month).padStart(2, '0')}`;
-    }
-  }
-  return anchor ?? defaultAnchor(period);
+function normalizeAnchor(period: Period, anchor: string | undefined): string {
+  const fallback = defaultAnchor(period);
+  if (!anchor) return fallback;
+  if (period === 'year') return /^\d{4}$/.test(anchor) ? anchor : fallback;
+  if (period === 'month') return /^\d{4}-\d{2}$/.test(anchor) ? anchor : fallback;
+  return /^\d{4}-\d{2}-\d{2}$/.test(anchor) ? anchor : fallback;
 }
 
-function inputType(period: Period): 'date' | 'month' | 'number' {
-  if (period === 'month') return 'month';
-  if (period === 'year') return 'number';
-  return 'date';
+function monthOptions(): { value: string; label: string }[] {
+  const today = todayKey();
+  const [yearRaw, monthRaw] = today.split('-');
+  const startYear = Number(yearRaw);
+  const startMonth = Number(monthRaw);
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+
+  return Array.from({ length: 36 }, (_, index) => {
+    const date = new Date(Date.UTC(startYear, startMonth - 1 - index, 1));
+    const value = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    return { value, label: formatter.format(date) };
+  });
+}
+
+function yearOptions(): string[] {
+  const currentYear = Number(todayKey().slice(0, 4));
+  return Array.from({ length: 11 }, (_, index) => String(currentYear - index));
+}
+
+function periodFieldLabel(period: Period): string {
+  if (period === 'day') return 'Day';
+  if (period === 'week') return 'Week starting';
+  if (period === 'month') {
+    return 'Month';
+  }
+  return 'Year';
 }
 
 function cityDetailHref(city: string, period: Period, anchor: string): string {
@@ -84,16 +100,11 @@ export default async function GrossSalesByCityPage({
     return <></>;
   }
 
-  const {
-    period: rawPeriod,
-    anchor: rawAnchor,
-    monthYear: rawMonthYear,
-    monthNumber: rawMonthNumber,
-  } = await searchParams;
+  const { period: rawPeriod, anchor: rawAnchor } = await searchParams;
   const period = isPeriod(rawPeriod) ? rawPeriod : 'month';
-  const anchor = normalizeAnchor(period, rawAnchor, rawMonthYear, rawMonthNumber);
-  const [selectedMonthYear, selectedMonthNumber = ''] =
-    period === 'month' ? anchor.split('-') : ['', ''];
+  const anchor = normalizeAnchor(period, rawAnchor);
+  const months = monthOptions();
+  const years = yearOptions();
 
   let analytics: Awaited<ReturnType<typeof getSalesAnalytics>> | null = null;
   let loadError: string | null = null;
@@ -153,56 +164,42 @@ export default async function GrossSalesByCityPage({
             >
               <input type="hidden" name="period" value={period} />
               {period === 'month' ? (
-                <>
-                  <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-                    Year
-                    <input
-                      type="number"
-                      name="monthYear"
-                      defaultValue={selectedMonthYear}
-                      min="2000"
-                      max="2100"
-                      inputMode="numeric"
-                      className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-28"
-                    />
-                  </label>
-                  <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-                    Month
-                    <select
-                      name="monthNumber"
-                      defaultValue={String(Number(selectedMonthNumber))}
-                      className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-40"
-                    >
-                      {[
-                        'January',
-                        'February',
-                        'March',
-                        'April',
-                        'May',
-                        'June',
-                        'July',
-                        'August',
-                        'September',
-                        'October',
-                        'November',
-                        'December',
-                      ].map((month, index) => (
-                        <option key={month} value={index + 1}>
-                          {month}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </>
-              ) : (
                 <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-                  Period
-                  <input
-                    type={inputType(period)}
+                  {periodFieldLabel(period)}
+                  <select
                     name="anchor"
                     defaultValue={anchor}
-                    min={period === 'year' ? '2000' : undefined}
-                    max={period === 'year' ? '2100' : undefined}
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-52"
+                  >
+                    {months.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : period === 'year' ? (
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {periodFieldLabel(period)}
+                  <select
+                    name="anchor"
+                    defaultValue={anchor}
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-36"
+                  >
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {periodFieldLabel(period)}
+                  <input
+                    type="date"
+                    name="anchor"
+                    defaultValue={anchor}
                     className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-44"
                   />
                 </label>
