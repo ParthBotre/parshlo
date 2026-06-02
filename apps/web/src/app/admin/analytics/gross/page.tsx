@@ -249,12 +249,11 @@ export default async function GrossSalesByCityPage({
         <SalesTable
           title="Product-wise sales"
           empty="No product sales in this period."
-          headers={['Product', 'Qty', 'Free', 'Discount', 'Gross', 'Share']}
+          headers={['Product', 'Qty', 'Free', 'Gross', 'Share']}
           rows={(analytics?.productRows ?? []).map((row) => [
             row.productName,
             row.chargedQuantity,
             row.freeQuantity,
-            formatINR(row.discountPaise),
             formatINR(row.grossPaise),
             `${row.sharePercent}%`,
           ])}

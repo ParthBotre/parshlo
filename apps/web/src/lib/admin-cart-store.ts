@@ -4,7 +4,7 @@ import { type BuyerProductView } from '@parshlo/types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { UNLIMITED_CART_QTY, clampCartQuantity } from '@/lib/cart-quantity';
+import { UNLIMITED_CART_QTY } from '@/lib/cart-quantity';
 import { type CartLine, totals } from '@/lib/cart-store';
 
 export { totals };
@@ -12,22 +12,31 @@ export type { CartLine };
 
 interface AdminCartState {
   lines: CartLine[];
-  add: (product: BuyerProductView, qty?: number) => void;
+  add: (product: BuyerProductView, qty?: number, freeQty?: number) => void;
   setQty: (productId: string, qty: number) => void;
   setPriceTier: (productId: string, tier: NonNullable<CartLine['priceTier']>) => void;
   setFreeQty: (productId: string, qty: number) => void;
-  setDiscountPaise: (productId: string, paise: number) => void;
   remove: (productId: string) => void;
   clear: () => void;
+}
+
+function clampAdminQuantity(qty: number, maxQty: number): number {
+  const max = Number.isFinite(maxQty) && maxQty > 0 ? Math.floor(maxQty) : UNLIMITED_CART_QTY;
+  const value = Math.floor(qty);
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(max, Math.max(0, value));
 }
 
 export const useAdminCart = create<AdminCartState>()(
   persist(
     (set) => ({
       lines: [],
-      add: (product, qty = 1) =>
+      add: (product, qty = 1, freeQty = 0) =>
         set((state) => {
-          const nextQty = clampCartQuantity(qty, UNLIMITED_CART_QTY);
+          const nextQty = clampAdminQuantity(qty, UNLIMITED_CART_QTY);
+          const nextFreeQty = clampAdminQuantity(freeQty, UNLIMITED_CART_QTY);
           const existing = state.lines.find((l) => l.productId === product.id);
           if (existing) {
             const maxQty = Math.max(existing.maxQty, UNLIMITED_CART_QTY);
@@ -37,7 +46,11 @@ export const useAdminCart = create<AdminCartState>()(
                   ? {
                       ...l,
                       maxQty,
-                      qty: clampCartQuantity(l.qty + nextQty, maxQty),
+                      qty: clampAdminQuantity(l.qty + nextQty, maxQty),
+                      schemeFreeQuantity: clampAdminQuantity(
+                        (l.schemeFreeQuantity ?? 0) + nextFreeQty,
+                        maxQty,
+                      ),
                     }
                   : l,
               ),
@@ -57,6 +70,8 @@ export const useAdminCart = create<AdminCartState>()(
                 gstRate: product.gstRate,
                 maxQty: UNLIMITED_CART_QTY,
                 qty: nextQty,
+                schemeFreeQuantity: nextFreeQty,
+                discountPaise: 0,
               },
             ],
           };
@@ -67,11 +82,7 @@ export const useAdminCart = create<AdminCartState>()(
             l.productId === productId
               ? {
                   ...l,
-                  qty: clampCartQuantity(qty, l.maxQty || qty),
-                  schemeFreeQuantity: Math.min(
-                    l.schemeFreeQuantity ?? 0,
-                    Math.max((l.maxQty || qty) - qty, 0),
-                  ),
+                  qty: clampAdminQuantity(qty, l.maxQty || UNLIMITED_CART_QTY),
                 }
               : l,
           ),
@@ -90,7 +101,7 @@ export const useAdminCart = create<AdminCartState>()(
               ...l,
               priceTier: tier,
               unitPricePaise,
-              discountPaise: Math.min(l.discountPaise ?? 0, unitPricePaise * l.qty),
+              discountPaise: 0,
             };
           }),
         })),
@@ -100,21 +111,7 @@ export const useAdminCart = create<AdminCartState>()(
             l.productId === productId
               ? {
                   ...l,
-                  schemeFreeQuantity: Math.max(
-                    0,
-                    Math.min(Math.trunc(qty), Math.max((l.maxQty || l.qty) - l.qty, 0)),
-                  ),
-                }
-              : l,
-          ),
-        })),
-      setDiscountPaise: (productId, paise) =>
-        set((state) => ({
-          lines: state.lines.map((l) =>
-            l.productId === productId
-              ? {
-                  ...l,
-                  discountPaise: Math.max(0, Math.min(Math.trunc(paise), l.unitPricePaise * l.qty)),
+                  schemeFreeQuantity: clampAdminQuantity(qty, l.maxQty || UNLIMITED_CART_QTY),
                 }
               : l,
           ),

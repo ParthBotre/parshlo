@@ -98,17 +98,16 @@ function periodLabel(date: Date, period: OrderPeriod): string {
   }
   if (period === 'week') {
     const start = startOfWeek(date);
-    const end = new Date(start);
-    end.setUTCDate(start.getUTCDate() + 6);
-    return `${formatDateKeyDisplay(start.toISOString().slice(0, 10))} - ${formatDateKeyDisplay(end.toISOString().slice(0, 10))}`;
+    return `Week starting ${formatDateKeyDisplay(start.toISOString().slice(0, 10))}`;
   }
   if (period === 'month') {
-    const parts = calendarParts(date);
-    const lastDay = new Date(Date.UTC(parts.year, parts.month, 0)).getUTCDate();
-    return `${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-01`)} - ${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-${pad2(lastDay)}`)}`;
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: BUSINESS_TIME_ZONE,
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
   }
-  const year = calendarParts(date).year;
-  return `${formatDateKeyDisplay(`${year}-01-01`)} - ${formatDateKeyDisplay(`${year}-12-31`)}`;
+  return String(calendarParts(date).year);
 }
 
 function groupOrders(orders: AdminOrder[], period: OrderPeriod) {
@@ -213,7 +212,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                     <Link
                       key={f.value}
                       href={ordersHref(status, f.value)}
-                      className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
                         period === f.value
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -233,9 +232,14 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                         <h3 className="text-sm font-semibold">{group.label}</h3>
                         <p className="text-muted-foreground text-xs">{group.rows.length} orders</p>
                       </div>
-                      <p className="font-mono text-sm font-semibold">
-                        {formatINR(group.totalPaise)}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-muted-foreground text-[11px] uppercase tracking-wider">
+                          Period total
+                        </p>
+                        <p className="font-mono text-sm font-semibold">
+                          {formatINR(group.totalPaise)}
+                        </p>
+                      </div>
                     </div>
                     <div className="w-full max-w-full overflow-x-auto">
                       <table className="w-full min-w-[1040px] text-sm">

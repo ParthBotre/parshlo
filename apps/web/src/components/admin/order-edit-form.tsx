@@ -13,7 +13,6 @@ interface EditableOrderItem {
   productName: string;
   quantity: string;
   schemeFreeQuantity: string;
-  discountRupees: string;
   priceTier: ProductPriceTier;
   unitPricePaise: number;
   gstRate: string;
@@ -41,7 +40,6 @@ export function OrderEditForm({
       productName: item.productName,
       quantity: String(item.quantity),
       schemeFreeQuantity: String(item.schemeFreeQuantity),
-      discountRupees: (item.discountPaise / 100).toFixed(2),
       priceTier: item.priceTier,
       unitPricePaise: item.unitPricePaise,
       gstRate: item.gstRate,
@@ -80,7 +78,7 @@ export function OrderEditForm({
           productId: item.productId,
           quantity: Number.parseInt(item.quantity, 10),
           schemeFreeQuantity: Number.parseInt(item.schemeFreeQuantity || '0', 10),
-          discountPaise: Math.round(Number.parseFloat(item.discountRupees || '0') * 100),
+          discountPaise: 0,
           priceTier: item.priceTier,
         })),
       };
@@ -132,7 +130,6 @@ export function OrderEditForm({
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3 text-right">Paid qty</th>
               <th className="px-4 py-3 text-right">Free</th>
-              <th className="px-4 py-3 text-right">Discount</th>
               <th className="px-4 py-3">Rate tier</th>
               <th className="px-4 py-3 text-right">Current unit</th>
               <th className="px-4 py-3 text-right">GST Rate</th>
@@ -147,7 +144,7 @@ export function OrderEditForm({
                 <td className="px-4 py-3">
                   <input
                     type="number"
-                    min={1}
+                    min={0}
                     inputMode="numeric"
                     value={item.quantity}
                     disabled={approvedRateOnly}
@@ -168,20 +165,6 @@ export function OrderEditForm({
                       updateItem(item.productId, { schemeFreeQuantity: event.currentTarget.value })
                     }
                     className="border-input bg-background ml-auto h-9 w-24 rounded-md border px-2 text-right font-mono"
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
-                    value={item.discountRupees}
-                    disabled={approvedRateOnly}
-                    onChange={(event) =>
-                      updateItem(item.productId, { discountRupees: event.currentTarget.value })
-                    }
-                    className="border-input bg-background ml-auto h-9 w-28 rounded-md border px-2 text-right font-mono"
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -218,8 +201,7 @@ export function OrderEditForm({
 
       {approvedRateOnly ? (
         <p className="text-muted-foreground text-xs">
-          Approved orders allow rate-tier changes only. Quantities, free units, and discounts stay
-          locked.
+          Approved orders allow rate-tier changes only. Quantities and free units stay locked.
         </p>
       ) : null}
 

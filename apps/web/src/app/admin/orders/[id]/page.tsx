@@ -240,7 +240,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                   <th className="whitespace-nowrap px-5 py-3 text-right">Free</th>
                   <th className="whitespace-nowrap px-5 py-3">Rate</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Unit</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right">Discount</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">GST Rate</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right">Line total</th>
                 </tr>
@@ -262,9 +261,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right font-mono">
                       {formatINR(line.unitPricePaise)}
-                    </td>
-                    <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
-                      {line.discountPaise > 0 ? `-${formatINR(line.discountPaise)}` : '—'}
                     </td>
                     <td className="text-muted-foreground whitespace-nowrap px-5 py-3 text-right font-mono">
                       {line.gstRate}% included

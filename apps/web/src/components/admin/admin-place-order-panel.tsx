@@ -6,15 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { AdminCartDrawer } from '@/components/admin/admin-cart-drawer';
-import { AddToCartRow } from '@/components/cart/add-to-cart-row';
-import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { totals, useAdminCart } from '@/lib/admin-cart-store';
 import { type AdminBuyer, placeOrderOnBehalfFromBrowser } from '@/lib/api/admin';
-import { UNLIMITED_CART_QTY } from '@/lib/cart-quantity';
 import { PRICING_ENABLED } from '@/lib/feature-flags';
 import { formatINR } from '@/lib/utils';
 
@@ -44,6 +41,7 @@ export function AdminPlaceOrderPanel({
   const { itemCount } = totals(cart.lines);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [buyerId, setBuyerId] = useState('');
+  const [buyerQuery, setBuyerQuery] = useState('');
   const [query, setQuery] = useState('');
 
   const sortedBuyers = useMemo(
@@ -62,6 +60,17 @@ export function AdminPlaceOrderPanel({
   );
 
   const selectedBuyer = sortedBuyers.find((b) => b.id === buyerId) ?? null;
+  const visibleBuyers = useMemo(() => {
+    const needle = buyerQuery.trim().toLowerCase();
+    if (!needle) {
+      return sortedBuyers;
+    }
+    return sortedBuyers.filter((b) =>
+      [b.businessName, b.fullName, b.email, b.gstin, b.mobile, b.city, b.state, b.businessType]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle)),
+    );
+  }, [buyerQuery, sortedBuyers]);
   const catalogEnabled = Boolean(selectedBuyer && canPlaceForBuyer(selectedBuyer));
   const visibleProducts = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -93,13 +102,22 @@ export function AdminPlaceOrderPanel({
           </div>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium">Buyer</span>
+            <input
+              value={buyerQuery}
+              onChange={(event) => setBuyerQuery(event.currentTarget.value)}
+              placeholder="Search buyer by business, contact, GSTIN, city..."
+              className="border-input bg-background placeholder:text-muted-foreground focus:border-primary h-11 w-full rounded-md border px-3 text-base outline-none transition-colors sm:text-sm"
+            />
             <select
               className="border-input bg-background flex h-11 w-full rounded-md border px-3 text-sm"
               value={buyerId}
               onChange={(e) => onBuyerChange(e.target.value)}
             >
               <option value="">Choose a buyer…</option>
-              {sortedBuyers.map((b) => (
+              {selectedBuyer && !visibleBuyers.some((b) => b.id === selectedBuyer.id) ? (
+                <option value={selectedBuyer.id}>{buyerLabel(selectedBuyer)}</option>
+              ) : null}
+              {visibleBuyers.map((b) => (
                 <option key={b.id} value={b.id} disabled={!canPlaceForBuyer(b)}>
                   {buyerLabel(b)}
                   {!canPlaceForBuyer(b) ? ` (${b.accountStatus.replace(/_/g, ' ')})` : ''}
@@ -182,7 +200,7 @@ export function AdminPlaceOrderPanel({
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         buyer={selectedBuyer}
-        onCheckout={async ({ purchaseOrderNumber, notes }) => {
+        onCheckout={async ({ notes }) => {
           if (!selectedBuyer) {
             throw new Error('Select a buyer before placing the order.');
           }
@@ -192,10 +210,9 @@ export function AdminPlaceOrderPanel({
               productId: l.productId,
               quantity: l.qty,
               schemeFreeQuantity: l.schemeFreeQuantity ?? 0,
-              discountPaise: l.discountPaise ?? 0,
+              discountPaise: 0,
               priceTier: l.priceTier,
             })),
-            purchaseOrderNumber,
             notes,
           });
           cart.clear();
@@ -222,6 +239,52 @@ function AdminProductCard({
   const inCart = cart.lines.find((l) => l.productId === product.id);
   const defaultTier = priceTierForBusinessType(buyer?.businessType);
   const defaultPrice = defaultTier === 'RATE_B' ? product.rateBPaise : product.rateAPaise;
+  const [paidQty, setPaidQty] = useState('1');
+  const [freeQty, setFreeQty] = useState('0');
+  const paidQtyValue = inCart ? String(inCart.qty) : paidQty;
+  const freeQtyValue = inCart ? String(inCart.schemeFreeQuantity ?? 0) : freeQty;
+
+  const parseQty = (value: string): number => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  };
+  const currentPaidQty = parseQty(paidQtyValue);
+  const currentFreeQty = parseQty(freeQtyValue);
+  const canAdd = !disabled && (currentPaidQty > 0 || currentFreeQty > 0);
+
+  const updatePaidQty = (value: string): void => {
+    const next = String(parseQty(value));
+    if (inCart) {
+      cart.setQty(product.id, Number(next));
+    } else {
+      setPaidQty(next);
+    }
+  };
+
+  const updateFreeQty = (value: string): void => {
+    const next = String(parseQty(value));
+    if (inCart) {
+      cart.setFreeQty(product.id, Number(next));
+    } else {
+      setFreeQty(next);
+    }
+  };
+
+  const addOrUpdate = (): void => {
+    if (!canAdd) {
+      return;
+    }
+    if (inCart) {
+      cart.setQty(product.id, currentPaidQty);
+      cart.setFreeQty(product.id, currentFreeQty);
+      return;
+    }
+    cart.add(
+      { ...product, wholesalePricePaise: defaultPrice, priceTier: defaultTier },
+      currentPaidQty,
+      currentFreeQty,
+    );
+  };
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
@@ -245,24 +308,41 @@ function AdminProductCard({
           {defaultTier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)'} · GST Rate (
           {product.gstRate}%) included in price
         </p>
-        <div className="mt-auto pt-1">
-          {inCart ? (
-            <CartQuantityInput
-              qty={inCart.qty}
-              maxQty={inCart.maxQty || UNLIMITED_CART_QTY}
-              onQtyChange={(next) => cart.setQty(product.id, next)}
-              disabled={disabled}
-              className="w-full justify-center"
-            />
-          ) : (
-            <AddToCartRow
-              product={product}
-              disabled={disabled}
-              onAdd={(p, qty) => {
-                cart.add({ ...p, wholesalePricePaise: defaultPrice, priceTier: defaultTier }, qty);
-              }}
-            />
-          )}
+        <div className="mt-auto space-y-3 pt-1">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+              Paid qty
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={paidQtyValue}
+                disabled={disabled}
+                onChange={(event) => updatePaidQty(event.currentTarget.value)}
+                className="border-input bg-background text-foreground h-10 rounded-md border px-3 text-sm"
+              />
+            </label>
+            <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+              Free qty
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={freeQtyValue}
+                disabled={disabled}
+                onChange={(event) => updateFreeQty(event.currentTarget.value)}
+                className="border-input bg-background text-foreground h-10 rounded-md border px-3 text-sm"
+              />
+            </label>
+          </div>
+          {currentPaidQty === 0 && currentFreeQty > 0 ? (
+            <p className="text-muted-foreground text-xs">
+              Free-only reimbursement line. No amount will be billed for this product.
+            </p>
+          ) : null}
+          <Button className="w-full" disabled={!canAdd} onClick={addOrUpdate}>
+            {inCart ? 'Update cart' : 'Add to cart'}
+          </Button>
         </div>
       </CardContent>
     </Card>

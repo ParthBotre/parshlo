@@ -1,9 +1,9 @@
-import { BadgeCheck, IndianRupee, ScrollText, Users } from 'lucide-react';
+import { BadgeCheck, IndianRupee, MapPin, ScrollText, Users } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { getAnalyticsSummary, listPendingKyc } from '@/lib/api/admin';
+import { getAnalyticsSummary, getSalesByCity, listPendingKyc } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { formatDateIst } from '@/lib/format-datetime';
@@ -22,11 +22,13 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
 
   let summary: Awaited<ReturnType<typeof getAnalyticsSummary>> | null = null;
   let pending: Awaited<ReturnType<typeof listPendingKyc>> = [];
+  let citySales: Awaited<ReturnType<typeof getSalesByCity>> | null = null;
 
   try {
-    [summary, pending] = await Promise.all([
+    [summary, pending, citySales] = await Promise.all([
       getAnalyticsSummary(session.accessToken, { next: { revalidate: 30 } }),
       listPendingKyc(session.accessToken, { next: { revalidate: 30 } }),
+      getSalesByCity(session.accessToken, { next: { revalidate: 30 } }),
     ]);
   } catch (err) {
     if (!(err instanceof ApiError)) {
@@ -70,6 +72,61 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
           href="/admin/analytics/gross"
         />
       </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-base font-semibold">City-wise sales</h2>
+                <p className="text-muted-foreground text-xs">
+                  {formatINR(citySales?.totalGrossPaise ?? 0)} across {citySales?.totalOrders ?? 0}{' '}
+                  orders this month
+                </p>
+              </div>
+            </div>
+            <Link href="/admin/analytics/gross" className="text-primary text-sm hover:underline">
+              Open full analytics →
+            </Link>
+          </div>
+          {(citySales?.rows ?? []).length === 0 ? (
+            <p className="text-muted-foreground border-t p-8 text-center text-sm">
+              No city sales recorded this month.
+            </p>
+          ) : (
+            <div className="overflow-x-auto border-t">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-5 py-3">City</th>
+                    <th className="px-5 py-3 text-right">Orders</th>
+                    <th className="px-5 py-3 text-right">Gross</th>
+                    <th className="px-5 py-3 text-right">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(citySales?.rows ?? []).slice(0, 8).map((row) => (
+                    <tr key={`${row.city}-${row.state}`} className="border-t">
+                      <td className="px-5 py-3 font-medium">
+                        {row.city}
+                        <span className="text-muted-foreground font-normal"> · {row.state}</span>
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono">{row.orderCount}</td>
+                      <td className="px-5 py-3 text-right font-mono">
+                        {formatINR(row.grossPaise)}
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono">{row.sharePercent}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-0">

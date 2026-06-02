@@ -29,13 +29,18 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[
   REJECTED: [],
 };
 
-export const OrderItemInput = z.object({
-  productId: EntityId,
-  quantity: z.number().int().positive(),
-  schemeFreeQuantity: z.number().int().nonnegative().default(0),
-  discountPaise: Paise.default(0),
-  priceTier: ProductPriceTier.optional(),
-});
+export const OrderItemInput = z
+  .object({
+    productId: EntityId,
+    quantity: z.number().int().nonnegative(),
+    schemeFreeQuantity: z.number().int().nonnegative().default(0),
+    discountPaise: Paise.default(0),
+    priceTier: ProductPriceTier.optional(),
+  })
+  .refine((item) => item.quantity > 0 || item.schemeFreeQuantity > 0, {
+    path: ['quantity'],
+    message: 'Enter paid quantity or free quantity.',
+  });
 export type OrderItemInput = z.infer<typeof OrderItemInput>;
 
 export const PlaceOrderInput = z.object({
@@ -59,7 +64,7 @@ export type UpdateOrderBeforeApprovalInput = z.infer<typeof UpdateOrderBeforeApp
 export const OrderItemView = z.object({
   productId: EntityId,
   productName: z.string(),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().nonnegative(),
   schemeFreeQuantity: z.number().int().nonnegative().default(0),
   unitPricePaise: Paise,
   discountPaise: Paise.default(0),

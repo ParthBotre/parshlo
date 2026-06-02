@@ -3,7 +3,6 @@
 import { Info, Loader2, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 
-import { CartQuantityInput } from '@/components/cart/cart-quantity-input';
 import { Button } from '@/components/ui/button';
 import { totals, useAdminCart } from '@/lib/admin-cart-store';
 import { type AdminBuyer } from '@/lib/api/admin';
@@ -27,6 +26,9 @@ export function AdminCartDrawer({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasInvalidLine = cart.lines.some(
+    (line) => line.qty <= 0 && (line.schemeFreeQuantity ?? 0) <= 0,
+  );
 
   const onPlaceOrder = async (): Promise<void> => {
     if (!buyer || cart.lines.length === 0) {
@@ -50,11 +52,6 @@ export function AdminCartDrawer({
       setSubmitting(false);
     }
   };
-  const updateDiscountRupees = (productId: string, value: string): void => {
-    const parsed = Number(value);
-    cart.setDiscountPaise(productId, Number.isFinite(parsed) ? Math.round(parsed * 100) : 0);
-  };
-
   if (!open) {
     return null;
   }
@@ -107,11 +104,19 @@ export function AdminCartDrawer({
                       <Trash2 className="text-muted-foreground h-4 w-4" />
                     </Button>
                   </div>
-                  <CartQuantityInput
-                    qty={line.qty}
-                    maxQty={line.maxQty || line.qty}
-                    onQtyChange={(next) => cart.setQty(line.productId, next)}
-                  />
+                  <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                    Paid qty
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={line.qty}
+                      onChange={(event) =>
+                        cart.setQty(line.productId, Number(event.currentTarget.value))
+                      }
+                      className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
+                    />
+                  </label>
                   <label className="text-muted-foreground grid gap-1 text-xs font-medium">
                     Rate
                     <select
@@ -132,40 +137,10 @@ export function AdminCartDrawer({
                       </option>
                     </select>
                   </label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-                      Free qty
-                      <input
-                        type="number"
-                        min={0}
-                        max={Math.max((line.maxQty || line.qty) - line.qty, 0)}
-                        value={line.schemeFreeQuantity ?? 0}
-                        onChange={(e) =>
-                          cart.setFreeQty(line.productId, Number(e.currentTarget.value))
-                        }
-                        className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
-                      />
-                    </label>
-                    <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-                      Discount (₹)
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        max={(line.unitPricePaise * line.qty) / 100}
-                        value={((line.discountPaise ?? 0) / 100).toString()}
-                        onChange={(e) =>
-                          updateDiscountRupees(line.productId, e.currentTarget.value)
-                        }
-                        className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
-                      />
-                    </label>
-                  </div>
-                  {(line.schemeFreeQuantity ?? 0) > 0 || (line.discountPaise ?? 0) > 0 ? (
+                  {(line.schemeFreeQuantity ?? 0) > 0 ? (
                     <p className="text-muted-foreground text-xs">
                       Staff scheme: {line.schemeFreeQuantity ?? 0} free · Total qty{' '}
-                      {line.qty + (line.schemeFreeQuantity ?? 0)} · Discount{' '}
-                      {formatINR(line.discountPaise ?? 0)}
+                      {line.qty + (line.schemeFreeQuantity ?? 0)}
                     </p>
                   ) : null}
                 </li>
@@ -209,7 +184,9 @@ export function AdminCartDrawer({
           <Button
             className="w-full"
             size="lg"
-            disabled={submitting || cart.lines.length === 0 || !PRICING_ENABLED || !buyer}
+            disabled={
+              submitting || cart.lines.length === 0 || hasInvalidLine || !PRICING_ENABLED || !buyer
+            }
             onClick={() => void onPlaceOrder()}
           >
             {submitting ? (

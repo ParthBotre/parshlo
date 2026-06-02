@@ -220,14 +220,23 @@ export class OrderService {
     );
 
     const view = await this.getOrder(order.id, buyerId);
+    const orderPlacer =
+      options?.actorId && options.actorId !== buyerId
+        ? await this.prisma.user.findUnique({
+            where: { id: options.actorId },
+            select: { email: true, fullName: true },
+          })
+        : { email: buyer.email, fullName: buyer.fullName };
 
     // Side-effects after commit. Best-effort: failures are logged but never
     // propagate back to the user — their order is already durable.
-    void this.dispatchOrderPlacedSideEffects(view, buyer.email, buyer.fullName).catch(
-      (err: unknown) => {
-        this.log.error({ err, orderId: view.id }, 'failed to dispatch order-placed side effects');
-      },
-    );
+    void this.dispatchOrderPlacedSideEffects(
+      view,
+      orderPlacer?.email ?? buyer.email,
+      orderPlacer?.fullName ?? buyer.fullName,
+    ).catch((err: unknown) => {
+      this.log.error({ err, orderId: view.id }, 'failed to dispatch order-placed side effects');
+    });
 
     return view;
   }

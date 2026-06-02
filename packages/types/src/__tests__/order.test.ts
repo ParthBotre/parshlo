@@ -54,13 +54,33 @@ describe('PlaceOrderInput', () => {
     expect(() => PlaceOrderInput.parse({ ...validBase, idempotencyKey: 'not-a-uuid' })).toThrow();
   });
 
-  it('rejects non-positive quantities', () => {
+  it('accepts a free-only line for staff reimbursement flows', () => {
+    expect(
+      PlaceOrderInput.parse({
+        ...validBase,
+        items: [
+          {
+            productId: '11111111-1111-1111-1111-111111111111',
+            quantity: 0,
+            schemeFreeQuantity: 12,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      items: [{ quantity: 0, schemeFreeQuantity: 12 }],
+    });
+  });
+
+  it('rejects lines with no paid or free quantity', () => {
     expect(() =>
       PlaceOrderInput.parse({
         ...validBase,
         items: [{ productId: '11111111-1111-1111-1111-111111111111', quantity: 0 }],
       }),
     ).toThrow();
+  });
+
+  it('rejects negative quantities', () => {
     expect(() =>
       PlaceOrderInput.parse({
         ...validBase,
