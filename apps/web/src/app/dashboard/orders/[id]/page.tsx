@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getOrder } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateTimeIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -64,7 +65,7 @@ export default async function OrderDetailPage({ params }: PageProps): Promise<JS
             {order.orderNumber}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Placed {new Date(order.placedAt).toLocaleString('en-IN')}
+            Placed {formatDateTimeIst(order.placedAt)}
           </p>
         </div>
         <Badge

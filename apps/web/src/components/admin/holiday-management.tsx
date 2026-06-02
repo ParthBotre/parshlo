@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { type EmployeeLeaveDashboard, type EmployeeLeaveRequest } from '@/lib/api/admin';
+import { dateInputKeyIst, formatDateKeyDisplay } from '@/lib/format-datetime';
 
 const STATUS_VARIANTS = {
   PENDING: 'secondary',
@@ -19,7 +20,7 @@ const STATUS_VARIANTS = {
 } as const;
 
 function todayDateInput(): string {
-  return new Date().toISOString().slice(0, 10);
+  return dateInputKeyIst();
 }
 
 function inclusiveDayCount(startDate: string, endDate: string): number {
@@ -38,11 +39,7 @@ function readProblem(json: unknown, fallback: string): string {
 }
 
 function formatDate(value: string): string {
-  return new Date(`${value}T00:00:00.000Z`).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatDateKeyDisplay(value);
 }
 
 export function HolidayManagement({

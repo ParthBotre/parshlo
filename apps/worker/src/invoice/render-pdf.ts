@@ -34,6 +34,19 @@ export interface InvoiceData {
   totalPaise: number;
 }
 
+function formatIstDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(date);
+  const v = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return `${v('day')}-${v('month')}-${v('year')}`;
+}
+
 /**
  * Render a GST-compliant tax invoice PDF. Returns both the bytes and a
  * SHA-256 digest of the bytes for retention/audit hashing.
@@ -76,7 +89,7 @@ export async function renderInvoicePdf(
   y -= 12;
   draw(`Order #: ${data.orderNumber}`, { size: 9, color: grey });
   y -= 12;
-  draw(`Date: ${data.placedAt.toISOString().slice(0, 10)}`, { size: 9, color: grey });
+  draw(`Date: ${formatIstDate(data.placedAt)}`, { size: 9, color: grey });
 
   // ---- Seller / Buyer block ----
   y -= 30;

@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatDateTimeIst } from '@/lib/format-datetime';
 
 export function KycActionRow({
   id,
@@ -77,9 +78,7 @@ export function KycActionRow({
       <td className="px-5 py-3">
         <Badge variant="secondary">{status.replace(/_/g, ' ')}</Badge>
       </td>
-      <td className="text-muted-foreground px-5 py-3">
-        {new Date(submittedAt).toLocaleString('en-IN')}
-      </td>
+      <td className="text-muted-foreground px-5 py-3">{formatDateTimeIst(submittedAt)}</td>
       <td className="px-5 py-3">
         <div className="flex items-center justify-end gap-2">
           {error ? <span className="text-destructive text-xs">{error}</span> : null}

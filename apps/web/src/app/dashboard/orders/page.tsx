@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { listMyOrders } from '@/lib/api/orders';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateTimeIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -92,7 +93,7 @@ export default async function OrdersPage(): Promise<JSX.Element> {
                         {o.items.length}
                       </td>
                       <td className="text-muted-foreground hidden whitespace-nowrap px-4 py-3 sm:table-cell sm:px-5">
-                        {new Date(o.placedAt).toLocaleString('en-IN')}
+                        {formatDateTimeIst(o.placedAt)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-mono sm:px-5">
                         {formatINR(o.totalPaise)}

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getAdminBuyer } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateIst, formatDateKeyDisplay } from '@/lib/format-datetime';
 import { orderStatusLabel } from '@/lib/order-workflow';
 import { formatINR } from '@/lib/utils';
 
@@ -44,7 +45,7 @@ function isBuyerAnalyticsPeriod(value: string | undefined): value is BuyerAnalyt
 }
 
 function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString('en-IN') : '—';
+  return value ? formatDateIst(value) : '—';
 }
 
 function businessCalendarDate(now = new Date()): Date {
@@ -56,10 +57,6 @@ function businessCalendarDate(now = new Date()): Date {
   }).formatToParts(now);
   const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
   return new Date(Date.UTC(value('year'), value('month') - 1, value('day')));
-}
-
-function formatUtcDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
 }
 
 function dateKey(date: Date): string {
@@ -141,30 +138,24 @@ function periodContextLabel(period: BuyerAnalyticsPeriod, anchor: string): strin
   const anchorDate = parseDateKey(anchor) ?? businessCalendarDate();
 
   if (period === 'day') {
-    return formatUtcDate(anchorDate, {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDateKeyDisplay(dateKey(anchorDate));
   }
 
   if (period === 'week') {
     const start = parseWeekKey(anchor) ?? anchorDate;
     const end = new Date(start);
     end.setUTCDate(start.getUTCDate() + 6);
-    return `${anchor.replace('-W', ' Week ')} · ${formatUtcDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    return `${formatDateKeyDisplay(dateKey(start))} - ${formatDateKeyDisplay(dateKey(end))}`;
   }
 
   if (period === 'month') {
     const [year, month] = anchor.split('-').map(Number);
-    return formatUtcDate(new Date(Date.UTC(year, month - 1, 1)), {
-      month: 'long',
-      year: 'numeric',
-    });
+    const paddedMonth = String(month).padStart(2, '0');
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return `${formatDateKeyDisplay(`${year}-${paddedMonth}-01`)} - ${formatDateKeyDisplay(`${year}-${paddedMonth}-${String(lastDay).padStart(2, '0')}`)}`;
   }
 
-  return anchor;
+  return `${formatDateKeyDisplay(`${anchor}-01-01`)} - ${formatDateKeyDisplay(`${anchor}-12-31`)}`;
 }
 
 function periodInputConfig(period: BuyerAnalyticsPeriod): {
@@ -235,7 +226,7 @@ function weekCalendar(anchor: string): {
   }
 
   return {
-    monthLabel: formatUtcDate(monthStart, { month: 'long', year: 'numeric' }),
+    monthLabel: `${formatDateKeyDisplay(dateKey(monthStart))} - ${formatDateKeyDisplay(dateKey(monthEnd))}`,
     previousAnchor: weekKey(
       new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1)),
     ),

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type AdminEmployee } from '@/lib/api/admin';
+import { formatDateTimeIst } from '@/lib/format-datetime';
 
 const ROLES = ['SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN'] as const;
 const STATUSES = ['APPROVED', 'SUSPENDED'] as const;
@@ -193,9 +194,7 @@ function EmployeeRow({
   const [role, setRole] = useState(employee.primaryRole);
   const [status, setStatus] = useState(employee.accountStatus);
   const [reason, setReason] = useState(employee.suspensionReason ?? '');
-  const lastLogin = employee.lastLoginAt
-    ? new Date(employee.lastLoginAt).toLocaleString('en-IN')
-    : 'Never';
+  const lastLogin = employee.lastLoginAt ? formatDateTimeIst(employee.lastLoginAt) : 'Never';
 
   return (
     <tr>

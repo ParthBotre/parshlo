@@ -15,6 +15,7 @@ import {
   StatementList,
   StatementRow,
 } from '@/lib/api/admin';
+import { formatDateKeyDisplay } from '@/lib/format-datetime';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -47,7 +48,7 @@ function paise(v: string | number | bigint) {
 }
 
 function fmt(d: string) {
-  return new Date(d).toLocaleDateString('en-IN', { timeZone: BUSINESS_TIME_ZONE });
+  return formatDateKeyDisplay(calendarDateKey(new Date(d)));
 }
 
 function calendarParts(date: Date): { year: number; month: number; day: number } {
@@ -71,14 +72,6 @@ function calendarDateKey(date: Date): string {
   return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
 }
 
-function formatCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString('en-IN', { ...options, timeZone: BUSINESS_TIME_ZONE });
-}
-
-function formatUtcCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
-}
-
 function businessCalendarDate(date: Date): Date {
   const parts = calendarParts(date);
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
@@ -93,9 +86,7 @@ function dateInputFromBusinessIso(value: string): string {
 }
 
 function dateInputToStatementLabel(dateValue: string): string {
-  return new Date(`${dateValue}T00:00:00.000+05:30`).toLocaleDateString('en-IN', {
-    timeZone: BUSINESS_TIME_ZONE,
-  });
+  return formatDateKeyDisplay(dateValue);
 }
 
 function monthToBillingPeriod(
@@ -173,26 +164,24 @@ function startOfWeek(date: Date) {
 
 function formatPeriodLabel(date: Date, period: ConsignmentPeriod) {
   if (period === 'day') {
-    return formatCalendarDate(date, {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDateKeyDisplay(calendarDateKey(date));
   }
 
   if (period === 'week') {
     const start = startOfWeek(date);
     const end = new Date(start);
     end.setUTCDate(start.getUTCDate() + 6);
-    return `${formatUtcCalendarDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcCalendarDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    return `${formatDateKeyDisplay(start.toISOString().slice(0, 10))} - ${formatDateKeyDisplay(end.toISOString().slice(0, 10))}`;
   }
 
   if (period === 'month') {
-    return formatCalendarDate(date, { month: 'long', year: 'numeric' });
+    const parts = calendarParts(date);
+    const lastDay = new Date(Date.UTC(parts.year, parts.month, 0)).getUTCDate();
+    return `${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-01`)} - ${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-${pad2(lastDay)}`)}`;
   }
 
-  return formatCalendarDate(date, { year: 'numeric' });
+  const year = calendarParts(date).year;
+  return `${formatDateKeyDisplay(`${year}-01-01`)} - ${formatDateKeyDisplay(`${year}-12-31`)}`;
 }
 
 function periodKey(date: Date, period: ConsignmentPeriod) {

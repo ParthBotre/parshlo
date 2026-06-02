@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { loadMonthOrdersForAnalytics } from '@/lib/admin-gross-analytics';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { dateInputKeyIst } from '@/lib/format-datetime';
 import {
   aggregateSalesByBuyerInLocation,
   type BuyerPeriodRanges,
@@ -37,7 +38,7 @@ function isPeriod(value: string | undefined): value is Period {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return dateInputKeyIst();
 }
 
 function defaultAnchor(period: Period): string {

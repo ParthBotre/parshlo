@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { listAllOrders } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateKeyDisplay } from '@/lib/format-datetime';
 import { orderStatusLabel } from '@/lib/order-workflow';
 import { formatINR } from '@/lib/utils';
 
@@ -68,14 +69,6 @@ function calendarDateKey(date: Date): string {
   return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
 }
 
-function formatCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString('en-IN', { ...options, timeZone: BUSINESS_TIME_ZONE });
-}
-
-function formatUtcCalendarDate(date: Date, options: Intl.DateTimeFormatOptions): string {
-  return date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' });
-}
-
 function businessCalendarDate(date: Date): Date {
   const parts = calendarParts(date);
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
@@ -101,23 +94,21 @@ function periodKey(date: Date, period: OrderPeriod): string {
 
 function periodLabel(date: Date, period: OrderPeriod): string {
   if (period === 'day') {
-    return formatCalendarDate(date, {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDateKeyDisplay(calendarDateKey(date));
   }
   if (period === 'week') {
     const start = startOfWeek(date);
     const end = new Date(start);
     end.setUTCDate(start.getUTCDate() + 6);
-    return `${formatUtcCalendarDate(start, { day: '2-digit', month: 'short' })} - ${formatUtcCalendarDate(end, { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    return `${formatDateKeyDisplay(start.toISOString().slice(0, 10))} - ${formatDateKeyDisplay(end.toISOString().slice(0, 10))}`;
   }
   if (period === 'month') {
-    return formatCalendarDate(date, { month: 'long', year: 'numeric' });
+    const parts = calendarParts(date);
+    const lastDay = new Date(Date.UTC(parts.year, parts.month, 0)).getUTCDate();
+    return `${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-01`)} - ${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-${pad2(lastDay)}`)}`;
   }
-  return formatCalendarDate(date, { year: 'numeric' });
+  const year = calendarParts(date).year;
+  return `${formatDateKeyDisplay(`${year}-01-01`)} - ${formatDateKeyDisplay(`${year}-12-31`)}`;
 }
 
 function groupOrders(orders: AdminOrder[], period: OrderPeriod) {
@@ -286,11 +277,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                                 {rateTierLabel(o.rateTierSummary)}
                               </td>
                               <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
-                                {formatCalendarDate(new Date(o.placedAt), {
-                                  day: 'numeric',
-                                  month: 'numeric',
-                                  year: 'numeric',
-                                })}
+                                {formatDateKeyDisplay(calendarDateKey(new Date(o.placedAt)))}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
                                 {formatINR(o.totalPaise)}

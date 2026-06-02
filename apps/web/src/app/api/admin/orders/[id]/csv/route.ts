@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getAdminOrder } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateIst } from '@/lib/format-datetime';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -18,12 +19,7 @@ function numericOrderNumber(orderNumber: string): string {
 }
 
 function csvDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
+  return formatDateIst(value);
 }
 
 export async function GET(_req: Request, { params }: RouteContext): Promise<Response> {

@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getAnalyticsSummary, listPendingKyc } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
+import { formatDateIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -99,7 +100,7 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
                       {k.status.replace(/_/g, ' ')}
                     </td>
                     <td className="text-muted-foreground px-5 py-3">
-                      {new Date(k.submittedAt).toLocaleDateString('en-IN')}
+                      {formatDateIst(k.submittedAt)}
                     </td>
                   </tr>
                 ))}

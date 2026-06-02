@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { type AdminBuyer } from '@/lib/api/admin';
+import { formatDateIst } from '@/lib/format-datetime';
 
 const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'secondary' | 'outline'> = {
   APPROVED: 'success',
@@ -121,7 +122,7 @@ export function BuyerDirectory({ buyers }: { buyers: AdminBuyer[] }): JSX.Elemen
                     </Badge>
                   </td>
                   <td className="text-muted-foreground whitespace-nowrap px-5 py-3">
-                    {new Date(buyer.createdAt).toLocaleDateString('en-IN')}
+                    {formatDateIst(buyer.createdAt)}
                   </td>
                 </tr>
               ))}
