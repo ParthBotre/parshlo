@@ -12,7 +12,7 @@ import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getAdminOrder } from '@/lib/api/admin';
+import { getAdminOrder, listAdminProducts } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { courierServiceLabel } from '@/lib/courier-services';
@@ -52,8 +52,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
   }
 
   let order: Awaited<ReturnType<typeof getAdminOrder>>;
+  let products: Awaited<ReturnType<typeof listAdminProducts>> = [];
   try {
     order = await getAdminOrder(session.accessToken, id, { next: { revalidate: 0 } });
+    if (session.user.roles.includes('SUPER_ADMIN')) {
+      products = await listAdminProducts(session.accessToken, { next: { revalidate: 0 } });
+    }
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 404 || err.problem.code === 'ORDER_NOT_FOUND') {
@@ -137,6 +141,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
                 order={order}
                 canEdit={canApproveOrClose}
                 canEditApprovedRates={canEditApprovedRates}
+                products={products.filter((product) => product.status === 'ACTIVE')}
               />
             </CardContent>
           </Card>

@@ -39,7 +39,7 @@ export const OrderItemInput = z
   })
   .refine((item) => item.quantity > 0 || item.schemeFreeQuantity > 0, {
     path: ['quantity'],
-    message: 'Enter paid quantity or free quantity.',
+    message: 'Remove the product line or keep at least one paid/free unit.',
   });
 export type OrderItemInput = z.infer<typeof OrderItemInput>;
 

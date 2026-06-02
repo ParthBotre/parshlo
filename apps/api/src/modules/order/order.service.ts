@@ -583,18 +583,12 @@ export class OrderService {
 
       if (superAdminEditableAfterApproval) {
         const existingByProductId = new Map(order.items.map((item) => [item.productId, item]));
-        if (existingByProductId.size !== input.items.length) {
-          throw new BadRequestException({
-            code: 'ORDER_APPROVED_ITEMS_FIXED',
-            message: 'Approved orders can only edit existing product lines before dispatch.',
-          });
-        }
         for (const item of input.items) {
           const existing = existingByProductId.get(item.productId);
-          if (!existing || existing.discountPaise !== BigInt(item.discountPaise)) {
+          if (existing && existing.discountPaise !== BigInt(item.discountPaise)) {
             throw new BadRequestException({
               code: 'ORDER_APPROVED_ITEMS_FIXED',
-              message: 'Approved orders can only edit existing product lines before dispatch.',
+              message: 'Approved orders cannot edit discounts.',
             });
           }
         }

@@ -1,11 +1,12 @@
 'use client';
 
 import { type OrderView, type ProductPriceTier } from '@parshlo/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { type AdminProduct } from '@/lib/api/admin';
 import { formatINR } from '@/lib/utils';
 
 interface EditableOrderItem {
@@ -15,6 +16,8 @@ interface EditableOrderItem {
   schemeFreeQuantity: string;
   priceTier: ProductPriceTier;
   unitPricePaise: number;
+  rateAPaise?: number;
+  rateBPaise?: number;
   gstRate: string;
 }
 
@@ -26,10 +29,12 @@ export function OrderEditForm({
   order,
   canEdit,
   canEditApprovedRates,
+  products = [],
 }: {
   order: OrderView;
   canEdit: boolean;
   canEditApprovedRates: boolean;
+  products?: AdminProduct[];
 }): JSX.Element {
   const router = useRouter();
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(order.purchaseOrderNumber ?? '');
@@ -49,9 +54,21 @@ export function OrderEditForm({
   const [error, setError] = useState<string | null>(null);
   const editableBeforeApproval =
     canEdit && (order.status === 'RECEIVED' || order.status === 'UNDER_REVIEW');
-  const superAdminEditableAfterApproval =
-    canEditApprovedRates && (order.status === 'APPROVED' || order.status === 'PREPARING');
-  const editable = editableBeforeApproval || superAdminEditableAfterApproval;
+  const superAdminCanManageLines =
+    canEditApprovedRates &&
+    (order.status === 'RECEIVED' ||
+      order.status === 'UNDER_REVIEW' ||
+      order.status === 'APPROVED' ||
+      order.status === 'PREPARING');
+  const editable = editableBeforeApproval || superAdminCanManageLines;
+  const availableProducts = useMemo(
+    () =>
+      products
+        .filter((product) => !items.some((item) => item.productId === product.id))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [items, products],
+  );
+  const [productToAdd, setProductToAdd] = useState('');
 
   if (!editable) {
     return (
@@ -68,20 +85,59 @@ export function OrderEditForm({
     );
   };
 
+  const removeItem = (productId: string): void => {
+    setItems((current) => current.filter((item) => item.productId !== productId));
+  };
+
+  const addProduct = (): void => {
+    const product = products.find((p) => p.id === productToAdd);
+    if (!product) {
+      return;
+    }
+    setItems((current) => [
+      ...current,
+      {
+        productId: product.id,
+        productName: product.name,
+        quantity: '1',
+        schemeFreeQuantity: '0',
+        priceTier: 'RATE_A',
+        unitPricePaise: product.rateAPaise,
+        rateAPaise: product.rateAPaise,
+        rateBPaise: product.rateBPaise,
+        gstRate: product.gstRate,
+      },
+    ]);
+    setProductToAdd('');
+  };
+
+  const itemUnitPrice = (item: EditableOrderItem): number => {
+    if (item.priceTier === 'RATE_B') {
+      return item.rateBPaise ?? item.unitPricePaise;
+    }
+    return item.rateAPaise ?? item.unitPricePaise;
+  };
+
   const submit = async (): Promise<void> => {
     setSubmitting(true);
     setError(null);
     try {
-      const payload = {
-        purchaseOrderNumber: purchaseOrderNumber.trim() || undefined,
-        notes: notes.trim() || undefined,
-        items: items.map((item) => ({
+      const normalizedItems = items
+        .map((item) => ({
           productId: item.productId,
-          quantity: Number.parseInt(item.quantity, 10),
+          quantity: Number.parseInt(item.quantity || '0', 10),
           schemeFreeQuantity: Number.parseInt(item.schemeFreeQuantity || '0', 10),
           discountPaise: 0,
           priceTier: item.priceTier,
-        })),
+        }))
+        .filter((item) => item.quantity > 0 || item.schemeFreeQuantity > 0);
+      if (normalizedItems.length === 0) {
+        throw new Error('Keep at least one product with paid quantity or free quantity.');
+      }
+      const payload = {
+        purchaseOrderNumber: purchaseOrderNumber.trim() || undefined,
+        notes: notes.trim() || undefined,
+        items: normalizedItems,
       };
       const res = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
         method: 'PATCH',
@@ -124,8 +180,31 @@ export function OrderEditForm({
         </label>
       </div>
 
+      {superAdminCanManageLines ? (
+        <div className="grid gap-2 rounded-md border p-3 sm:flex sm:items-end">
+          <label className="text-muted-foreground grid flex-1 gap-1 text-xs font-medium uppercase tracking-wider">
+            Add product
+            <select
+              value={productToAdd}
+              onChange={(event) => setProductToAdd(event.currentTarget.value)}
+              className="border-input bg-background text-foreground h-10 rounded-md border px-3 text-sm normal-case tracking-normal"
+            >
+              <option value="">Choose product…</option>
+              {availableProducts.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="button" variant="outline" onClick={addProduct} disabled={!productToAdd}>
+            Add product
+          </Button>
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[800px] text-sm">
           <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
             <tr>
               <th className="px-4 py-3">Product</th>
@@ -134,6 +213,7 @@ export function OrderEditForm({
               <th className="px-4 py-3">Rate tier</th>
               <th className="px-4 py-3 text-right">Current unit</th>
               <th className="px-4 py-3 text-right">GST Rate</th>
+              {superAdminCanManageLines ? <th className="px-4 py-3" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -181,11 +261,24 @@ export function OrderEditForm({
                   </select>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
-                  {formatINR(item.unitPricePaise)}
+                  {formatINR(itemUnitPrice(item))}
                 </td>
                 <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-right font-mono">
                   {item.gstRate}% included
                 </td>
+                {superAdminCanManageLines ? (
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeItem(item.productId)}
+                      aria-label={`Remove ${item.productName}`}
+                    >
+                      <Trash2 className="text-muted-foreground h-4 w-4" />
+                    </Button>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -198,16 +291,16 @@ export function OrderEditForm({
         </p>
       ) : null}
 
-      {superAdminEditableAfterApproval ? (
+      {superAdminCanManageLines ? (
         <p className="text-muted-foreground text-xs">
           Super admins can edit paid quantity, free quantity, and rate tier until the order is
-          dispatched. Product lines stay fixed after approval.
+          dispatched. Rows with 0 paid and 0 free are removed on save.
         </p>
       ) : null}
 
       <Button onClick={() => void submit()} disabled={submitting}>
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {superAdminEditableAfterApproval ? 'Save super admin edits' : 'Save order edits'}
+        {superAdminCanManageLines ? 'Save super admin edits' : 'Save order edits'}
       </Button>
     </div>
   );
