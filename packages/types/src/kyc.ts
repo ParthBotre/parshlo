@@ -105,10 +105,28 @@ export const AdminCreateBuyerInputSchema = B2BApplicationInputSchema.extend({
 });
 export type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
 
-export const AdminUpdateBuyerInputSchema = B2BApplicationInputSchema.extend({
+const AdminUpdateBuyerAddress = z.object({
+  line1: z.string().trim().max(200).optional(),
+  line2: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(100).optional(),
+  state: IndianStateCode.optional(),
+  pin: OptionalIndianPin.or(z.literal('000000')),
+  country: z.literal('IN').default('IN').optional(),
+});
+
+export const AdminUpdateBuyerInputSchema = z.object({
+  businessName: z.string().trim().max(200).optional(),
+  ownerName: z.string().trim().max(120).optional(),
+  businessType: BusinessType.optional(),
   gstin: AdminBuyerGstin,
-  accountStatus: AdminBuyerAccountStatus,
-}).partial();
+  pan: Pan.or(z.literal('')).optional(),
+  drugLicenseNumber: z.string().trim().max(60).optional(),
+  pharmacyRegistrationNumber: z.string().trim().max(60).optional(),
+  mobile: IndianMobile.or(z.literal('')).optional(),
+  businessEmail: z.string().trim().max(254).optional(),
+  address: AdminUpdateBuyerAddress.optional(),
+  accountStatus: AdminBuyerAccountStatus.optional(),
+});
 export type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
 
 /** KYC document types we accept. */

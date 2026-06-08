@@ -110,6 +110,37 @@ describe('Admin buyer GSTIN input', () => {
     expect(parsed.gstin).toBe('UNREGISTERED');
   });
 
+  it('allows legacy imported buyer records with blank optional admin-edit fields', () => {
+    const parsed = AdminUpdateBuyerInputSchema.parse({
+      businessName: 'Sneh Medical',
+      ownerName: 'Sneh',
+      drugLicenseNumber: '',
+      pharmacyRegistrationNumber: '',
+      mobile: '',
+      businessEmail: 'buyer-064@buyers.parshlo.local',
+      address: {
+        line1: '',
+        city: '',
+        state: 'MH',
+        pin: '',
+        country: 'IN',
+      },
+    });
+
+    expect(parsed.address?.pin).toBe('');
+    expect(parsed.mobile).toBe('');
+  });
+
+  it('allows the legacy 000000 PIN placeholder during admin edits', () => {
+    const parsed = AdminUpdateBuyerInputSchema.parse({
+      address: {
+        pin: '000000',
+      },
+    });
+
+    expect(parsed.address?.pin).toBe('000000');
+  });
+
   it('still rejects invalid GSTIN text for admin buyer edits', () => {
     expect(() => AdminUpdateBuyerInputSchema.parse({ gstin: 'BAD-GST' })).toThrow();
   });
