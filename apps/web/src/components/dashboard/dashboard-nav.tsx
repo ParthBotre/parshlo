@@ -21,7 +21,19 @@ import { cn } from '@/lib/utils';
 // Icons must be resolved on the client. The parent server layout sends a
 // JSON-serializable key, and we look up the actual lucide component here —
 // passing function references across the RSC boundary is forbidden.
-const ICONS = {
+export type NavIconKey =
+  | 'dashboard'
+  | 'kyc'
+  | 'orders'
+  | 'buyers'
+  | 'products'
+  | 'catalog'
+  | 'place-order'
+  | 'logistics'
+  | 'employees'
+  | 'holidays';
+
+const ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   kyc: BadgeCheck,
   orders: ScrollText,
@@ -32,9 +44,7 @@ const ICONS = {
   logistics: Truck,
   employees: ShieldCheck,
   holidays: CalendarDays,
-} as const satisfies Record<string, LucideIcon>;
-
-export type NavIconKey = keyof typeof ICONS;
+};
 
 export interface NavItem {
   href: string;
