@@ -73,6 +73,10 @@ export function AdminBuyerCreateForm(): JSX.Element {
       pharmacyRegistrationNumber: parsed.pharmacyRegistrationNumber?.trim()
         ? parsed.pharmacyRegistrationNumber.trim()
         : undefined,
+      address: {
+        ...parsed.address,
+        pin: parsed.address.pin?.trim() ?? '',
+      },
     };
 
     const res = await fetch('/api/admin/buyers', {

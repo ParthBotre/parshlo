@@ -108,7 +108,7 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
                   </tr>
                 </thead>
                 <tbody>
-                  {(citySales?.rows ?? []).slice(0, 8).map((row) => (
+                  {(citySales?.rows ?? []).map((row) => (
                     <tr key={`${row.city}-${row.state}`} className="border-t">
                       <td className="px-5 py-3 font-medium">
                         {row.city}

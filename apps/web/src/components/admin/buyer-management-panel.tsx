@@ -102,7 +102,7 @@ export function BuyerManagementPanel({ buyer }: { buyer: AdminBuyer }): JSX.Elem
         line2: values.addressLine2.trim() ? values.addressLine2 : undefined,
         city: values.city,
         state: values.state as BuyerAddressInput['state'],
-        pin: values.pin,
+        pin: values.pin.trim(),
         country: 'IN',
       },
     };
