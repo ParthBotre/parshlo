@@ -19,6 +19,7 @@ import {
   AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
   CreateHrExpenseInputSchema,
+  EmailHrDocumentInputSchema,
   CreateLeaveRequestInputSchema,
   GenerateHrDocumentInputSchema,
   GenerateHrSalarySlipInputSchema,
@@ -37,6 +38,7 @@ import {
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
   type CreateHrExpenseInput,
+  type EmailHrDocumentInput,
   type CreateLeaveRequestInput,
   type GenerateHrDocumentInput,
   type GenerateHrSalarySlipInput,
@@ -390,6 +392,22 @@ export class AdminController {
     @Body(new ZodValidationPipe(GenerateHrDocumentInputSchema)) body: GenerateHrDocumentInput,
   ): ReturnType<AdminService['generateHrDocument']> {
     return this.admin.generateHrDocument(employeeId, user.userId, body);
+  }
+
+  @Post('hr/records/:employeeId/documents/email')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.document.email',
+    resource: 'EmployeeHrDocument',
+    resolveResourceId: (_req, result) => (result as { document?: { id?: string } }).document?.id,
+  })
+  emailHrDocument(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('employeeId') employeeId: string,
+    @Body(new ZodValidationPipe(EmailHrDocumentInputSchema)) body: EmailHrDocumentInput,
+  ): ReturnType<AdminService['emailHrDocument']> {
+    return this.admin.emailHrDocument(employeeId, user.userId, body);
   }
 
   @Post('hr/salary-slips')

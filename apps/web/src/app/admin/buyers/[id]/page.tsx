@@ -1,6 +1,7 @@
 import { type OrderStatus } from '@parshlo/types';
 import { type Metadata } from 'next';
 import Link from 'next/link';
+import { type z } from 'zod';
 
 import { BuyerManagementPanel } from '@/components/admin/buyer-management-panel';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,7 @@ const PERIOD_ANALYTICS_LABELS = [
   { key: 'year', label: 'Yearly' },
 ] as const;
 type BuyerAnalyticsPeriod = (typeof PERIOD_ANALYTICS_LABELS)[number]['key'];
+type OrderStatusType = z.infer<typeof OrderStatus>;
 
 const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
 
@@ -241,7 +243,7 @@ function statusBreakdownLabel(statusCounts: Record<string, number>): string {
   return (
     Object.entries(statusCounts)
       .filter(([, count]) => count > 0)
-      .map(([status, count]) => `${orderStatusLabel(status as OrderStatus)} ${count}`)
+      .map(([status, count]) => `${orderStatusLabel(status as OrderStatusType)} ${count}`)
       .join(' · ') || 'No orders'
   );
 }
@@ -584,7 +586,7 @@ export default async function BuyerDetailPage({
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <Badge variant="secondary">
-                            {orderStatusLabel(order.status as OrderStatus)}
+                            {orderStatusLabel(order.status as OrderStatusType)}
                           </Badge>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-mono">
@@ -620,7 +622,7 @@ export default async function BuyerDetailPage({
               <p className="font-mono text-sm font-medium">{summary.latestOrderNumber ?? '—'}</p>
               <p className="text-muted-foreground text-xs">
                 {summary.latestOrderStatus
-                  ? orderStatusLabel(summary.latestOrderStatus as OrderStatus)
+                  ? orderStatusLabel(summary.latestOrderStatus as OrderStatusType)
                   : 'No orders'}{' '}
                 · {formatDate(summary.latestOrderAt)}
               </p>

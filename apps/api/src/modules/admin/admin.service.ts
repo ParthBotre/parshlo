@@ -14,6 +14,8 @@ import {
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
   type CreateHrExpenseInput,
+  type EmailHrDocumentInput,
+  type EmailHrDocumentResponse,
   type CreateLeaveRequestInput,
   type GenerateHrDocumentInput,
   type GenerateHrDocumentResponse,
@@ -53,6 +55,8 @@ const ORDER_STATUSES: OrderStatus[] = [
   'CANCELLED',
   'REJECTED',
 ];
+
+const HR_DOCUMENT_REQUIRED_CC = ['hemantbotre@gmail.com'];
 
 const BUYER_ANALYTICS_PERIODS = ['day', 'week', 'month', 'year'] as const;
 type BuyerAnalyticsPeriod = (typeof BUYER_ANALYTICS_PERIODS)[number];
@@ -204,6 +208,19 @@ export class AdminService {
 
   private normalizeEmail(value: string): string {
     return value.trim().toLowerCase();
+  }
+
+  private normalizeEmailList(values: string[] | undefined, excluded: string[] = []): string[] {
+    const excludedSet = new Set(excluded.map((value) => this.normalizeEmail(value)));
+    const seen = new Set<string>();
+    const emails: string[] = [];
+    for (const value of values ?? []) {
+      const email = this.normalizeEmail(value);
+      if (!email || excludedSet.has(email) || seen.has(email)) continue;
+      seen.add(email);
+      emails.push(email);
+    }
+    return emails;
   }
 
   private async nextUnregisteredGstin(tx: Prisma.TransactionClient): Promise<string> {
@@ -1131,37 +1148,72 @@ export class AdminService {
     actorId: string,
     input: GenerateHrDocumentInput,
   ): Promise<GenerateHrDocumentResponse> {
-    const record = await this.getHrRecordOrThrow(employeeId);
-    const referenceNumber = await this.nextHrReference(input.type, new Date());
-    const title = input.type === 'OFFER_LETTER' ? 'OFFER LETTER' : 'APPOINTMENT LETTER';
-    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
-    const lines =
-      input.type === 'OFFER_LETTER'
-        ? this.offerLetterLines(record)
-        : this.appointmentLetterLines(record, referenceNumber);
-    const bytes = await this.renderHrPdf(title, lines);
-
-    const document = await this.prisma.employeeHrDocument.create({
-      data: {
-        employeeId,
-        generatedById: actorId,
-        type: input.type,
-        referenceNumber,
-        fileName,
-        payload: {
-          employeeName: record.employee.fullName,
-          employeeCode: record.employeeCode,
-          roleTitle: record.roleTitle,
-          generatedOn: formatDateOnly(new Date()),
-        },
-      },
-    });
+    const { document, fileName, bytes } = await this.createHrDocumentPdf(
+      employeeId,
+      actorId,
+      input,
+      'GENERATED',
+    );
 
     return {
       document: this.toHrDocumentView(document),
       fileName,
       contentType: 'application/pdf',
       contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async emailHrDocument(
+    employeeId: string,
+    actorId: string,
+    input: EmailHrDocumentInput,
+  ): Promise<EmailHrDocumentResponse> {
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') !== true) {
+      throw new BadRequestException({
+        code: 'EMAIL_NOTIFICATIONS_DISABLED',
+        message: 'Email notifications are disabled.',
+      });
+    }
+
+    const { record, document, fileName, bytes } = await this.createHrDocumentPdf(
+      employeeId,
+      actorId,
+      input,
+      'EMAILED',
+    );
+    const recipientEmail = this.normalizeEmail(
+      input.recipientEmail ?? record.mailId ?? record.employee.email,
+    );
+    const ccEmails = this.normalizeEmailList(
+      [...HR_DOCUMENT_REQUIRED_CC, ...(input.ccEmails ?? [])],
+      [recipientEmail],
+    );
+    const bccEmails = this.normalizeEmailList(input.bccEmails, [recipientEmail, ...ccEmails]);
+
+    await this.jobs.enqueueEmail({
+      kind: 'HR_DOCUMENT_READY',
+      to: recipientEmail,
+      cc: ccEmails.length > 0 ? ccEmails : undefined,
+      bcc: bccEmails.length > 0 ? bccEmails : undefined,
+      attachments: [
+        {
+          filename: fileName,
+          content: Buffer.from(bytes).toString('base64'),
+          contentType: 'application/pdf',
+        },
+      ],
+      data: {
+        employeeName: record.employee.fullName,
+        documentType: input.type,
+        referenceNumber: document.referenceNumber,
+        ccEmails,
+        bccCount: bccEmails.length,
+      },
+    });
+
+    return {
+      document: this.toHrDocumentView(document),
+      recipientEmail,
     };
   }
 
@@ -1286,6 +1338,54 @@ export class AdminService {
       contentType: 'application/pdf',
       contentBase64: Buffer.from(bytes).toString('base64'),
     };
+  }
+
+  private async createHrDocumentPdf(
+    employeeId: string,
+    actorId: string,
+    input: GenerateHrDocumentInput,
+    delivery: 'GENERATED' | 'EMAILED',
+  ): Promise<{
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>;
+    document: {
+      id: string;
+      employeeId: string;
+      type: string;
+      referenceNumber: string;
+      fileName: string;
+      generatedAt: Date;
+    };
+    fileName: string;
+    bytes: Uint8Array;
+  }> {
+    const record = await this.getHrRecordOrThrow(employeeId);
+    const referenceNumber = await this.nextHrReference(input.type, new Date());
+    const title = input.type === 'OFFER_LETTER' ? 'OFFER LETTER' : 'APPOINTMENT LETTER';
+    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const lines =
+      input.type === 'OFFER_LETTER'
+        ? this.offerLetterLines(record)
+        : this.appointmentLetterLines(record, referenceNumber);
+    const bytes = await this.renderHrPdf(title, lines);
+
+    const document = await this.prisma.employeeHrDocument.create({
+      data: {
+        employeeId,
+        generatedById: actorId,
+        type: input.type,
+        referenceNumber,
+        fileName,
+        payload: {
+          employeeName: record.employee.fullName,
+          employeeCode: record.employeeCode,
+          roleTitle: record.roleTitle,
+          generatedOn: formatDateOnly(new Date()),
+          delivery,
+        },
+      },
+    });
+
+    return { record, document, fileName, bytes };
   }
 
   async leaveDashboard(actorId: string, actorRoles: string[]): Promise<EmployeeLeaveDashboardView> {

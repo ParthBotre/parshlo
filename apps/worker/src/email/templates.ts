@@ -215,3 +215,34 @@ export function renderLeaveRequestReviewed(d: LeaveRequestData): Rendered {
     text: `Your holiday request for ${d.startDate} to ${d.endDate} was ${approved ? 'approved' : 'rejected'}.${d.reviewerNote ? ` Note: ${d.reviewerNote}` : ''}`,
   };
 }
+
+export interface HrDocumentReadyData {
+  employeeName: string;
+  documentType: 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'SALARY_SLIP';
+  referenceNumber: string;
+}
+
+export function renderHrDocumentReady(d: HrDocumentReadyData): Rendered {
+  const label =
+    d.documentType === 'OFFER_LETTER'
+      ? 'Offer letter'
+      : d.documentType === 'APPOINTMENT_LETTER'
+        ? 'Appointment letter'
+        : 'Salary slip';
+  const body = `
+    <p>Hi ${d.employeeName},</p>
+    <p>Your <strong>${label}</strong> is attached to this email.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
+      <tr><td style="padding:6px 0;color:#6b7480">Reference</td><td style="padding:6px 0;text-align:right;font-weight:600">${d.referenceNumber}</td></tr>
+    </table>
+  `;
+  return {
+    subject: `${label} from Parshlo`,
+    html: shell({
+      title: label,
+      preheader: `${label} attached`,
+      body,
+    }),
+    text: `Hi ${d.employeeName}, your ${label} is attached. Reference: ${d.referenceNumber}.`,
+  };
+}

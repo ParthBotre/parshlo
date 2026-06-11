@@ -7,11 +7,13 @@ import { type Redis } from 'ioredis';
 import { config } from '../config.js';
 import {
   type KycDecisionData,
+  type HrDocumentReadyData,
   type LeaveRequestData,
   type OrderPlacedAdminData,
   type OrderPlacedBuyerData,
   renderKycApproved,
   renderKycRejected,
+  renderHrDocumentReady,
   renderLeaveRequestCreated,
   renderLeaveRequestReviewed,
   renderOrderPlacedAdmin,
@@ -67,6 +69,8 @@ export function createEmailWorker({
           case 'LEAVE_REQUEST_APPROVED':
           case 'LEAVE_REQUEST_REJECTED':
             return renderLeaveRequestReviewed(data.data as unknown as LeaveRequestData);
+          case 'HR_DOCUMENT_READY':
+            return renderHrDocumentReady(data.data as unknown as HrDocumentReadyData);
           default:
             return {
               subject: data.subjectOverride ?? 'Parshlo notification',
@@ -78,11 +82,14 @@ export function createEmailWorker({
 
       await send.send({
         to: data.to,
+        cc: data.cc,
+        bcc: data.bcc,
         from: senderForKind(data.kind),
         replyTo: config.EMAIL_REPLY_TO,
         subject: data.subjectOverride ?? rendered.subject,
         html: rendered.html,
         text: rendered.text,
+        attachments: data.attachments,
       });
 
       // Write to NotificationLog if available (best-effort, never fails the job).
@@ -93,7 +100,7 @@ export function createEmailWorker({
             kind: data.kind,
             recipient: Array.isArray(data.to) ? data.to.join(',') : data.to,
             status: 'SENT',
-            metadata: data.data as object,
+            metadata: { ...data.data, cc: data.cc ?? [], bcc: data.bcc ?? [] },
           },
         });
       } catch (err) {

@@ -1,8 +1,13 @@
 import {
+  type AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
   AdminEmployeeView,
+  type AdminUpdateBuyerInputSchema,
+  type AdminUpdateEmployeeInputSchema,
   ArchiveHrEmployeeInputSchema,
   CreateHrExpenseInputSchema,
+  EmailHrDocumentInputSchema,
+  EmailHrDocumentResponse,
   CreateLeaveRequestInputSchema,
   EmployeeLeaveDashboardView,
   EmployeeLeaveRequestView,
@@ -17,31 +22,35 @@ import {
   AdminProductView,
   ApiErrorResponse,
   OrderView,
+  type PlaceOrderOnBehalfInput,
   ReviewHrExpenseInputSchema,
   ProductWriteInput,
   ReviewLeaveRequestInputSchema,
+  type UpdateOrderBeforeApprovalInput,
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
-  type ArchiveHrEmployeeInput,
-  type AdminCreateEmployeeInput,
-  type AdminCreateBuyerInput,
-  type CreateHrExpenseInput,
-  type CreateLeaveRequestInput,
-  type GenerateHrDocumentInput,
-  type GenerateHrSalarySlipInput,
-  type AdminUpdateBuyerInput,
-  type AdminUpdateEmployeeInput,
-  type PlaceOrderOnBehalfInput,
-  type ProductWriteInput as ProductWriteInputType,
-  type ReviewHrExpenseInput,
-  type ReviewLeaveRequestInput,
-  type UpdateOrderBeforeApprovalInput,
-  type UpsertHrEmployeeRecordInput,
-  type UpsertHrWorkLogInput,
 } from '@parshlo/types';
 import { z } from 'zod';
 
 import { apiCall, ApiError, type ApiCallOptions } from '../api-client';
+
+type ArchiveHrEmployeeInput = z.infer<typeof ArchiveHrEmployeeInputSchema>;
+type AdminCreateEmployeeInput = z.infer<typeof AdminCreateEmployeeInputSchema>;
+type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
+type CreateHrExpenseInput = z.infer<typeof CreateHrExpenseInputSchema>;
+type EmailHrDocumentInput = z.infer<typeof EmailHrDocumentInputSchema>;
+type CreateLeaveRequestInput = z.infer<typeof CreateLeaveRequestInputSchema>;
+type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
+type GenerateHrSalarySlipInput = z.infer<typeof GenerateHrSalarySlipInputSchema>;
+type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
+type AdminUpdateEmployeeInput = z.infer<typeof AdminUpdateEmployeeInputSchema>;
+type PlaceOrderOnBehalfInputType = z.infer<typeof PlaceOrderOnBehalfInput>;
+type ProductWriteInputType = z.infer<typeof ProductWriteInput>;
+type ReviewHrExpenseInput = z.infer<typeof ReviewHrExpenseInputSchema>;
+type ReviewLeaveRequestInput = z.infer<typeof ReviewLeaveRequestInputSchema>;
+type UpdateOrderBeforeApprovalInputType = z.infer<typeof UpdateOrderBeforeApprovalInput>;
+type UpsertHrEmployeeRecordInput = z.infer<typeof UpsertHrEmployeeRecordInputSchema>;
+type UpsertHrWorkLogInput = z.infer<typeof UpsertHrWorkLogInputSchema>;
 
 const PendingKycAddress = z.object({
   line1: z.string(),
@@ -296,7 +305,7 @@ export function getAdminOrder(
 export function updateAdminOrderBeforeApproval(
   accessToken: string,
   id: string,
-  input: UpdateOrderBeforeApprovalInput,
+  input: UpdateOrderBeforeApprovalInputType,
   options: Pick<ApiCallOptions, 'baseUrl'> = {},
 ) {
   return apiCall(`/v1/admin/orders/${encodeURIComponent(id)}`, OrderView, {
@@ -515,6 +524,24 @@ export function generateHrDocument(
   );
 }
 
+export function emailHrDocument(
+  accessToken: string,
+  employeeId: string,
+  input: EmailHrDocumentInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof EmailHrDocumentResponse>> {
+  return apiCall(
+    `/v1/admin/hr/records/${encodeURIComponent(employeeId)}/documents/email`,
+    EmailHrDocumentResponse,
+    {
+      method: 'POST',
+      accessToken,
+      body: EmailHrDocumentInputSchema.parse(input),
+      ...options,
+    },
+  );
+}
+
 export function generateHrSalarySlip(
   accessToken: string,
   input: GenerateHrSalarySlipInput,
@@ -647,7 +674,7 @@ export function deleteBuyer(
 
 export function placeOrderOnBehalf(
   accessToken: string,
-  input: PlaceOrderOnBehalfInput,
+  input: PlaceOrderOnBehalfInputType,
   options: Pick<ApiCallOptions, 'baseUrl'> = {},
 ) {
   return apiCall('/v1/admin/orders', OrderView, {
@@ -661,9 +688,9 @@ export function placeOrderOnBehalf(
 
 /** Browser checkout for staff placing an order on behalf of a buyer. */
 export async function placeOrderOnBehalfFromBrowser(
-  input: Omit<PlaceOrderOnBehalfInput, 'idempotencyKey'> & { idempotencyKey?: string },
+  input: Omit<PlaceOrderOnBehalfInputType, 'idempotencyKey'> & { idempotencyKey?: string },
 ): Promise<z.infer<typeof OrderView>> {
-  const body: PlaceOrderOnBehalfInput = {
+  const body: PlaceOrderOnBehalfInputType = {
     ...input,
     idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
   };

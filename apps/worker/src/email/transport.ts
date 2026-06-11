@@ -5,11 +5,18 @@ import { config } from '../config.js';
 
 export interface EmailMessage {
   to: string | string[];
+  cc?: string[];
+  bcc?: string[];
   from?: string;
   replyTo?: string;
   subject: string;
   html: string;
   text: string;
+  attachments?: {
+    filename: string;
+    content: string;
+    contentType?: string;
+  }[];
 }
 
 export interface EmailTransport {
@@ -25,10 +32,13 @@ class ResendTransport implements EmailTransport {
     const { error } = await this.client.emails.send({
       from: msg.from ?? config.EMAIL_FROM_DEFAULT ?? config.EMAIL_FROM,
       to: Array.isArray(msg.to) ? msg.to : [msg.to],
+      cc: msg.cc,
+      bcc: msg.bcc,
       subject: msg.subject,
       html: msg.html,
       text: msg.text,
       replyTo: msg.replyTo ?? config.EMAIL_REPLY_TO,
+      attachments: msg.attachments,
     });
     if (error) {
       throw new Error(`Resend error: ${error.message}`);
@@ -51,9 +61,16 @@ class SmtpTransport implements EmailTransport {
       from: config.EMAIL_FROM,
       replyTo: msg.replyTo ?? config.EMAIL_REPLY_TO,
       to: msg.to,
+      cc: msg.cc,
+      bcc: msg.bcc,
       subject: msg.subject,
       html: msg.html,
       text: msg.text,
+      attachments: msg.attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: Buffer.from(attachment.content, 'base64'),
+        contentType: attachment.contentType,
+      })),
     });
   }
 }

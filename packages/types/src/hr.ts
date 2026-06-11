@@ -116,6 +116,13 @@ export const GenerateHrDocumentInputSchema = z.object({
 });
 export type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
 
+export const EmailHrDocumentInputSchema = GenerateHrDocumentInputSchema.extend({
+  recipientEmail: z.string().trim().email().max(160).optional().nullable(),
+  ccEmails: z.array(z.string().trim().email().max(160)).max(10).optional(),
+  bccEmails: z.array(z.string().trim().email().max(160)).max(10).optional(),
+});
+export type EmailHrDocumentInput = z.infer<typeof EmailHrDocumentInputSchema>;
+
 export const GenerateHrDocumentResponse = z.object({
   document: HrDocumentView,
   fileName: z.string(),
@@ -123,6 +130,12 @@ export const GenerateHrDocumentResponse = z.object({
   contentBase64: z.string(),
 });
 export type GenerateHrDocumentResponse = z.infer<typeof GenerateHrDocumentResponse>;
+
+export const EmailHrDocumentResponse = z.object({
+  document: HrDocumentView,
+  recipientEmail: z.string().email(),
+});
+export type EmailHrDocumentResponse = z.infer<typeof EmailHrDocumentResponse>;
 
 export const HrExpenseView = z.object({
   id: EntityId,

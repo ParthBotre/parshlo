@@ -15,6 +15,17 @@ const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 const ROLE_OPTIONS = ['SALES MANAGER', 'ADMIN', 'SUPER ADMIN'] as const;
+const REQUIRED_HR_DOCUMENT_CC = 'hemantbotre@gmail.com';
+
+type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER';
+
+interface EmailDocumentDraft {
+  employeeId: string;
+  type: HrLetterType;
+  recipientEmail: string;
+  ccEmails: string;
+  bccEmails: string;
+}
 
 interface HrRecordFormState {
   employeeId: string;
@@ -152,6 +163,25 @@ function downloadBase64Pdf(fileName: string, contentBase64: string): void {
   URL.revokeObjectURL(url);
 }
 
+function previewBase64Pdf(contentBase64: string): void {
+  const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function parseEmailList(value: string): string[] {
+  return value
+    .split(/[,;\n]/)
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function labelForLetterType(type: HrLetterType): string {
+  return type === 'OFFER_LETTER' ? 'offer letter' : 'appointment letter';
+}
+
 export function HrManagement({
   employees,
   dashboard,
@@ -164,6 +194,7 @@ export function HrManagement({
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
+  const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
     records.find((record) => record.employeeId === recordForm.employeeId) ?? null;
 
@@ -245,18 +276,69 @@ export function HrManagement({
     }
   }
 
-  async function generateDocument(employeeId: string, type: 'OFFER_LETTER' | 'APPOINTMENT_LETTER') {
+  async function fetchDocumentPdf(
+    employeeId: string,
+    type: HrLetterType,
+  ): Promise<{ fileName: string; contentBase64: string }> {
+    return submitJson<{ fileName: string; contentBase64: string }>(
+      `/api/admin/hr/records/${encodeURIComponent(employeeId)}/documents`,
+      'POST',
+      { type },
+      'Could not generate HR document.',
+    );
+  }
+
+  async function generateDocument(employeeId: string, type: HrLetterType) {
     try {
-      const result = await submitJson<{ fileName: string; contentBase64: string }>(
-        `/api/admin/hr/records/${encodeURIComponent(employeeId)}/documents`,
-        'POST',
-        { type },
-        'Could not generate HR document.',
-      );
+      const result = await fetchDocumentPdf(employeeId, type);
       downloadBase64Pdf(result.fileName, result.contentBase64);
       setMessage('PDF generated and downloaded.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not generate HR document.');
+    }
+  }
+
+  function startEmailDocument(record: HrEmployeeRecord, type: HrLetterType): void {
+    setError(null);
+    setMessage(null);
+    setEmailDraft({
+      employeeId: record.employeeId,
+      type,
+      recipientEmail: record.mailId ?? record.employeeEmail,
+      ccEmails: '',
+      bccEmails: '',
+    });
+  }
+
+  async function previewEmailAttachment(): Promise<void> {
+    if (!emailDraft) return;
+    try {
+      const result = await fetchDocumentPdf(emailDraft.employeeId, emailDraft.type);
+      previewBase64Pdf(result.contentBase64);
+      setMessage(`Preview opened for ${labelForLetterType(emailDraft.type)}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not preview HR document.');
+    }
+  }
+
+  async function emailDocument() {
+    if (!emailDraft) return;
+    try {
+      const result = await submitJson<{ recipientEmail: string }>(
+        `/api/admin/hr/records/${encodeURIComponent(emailDraft.employeeId)}/documents/email`,
+        'POST',
+        {
+          type: emailDraft.type,
+          recipientEmail: emailDraft.recipientEmail,
+          ccEmails: parseEmailList(emailDraft.ccEmails),
+          bccEmails: parseEmailList(emailDraft.bccEmails),
+        },
+        'Could not email HR document.',
+      );
+      setEmailDraft(null);
+      setMessage(`Document email queued for ${result.recipientEmail}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not email HR document.');
     }
   }
 
@@ -308,6 +390,66 @@ export function HrManagement({
     <div className="space-y-6">
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
       {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
+      {emailDraft ? (
+        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-xl">
+            <CardHeader>
+              <CardTitle className="text-base">
+                Email {labelForLetterType(emailDraft.type)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field label="Recipient">
+                <Input
+                  type="email"
+                  value={emailDraft.recipientEmail}
+                  onChange={(event) =>
+                    setEmailDraft((current) =>
+                      current ? { ...current, recipientEmail: event.target.value } : current,
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Required CC">
+                <Input value={REQUIRED_HR_DOCUMENT_CC} disabled />
+              </Field>
+              <Field label="Additional CC">
+                <Textarea
+                  rows={2}
+                  placeholder="Optional. Separate emails with commas."
+                  value={emailDraft.ccEmails}
+                  onChange={(event) =>
+                    setEmailDraft((current) =>
+                      current ? { ...current, ccEmails: event.target.value } : current,
+                    )
+                  }
+                />
+              </Field>
+              <Field label="BCC">
+                <Textarea
+                  rows={2}
+                  placeholder="Optional. Separate emails with commas."
+                  value={emailDraft.bccEmails}
+                  onChange={(event) =>
+                    setEmailDraft((current) =>
+                      current ? { ...current, bccEmails: event.target.value } : current,
+                    )
+                  }
+                />
+              </Field>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => void previewEmailAttachment()}>
+                  Preview Attachment
+                </Button>
+                <Button variant="outline" onClick={() => setEmailDraft(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => void emailDocument()}>Send Email</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -673,9 +815,23 @@ export function HrManagement({
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => startEmailDocument(record, 'OFFER_LETTER')}
+                >
+                  Email Offer
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => void generateDocument(record.employeeId, 'APPOINTMENT_LETTER')}
                 >
                   Appointment
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startEmailDocument(record, 'APPOINTMENT_LETTER')}
+                >
+                  Email Appointment
                 </Button>
                 {!record.archivedAt ? (
                   <Button

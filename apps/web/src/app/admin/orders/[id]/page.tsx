@@ -3,6 +3,7 @@ import { ArrowLeft, Download } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { type z } from 'zod';
 
 // import { CourierReceiptUpload } from '@/components/admin/courier-receipt-upload';
 import { CourierTrackingForm } from '@/components/admin/courier-tracking-form';
@@ -26,11 +27,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+type OrderStatusType = z.infer<typeof OrderStatus>;
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-function statusBadgeVariant(status: OrderStatus): 'secondary' | 'success' | 'warning' | 'default' {
+function statusBadgeVariant(
+  status: OrderStatusType,
+): 'secondary' | 'success' | 'warning' | 'default' {
   if (status === 'DELIVERED') {
     return 'success';
   }
