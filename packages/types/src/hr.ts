@@ -51,6 +51,7 @@ export const HrEmployeeRecordView = z.object({
   basicMonthlyPaise: HrMoneyPaise,
   hraMonthlyPaise: HrMoneyPaise,
   specialAllowanceMonthlyPaise: HrMoneyPaise,
+  allowanceMonthlyPaise: HrMoneyPaise,
   dailyAllowancePaise: HrMoneyPaise,
   petrolAllowancePaise: HrMoneyPaise,
   mobileAllowancePaise: HrMoneyPaise,
@@ -87,6 +88,7 @@ export const UpsertHrEmployeeRecordInputSchema = z.object({
   emergencyContactNumber: z.string().trim().max(30).optional().nullable(),
   panNumber: z.string().trim().max(20).optional().nullable(),
   grossMonthlyPaise: HrMoneyPaise,
+  allowanceMonthlyPaise: HrMoneyPaise.default(1_500_000),
   dailyAllowancePaise: HrMoneyPaise.default(50_000),
   petrolAllowancePaise: HrMoneyPaise.default(100_000),
   mobileAllowancePaise: HrMoneyPaise.default(100_000),
@@ -149,6 +151,11 @@ export const CreateHrExpenseInputSchema = z.object({
   billContentType: z.string().trim().max(120).optional().nullable(),
 });
 export type CreateHrExpenseInput = z.infer<typeof CreateHrExpenseInputSchema>;
+
+export const CreateMyHrExpenseInputSchema = CreateHrExpenseInputSchema.omit({
+  employeeId: true,
+});
+export type CreateMyHrExpenseInput = z.infer<typeof CreateMyHrExpenseInputSchema>;
 
 export const ReviewHrExpenseInputSchema = z.object({
   status: HrExpenseStatus.extract(['APPROVED', 'REJECTED']),

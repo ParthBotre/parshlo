@@ -38,7 +38,7 @@ export default async function HrPage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">HR</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Employee records, salary slips, expenses, work logs, and appointment documents.
+          Employee records, appointment documents, and Super Admin salary slip controls.
         </p>
       </div>
 

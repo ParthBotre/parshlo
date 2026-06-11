@@ -526,6 +526,7 @@ model EmployeeHrRecord {
   basicMonthlyPaise            BigInt
   hraMonthlyPaise              BigInt
   specialAllowanceMonthlyPaise BigInt
+  allowanceMonthlyPaise        BigInt @default(1500000)
   dailyAllowancePaise          BigInt @default(50000)
   petrolAllowancePaise         BigInt @default(100000)
   mobileAllowancePaise         BigInt @default(100000)

@@ -1,0 +1,2 @@
+ALTER TABLE "EmployeeHrRecord"
+ADD COLUMN "allowanceMonthlyPaise" BIGINT NOT NULL DEFAULT 1500000;

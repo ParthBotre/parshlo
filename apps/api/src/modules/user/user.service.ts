@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  type CreateMyHrExpenseInput,
   type EmployeeSalarySlipDownloadResponse,
+  type HrExpenseView,
   type HrSalarySlipView,
   type PublicUser,
 } from '@parshlo/types';
@@ -10,6 +12,17 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 function formatDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function expenseMonthBounds(value: string): { start: Date; end: Date } {
+  const date = parseDateOnly(value);
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  return { start, end };
 }
 
 function formatDisplayDate(value: Date | null): string {
@@ -64,6 +77,48 @@ export class UserService {
       orderBy: [{ periodMonth: 'desc' }, { createdAt: 'desc' }],
     });
     return slips.map((slip) => this.toSalarySlipView(slip));
+  }
+
+  async listExpenses(employeeId: string): Promise<HrExpenseView[]> {
+    const expenses = await this.prisma.employeeExpense.findMany({
+      where: { employeeId },
+      include: { employee: { select: { fullName: true } } },
+      orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
+    });
+    return expenses.map((expense) => this.toExpenseView(expense));
+  }
+
+  async createExpense(employeeId: string, input: CreateMyHrExpenseInput): Promise<HrExpenseView> {
+    const { start, end } = expenseMonthBounds(input.expenseDate);
+    const monthlyTotal = await this.prisma.employeeExpense.aggregate({
+      where: {
+        employeeId,
+        status: { not: 'REJECTED' },
+        expenseDate: { gte: start, lte: end },
+      },
+      _sum: { amountPaise: true },
+    });
+    const nextTotalPaise = toNumber(monthlyTotal._sum.amountPaise ?? 0) + input.amountPaise;
+    if (nextTotalPaise > 1_500_000) {
+      throw new BadRequestException({
+        code: 'EXPENSE_LIMIT_EXCEEDED',
+        message: 'Monthly expenses cannot exceed Rs. 15,000.',
+      });
+    }
+
+    const expense = await this.prisma.employeeExpense.create({
+      data: {
+        employeeId,
+        expenseDate: parseDateOnly(input.expenseDate),
+        type: input.type,
+        amountPaise: input.amountPaise,
+        description: input.description?.trim() ?? null,
+        billKey: input.billKey?.trim() ?? null,
+        billContentType: input.billContentType?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+    return this.toExpenseView(expense);
   }
 
   async downloadSalarySlip(
@@ -145,6 +200,38 @@ export class UserService {
       notes: slip.notes,
       createdAt: slip.createdAt.toISOString(),
       updatedAt: slip.updatedAt.toISOString(),
+    };
+  }
+
+  private toExpenseView(expense: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    expenseDate: Date;
+    type: string;
+    amountPaise: bigint;
+    description: string | null;
+    billKey: string | null;
+    billContentType: string | null;
+    status: string;
+    reviewerNote: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrExpenseView {
+    return {
+      id: expense.id,
+      employeeId: expense.employeeId,
+      employeeName: expense.employee.fullName,
+      expenseDate: formatDateOnly(expense.expenseDate),
+      type: expense.type as HrExpenseView['type'],
+      amountPaise: toNumber(expense.amountPaise),
+      description: expense.description,
+      billKey: expense.billKey,
+      billContentType: expense.billContentType,
+      status: expense.status as HrExpenseView['status'],
+      reviewerNote: expense.reviewerNote,
+      createdAt: expense.createdAt.toISOString(),
+      updatedAt: expense.updatedAt.toISOString(),
     };
   }
 

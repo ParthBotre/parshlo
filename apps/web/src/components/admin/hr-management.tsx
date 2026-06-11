@@ -7,22 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  type AdminEmployee,
-  type HrDashboard,
-  type HrEmployeeRecord,
-  type HrExpense,
-} from '@/lib/api/admin';
+import { type AdminEmployee, type HrDashboard, type HrEmployeeRecord } from '@/lib/api/admin';
 import { formatDateIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+const ROLE_OPTIONS = ['SALES MANAGER', 'ADMIN', 'SUPER ADMIN'] as const;
+
 interface HrRecordFormState {
   employeeId: string;
   employeeCode: string;
-  serialNumber: string;
   roleTitle: string;
   address: string;
   headQuarter: string;
@@ -44,6 +40,7 @@ interface HrRecordFormState {
   emergencyContactNumber: string;
   panNumber: string;
   grossMonthly: string;
+  allowanceMonthly: string;
   dailyAllowance: string;
   petrolAllowance: string;
   mobileAllowance: string;
@@ -80,7 +77,6 @@ function blankRecordForm(employeeId: string): HrRecordFormState {
   return {
     employeeId,
     employeeCode: '',
-    serialNumber: '',
     roleTitle: '',
     address: '',
     headQuarter: '',
@@ -102,6 +98,7 @@ function blankRecordForm(employeeId: string): HrRecordFormState {
     emergencyContactNumber: '',
     panNumber: '',
     grossMonthly: '',
+    allowanceMonthly: '15000.00',
     dailyAllowance: '500.00',
     petrolAllowance: '1000.00',
     mobileAllowance: '1000.00',
@@ -113,7 +110,6 @@ function formFromRecord(record: HrEmployeeRecord): HrRecordFormState {
   return {
     employeeId: record.employeeId,
     employeeCode: record.employeeCode,
-    serialNumber: record.serialNumber ? String(record.serialNumber) : '',
     roleTitle: record.roleTitle,
     address: record.address,
     headQuarter: record.headQuarter,
@@ -135,6 +131,7 @@ function formFromRecord(record: HrEmployeeRecord): HrRecordFormState {
     emergencyContactNumber: record.emergencyContactNumber ?? '',
     panNumber: record.panNumber ?? '',
     grossMonthly: rupeesInputFromPaise(record.grossMonthlyPaise),
+    allowanceMonthly: rupeesInputFromPaise(record.allowanceMonthlyPaise),
     dailyAllowance: rupeesInputFromPaise(record.dailyAllowancePaise),
     petrolAllowance: rupeesInputFromPaise(record.petrolAllowancePaise),
     mobileAllowance: rupeesInputFromPaise(record.mobileAllowancePaise),
@@ -163,15 +160,10 @@ export function HrManagement({
   dashboard: HrDashboard;
 }): JSX.Element {
   const [records, setRecords] = useState(dashboard.records);
-  const [expenses, setExpenses] = useState(dashboard.expenses);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
-  const firstEmployeeId = employees[0]?.id ?? '';
-  const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => {
-    const firstRecord = dashboard.records.find((record) => !record.archivedAt);
-    return firstRecord ? formFromRecord(firstRecord) : blankRecordForm(firstEmployeeId);
-  });
+  const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const editingRecord =
     records.find((record) => record.employeeId === recordForm.employeeId) ?? null;
 
@@ -216,7 +208,6 @@ export function HrManagement({
         {
           employeeId: recordForm.employeeId,
           employeeCode: recordForm.employeeCode,
-          serialNumber: recordForm.serialNumber ? Number(recordForm.serialNumber) : null,
           roleTitle: recordForm.roleTitle,
           address: recordForm.address,
           headQuarter: recordForm.headQuarter,
@@ -238,6 +229,7 @@ export function HrManagement({
           emergencyContactNumber: recordForm.emergencyContactNumber || null,
           panNumber: recordForm.panNumber || null,
           grossMonthlyPaise: rupeesToPaise(recordForm.grossMonthly),
+          allowanceMonthlyPaise: rupeesToPaise(recordForm.allowanceMonthly),
           dailyAllowancePaise: rupeesToPaise(recordForm.dailyAllowance),
           petrolAllowancePaise: rupeesToPaise(recordForm.petrolAllowance),
           mobileAllowancePaise: rupeesToPaise(recordForm.mobileAllowance),
@@ -312,67 +304,6 @@ export function HrManagement({
     }
   }
 
-  async function saveWorkLog(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    try {
-      await submitJson(
-        '/api/admin/hr/work-logs',
-        'PUT',
-        {
-          employeeId: formString(form, 'employeeId'),
-          workDate: formString(form, 'workDate'),
-          worked: form.get('worked') === 'on',
-          note: formString(form, 'note'),
-        },
-        'Could not save work log.',
-      );
-      setMessage('Work log saved.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save work log.');
-    }
-  }
-
-  async function createExpense(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    try {
-      const expense = await submitJson<HrExpense>(
-        '/api/admin/hr/expenses',
-        'POST',
-        {
-          employeeId: formString(form, 'employeeId'),
-          expenseDate: formString(form, 'expenseDate'),
-          type: formString(form, 'type', 'MISCELLANEOUS'),
-          amountPaise: rupeesToPaise(form.get('amount')),
-          description: formString(form, 'description'),
-          billKey: formString(form, 'billKey'),
-          billContentType: formString(form, 'billContentType'),
-        },
-        'Could not add expense.',
-      );
-      setExpenses((current) => [expense, ...current]);
-      setMessage('Expense added.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add expense.');
-    }
-  }
-
-  async function reviewExpense(id: string, status: 'APPROVED' | 'REJECTED'): Promise<void> {
-    try {
-      const expense = await submitJson<HrExpense>(
-        `/api/admin/hr/expenses/${encodeURIComponent(id)}/review`,
-        'PATCH',
-        { status },
-        'Could not review expense.',
-      );
-      setExpenses((current) => current.map((item) => (item.id === id ? expense : item)));
-      setMessage(`Expense ${status.toLowerCase()}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not review expense.');
-    }
-  }
-
   return (
     <div className="space-y-6">
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
@@ -390,7 +321,7 @@ export function HrManagement({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setRecordForm(blankRecordForm(firstEmployeeId))}
+              onClick={() => setRecordForm(blankRecordForm(''))}
             >
               New HR Record
             </Button>
@@ -405,6 +336,7 @@ export function HrManagement({
                 className={SELECT_CLASS}
                 onChange={(event) => loadEmployeeRecord(event.target.value)}
               >
+                <option value="">Choose employee</option>
                 {employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.fullName} · {employee.email}
@@ -421,23 +353,21 @@ export function HrManagement({
                 onChange={(event) => updateRecordForm('employeeCode', event.target.value)}
               />
             </Field>
-            <Field label="SR No">
-              <Input
-                name="serialNumber"
-                type="number"
-                min="1"
-                value={recordForm.serialNumber}
-                onChange={(event) => updateRecordForm('serialNumber', event.target.value)}
-              />
-            </Field>
             <Field label="Role">
-              <Input
+              <select
                 name="roleTitle"
                 required
-                placeholder="SALES MANAGER"
                 value={recordForm.roleTitle}
+                className={SELECT_CLASS}
                 onChange={(event) => updateRecordForm('roleTitle', event.target.value)}
-              />
+              >
+                <option value="">Choose role</option>
+                {ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Head Quarter">
               <Input
@@ -587,7 +517,17 @@ export function HrManagement({
                 onChange={(event) => updateRecordForm('grossMonthly', event.target.value)}
               />
             </Field>
-            <Field label="DA/day">
+            <Field label="Allowance/month">
+              <Input
+                name="allowanceMonthly"
+                type="number"
+                min="0"
+                step="0.01"
+                value={recordForm.allowanceMonthly}
+                onChange={(event) => updateRecordForm('allowanceMonthly', event.target.value)}
+              />
+            </Field>
+            <Field label="Daily allowance/day">
               <Input
                 name="dailyAllowance"
                 type="number"
@@ -637,7 +577,13 @@ export function HrManagement({
               />
             </Field>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:col-span-4">
-              <Button type="submit">{editingRecord ? 'Update HR Record' : 'Add HR Record'}</Button>
+              <Button type="submit" disabled={!recordForm.employeeId}>
+                {editingRecord ? 'Update HR Record' : 'Add HR Record'}
+              </Button>
+              <span className="text-muted-foreground text-sm">
+                SR No is assigned automatically. Gross salary is Basic + HRA + Special Allowance.
+                Monthly allowance stays separate.
+              </span>
               {editingRecord?.archivedAt ? (
                 <span className="text-muted-foreground text-sm">
                   Saving this record will reactivate the archived HR profile.
@@ -648,134 +594,38 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Salary Slip</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form
-              className="grid gap-4 sm:grid-cols-2"
-              onSubmit={(event) => void generateSalarySlip(event)}
-            >
-              <RecordSelect records={activeRecords} />
-              <Field label="Month">
-                <Input name="periodMonth" type="month" required />
-              </Field>
-              <Field label="Working days">
-                <Input name="workingDays" type="number" min="0" max="31" />
-              </Field>
-              <Field label="Bonus">
-                <Input name="bonus" type="number" min="0" step="0.01" defaultValue="0" />
-              </Field>
-              <Field label="Transaction date">
-                <Input name="transactionDate" type="date" />
-              </Field>
-              <Field label="Transaction ref">
-                <Input name="transactionReference" />
-              </Field>
-              <Field label="Notes" className="sm:col-span-2">
-                <Textarea name="notes" rows={2} />
-              </Field>
-              <div className="sm:col-span-2">
-                <Button type="submit">Generate Salary Slip PDF</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Work Log</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form
-              className="grid gap-4 sm:grid-cols-2"
-              onSubmit={(event) => void saveWorkLog(event)}
-            >
-              <RecordSelect records={activeRecords} />
-              <Field label="Date">
-                <Input name="workDate" type="date" required />
-              </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input name="worked" type="checkbox" defaultChecked />
-                Worked
-              </label>
-              <Field label="Note">
-                <Input name="note" />
-              </Field>
-              <div className="sm:col-span-2">
-                <Button type="submit" variant="outline">
-                  Save Work Log
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Expenses</CardTitle>
+          <CardTitle className="text-base">Salary Slip</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <form
-            className="grid gap-4 lg:grid-cols-5"
-            onSubmit={(event) => void createExpense(event)}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            onSubmit={(event) => void generateSalarySlip(event)}
           >
             <RecordSelect records={activeRecords} />
-            <Field label="Date">
-              <Input name="expenseDate" type="date" required />
+            <Field label="Month">
+              <Input name="periodMonth" type="month" required />
             </Field>
-            <Field label="Type">
-              <select name="type" className={SELECT_CLASS}>
-                <option value="DAILY_ALLOWANCE">Daily allowance</option>
-                <option value="PETROL">Petrol</option>
-                <option value="MOBILE">Mobile</option>
-                <option value="MISCELLANEOUS">Miscellaneous</option>
-              </select>
+            <Field label="Working days">
+              <Input name="workingDays" type="number" min="0" max="31" />
             </Field>
-            <Field label="Amount">
-              <Input name="amount" type="number" min="0" step="0.01" required />
+            <Field label="Bonus">
+              <Input name="bonus" type="number" min="0" step="0.01" defaultValue="0" />
             </Field>
-            <Field label="Bill key">
-              <Input name="billKey" placeholder="Upload link/key" />
+            <Field label="Transaction date">
+              <Input name="transactionDate" type="date" />
             </Field>
-            <Field label="Description" className="lg:col-span-4">
-              <Input name="description" />
+            <Field label="Transaction ref">
+              <Input name="transactionReference" />
             </Field>
-            <Button type="submit">Add Expense</Button>
+            <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+              <Textarea name="notes" rows={2} />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Button type="submit">Generate Salary Slip PDF</Button>
+            </div>
           </form>
-          <Table
-            headers={['Employee', 'Date', 'Type', 'Amount', 'Status', 'Action']}
-            rows={expenses.slice(0, 20).map((expense) => [
-              expense.employeeName,
-              formatDateIst(expense.expenseDate),
-              expense.type.replace(/_/g, ' '),
-              formatINR(expense.amountPaise),
-              expense.status,
-              expense.status === 'PENDING' ? (
-                <div key={expense.id} className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void reviewExpense(expense.id, 'APPROVED')}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => void reviewExpense(expense.id, 'REJECTED')}
-                  >
-                    Reject
-                  </Button>
-                </div>
-              ) : (
-                '-'
-              ),
-            ])}
-          />
         </CardContent>
       </Card>
 
@@ -865,7 +715,10 @@ function Field({
 function RecordSelect({ records }: { records: HrEmployeeRecord[] }): JSX.Element {
   return (
     <Field label="Employee">
-      <select name="employeeId" className={SELECT_CLASS}>
+      <select name="employeeId" className={SELECT_CLASS} required defaultValue="">
+        <option value="" disabled>
+          Choose employee
+        </option>
         {records.map((record) => (
           <option key={record.employeeId} value={record.employeeId}>
             {record.employeeName} · {record.employeeCode}
@@ -876,13 +729,7 @@ function RecordSelect({ records }: { records: HrEmployeeRecord[] }): JSX.Element
   );
 }
 
-function Table({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: ReactNode[][];
-}): JSX.Element {
+function Table({ headers, rows }: { headers: string[]; rows: ReactNode[][] }): JSX.Element {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full min-w-[1100px] text-sm">

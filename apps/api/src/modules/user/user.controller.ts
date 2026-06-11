@@ -1,13 +1,17 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   type AuthPrincipal,
+  CreateMyHrExpenseInputSchema,
+  type CreateMyHrExpenseInput,
   type EmployeeSalarySlipDownloadResponse,
+  type HrExpenseView,
   type HrSalarySlipView,
   type PublicUser,
 } from '@parshlo/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 
 import { UserService } from './user.service.js';
 
@@ -33,5 +37,19 @@ export class UserController {
     @Param('id') id: string,
   ): Promise<EmployeeSalarySlipDownloadResponse> {
     return this.userService.downloadSalarySlip(user.userId, id);
+  }
+
+  @Get('me/expenses')
+  expenses(@CurrentUser() user: AuthPrincipal): Promise<HrExpenseView[]> {
+    return this.userService.listExpenses(user.userId);
+  }
+
+  @Post('me/expenses')
+  @HttpCode(201)
+  createExpense(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(CreateMyHrExpenseInputSchema)) body: CreateMyHrExpenseInput,
+  ): Promise<HrExpenseView> {
+    return this.userService.createExpense(user.userId, body);
   }
 }

@@ -16,6 +16,7 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/products', label: 'Products', icon: 'products' },
   { href: '/admin/employees', label: 'Employee Permissions', icon: 'employees' },
   { href: '/admin/hr', label: 'HR', icon: 'hr' },
+  { href: '/admin/expenses', label: 'Expenses', icon: 'expenses' },
   { href: '/admin/holidays', label: 'Holidays', icon: 'holidays' },
   { href: '/admin/finance/logistics', label: 'Logistics', icon: 'logistics' },
 ];

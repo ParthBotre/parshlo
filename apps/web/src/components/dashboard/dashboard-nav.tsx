@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Package,
   PackageSearch,
+  ReceiptText,
   ShieldCheck,
   ScrollText,
   ShoppingCart,
@@ -35,6 +36,7 @@ export type NavIconKey =
   | 'employees'
   | 'hr'
   | 'salary'
+  | 'expenses'
   | 'holidays';
 
 const ICONS: Record<NavIconKey, LucideIcon> = {
@@ -49,6 +51,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   employees: ShieldCheck,
   hr: BriefcaseBusiness,
   salary: IndianRupee,
+  expenses: ReceiptText,
   holidays: CalendarDays,
 };
 

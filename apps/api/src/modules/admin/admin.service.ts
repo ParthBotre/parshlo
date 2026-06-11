@@ -817,7 +817,7 @@ export class AdminService {
     const employees = await this.prisma.user.findMany({
       where: {
         deletedAt: null,
-        OR: EMPLOYEE_ROLES.map((role) => ({ roles: { has: role } })),
+        NOT: { roles: { has: 'BUYER' } },
       },
       orderBy: [{ accountStatus: 'asc' }, { createdAt: 'desc' }],
     });
@@ -956,7 +956,7 @@ export class AdminService {
       where: {
         id: input.employeeId,
         deletedAt: null,
-        OR: EMPLOYEE_ROLES.map((role) => ({ roles: { has: role } })),
+        NOT: { roles: { has: 'BUYER' } },
       },
       select: { id: true, fullName: true, email: true },
     });
@@ -965,12 +965,18 @@ export class AdminService {
     }
 
     const salary = splitSalary(input.grossMonthlyPaise);
+    const existingRecord = await this.prisma.employeeHrRecord.findUnique({
+      where: { employeeId: input.employeeId },
+      select: { serialNumber: true },
+    });
+    const nextSerialNumber =
+      input.serialNumber ?? existingRecord?.serialNumber ?? (await this.nextHrSerialNumber());
     const record = await this.prisma.employeeHrRecord.upsert({
       where: { employeeId: input.employeeId },
       create: {
         employeeId: input.employeeId,
         employeeCode: input.employeeCode.trim().toUpperCase(),
-        serialNumber: input.serialNumber ?? null,
+        serialNumber: nextSerialNumber,
         roleTitle: input.roleTitle.trim().toUpperCase(),
         address: input.address.trim().toUpperCase(),
         headQuarter: input.headQuarter.trim().toUpperCase(),
@@ -999,6 +1005,7 @@ export class AdminService {
         basicMonthlyPaise: salary.basicMonthlyPaise,
         hraMonthlyPaise: salary.hraMonthlyPaise,
         specialAllowanceMonthlyPaise: salary.specialAllowanceMonthlyPaise,
+        allowanceMonthlyPaise: input.allowanceMonthlyPaise,
         dailyAllowancePaise: input.dailyAllowancePaise,
         petrolAllowancePaise: input.petrolAllowancePaise,
         mobileAllowancePaise: input.mobileAllowancePaise,
@@ -1006,7 +1013,7 @@ export class AdminService {
       },
       update: {
         employeeCode: input.employeeCode.trim().toUpperCase(),
-        serialNumber: input.serialNumber ?? null,
+        serialNumber: nextSerialNumber,
         roleTitle: input.roleTitle.trim().toUpperCase(),
         address: input.address.trim().toUpperCase(),
         headQuarter: input.headQuarter.trim().toUpperCase(),
@@ -1035,6 +1042,7 @@ export class AdminService {
         basicMonthlyPaise: salary.basicMonthlyPaise,
         hraMonthlyPaise: salary.hraMonthlyPaise,
         specialAllowanceMonthlyPaise: salary.specialAllowanceMonthlyPaise,
+        allowanceMonthlyPaise: input.allowanceMonthlyPaise,
         dailyAllowancePaise: input.dailyAllowancePaise,
         petrolAllowancePaise: input.petrolAllowancePaise,
         mobileAllowancePaise: input.mobileAllowancePaise,
@@ -1190,13 +1198,22 @@ export class AdminService {
       _sum: { amountPaise: true },
     });
     const approvedExpensePaise = Number(approvedExpenses._sum.amountPaise ?? 0);
-    const dailyAllowancePaise = toNumber(record.dailyAllowancePaise) * workingDays;
+    const monthlyAllowancePaise = toNumber(record.allowanceMonthlyPaise);
+    const petrolAllowancePaise = toNumber(record.petrolAllowancePaise);
+    const mobileAllowancePaise = toNumber(record.mobileAllowancePaise);
+    const dailyAllowancePaise = Math.max(
+      0,
+      Math.min(
+        toNumber(record.dailyAllowancePaise) * workingDays,
+        monthlyAllowancePaise - petrolAllowancePaise - mobileAllowancePaise,
+      ),
+    );
     const grossPaise = toNumber(record.grossMonthlyPaise);
     const netPayPaise =
       grossPaise +
       dailyAllowancePaise +
-      toNumber(record.petrolAllowancePaise) +
-      toNumber(record.mobileAllowancePaise) +
+      petrolAllowancePaise +
+      mobileAllowancePaise +
       approvedExpensePaise +
       input.bonusPaise -
       toNumber(record.deductionPaise);
@@ -1624,6 +1641,13 @@ export class AdminService {
     return `${prefix}${String(count + 1).padStart(4, '0')}`;
   }
 
+  private async nextHrSerialNumber(): Promise<number> {
+    const aggregate = await this.prisma.employeeHrRecord.aggregate({
+      _max: { serialNumber: true },
+    });
+    return (aggregate._max.serialNumber ?? 0) + 1;
+  }
+
   private toHrRecordView(record: {
     id: string;
     employeeId: string;
@@ -1654,6 +1678,7 @@ export class AdminService {
     basicMonthlyPaise: bigint;
     hraMonthlyPaise: bigint;
     specialAllowanceMonthlyPaise: bigint;
+    allowanceMonthlyPaise: bigint;
     dailyAllowancePaise: bigint;
     petrolAllowancePaise: bigint;
     mobileAllowancePaise: bigint;
@@ -1696,6 +1721,7 @@ export class AdminService {
       basicMonthlyPaise: toNumber(record.basicMonthlyPaise),
       hraMonthlyPaise: toNumber(record.hraMonthlyPaise),
       specialAllowanceMonthlyPaise: toNumber(record.specialAllowanceMonthlyPaise),
+      allowanceMonthlyPaise: toNumber(record.allowanceMonthlyPaise),
       dailyAllowancePaise: toNumber(record.dailyAllowancePaise),
       petrolAllowancePaise: toNumber(record.petrolAllowancePaise),
       mobileAllowancePaise: toNumber(record.mobileAllowancePaise),
