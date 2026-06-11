@@ -2,7 +2,9 @@
 
 import {
   BadgeCheck,
+  BriefcaseBusiness,
   CalendarDays,
+  IndianRupee,
   LayoutDashboard,
   type LucideIcon,
   Package,
@@ -31,6 +33,8 @@ export type NavIconKey =
   | 'place-order'
   | 'logistics'
   | 'employees'
+  | 'hr'
+  | 'salary'
   | 'holidays';
 
 const ICONS: Record<NavIconKey, LucideIcon> = {
@@ -43,6 +47,8 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   'place-order': ShoppingCart,
   logistics: Truck,
   employees: ShieldCheck,
+  hr: BriefcaseBusiness,
+  salary: IndianRupee,
   holidays: CalendarDays,
 };
 

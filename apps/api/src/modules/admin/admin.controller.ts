@@ -8,32 +8,47 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
+  ArchiveHrEmployeeInputSchema,
   AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
+  CreateHrExpenseInputSchema,
   CreateLeaveRequestInputSchema,
+  GenerateHrDocumentInputSchema,
+  GenerateHrSalarySlipInputSchema,
   AdminUpdateBuyerInputSchema,
   AdminUpdateEmployeeInputSchema,
   CourierReceiptUploadRequest,
   PlaceOrderOnBehalfInput,
   ProductWriteInput,
+  ReviewHrExpenseInputSchema,
   ReviewLeaveRequestInputSchema,
   UpdateCourierTrackingInput,
   UpdateOrderBeforeApprovalInput,
+  UpsertHrEmployeeRecordInputSchema,
+  UpsertHrWorkLogInputSchema,
+  type ArchiveHrEmployeeInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type CreateHrExpenseInput,
   type CreateLeaveRequestInput,
+  type GenerateHrDocumentInput,
+  type GenerateHrSalarySlipInput,
   type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type AuthPrincipal,
   type OrderStatus,
   type OrderView,
+  type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
+  type UpsertHrEmployeeRecordInput,
+  type UpsertHrWorkLogInput,
 } from '@parshlo/types';
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
@@ -323,6 +338,119 @@ export class AdminController {
     body: AdminUpdateEmployeeInput,
   ): ReturnType<AdminService['updateEmployee']> {
     return this.admin.updateEmployee(id, body, user.userId);
+  }
+
+  @Get('hr')
+  @RequireRoles('SUPER_ADMIN')
+  hrDashboard(): ReturnType<AdminService['hrDashboard']> {
+    return this.admin.hrDashboard();
+  }
+
+  @Put('hr/records')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.record.upsert',
+    resource: 'EmployeeHrRecord',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+  })
+  upsertHrRecord(
+    @Body(new ZodValidationPipe(UpsertHrEmployeeRecordInputSchema))
+    body: UpsertHrEmployeeRecordInput,
+  ): ReturnType<AdminService['upsertHrRecord']> {
+    return this.admin.upsertHrRecord(body);
+  }
+
+  @Patch('hr/records/:employeeId/archive')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.record.archive',
+    resource: 'EmployeeHrRecord',
+    resolveResourceId: (req) => (req.params as { employeeId?: string }).employeeId,
+  })
+  archiveHrRecord(
+    @Param('employeeId') employeeId: string,
+    @Body(new ZodValidationPipe(ArchiveHrEmployeeInputSchema)) body: ArchiveHrEmployeeInput,
+  ): ReturnType<AdminService['archiveHrRecord']> {
+    return this.admin.archiveHrRecord(employeeId, body);
+  }
+
+  @Post('hr/records/:employeeId/documents')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.document.generate',
+    resource: 'EmployeeHrDocument',
+    resolveResourceId: (_req, result) => (result as { document?: { id?: string } }).document?.id,
+  })
+  generateHrDocument(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('employeeId') employeeId: string,
+    @Body(new ZodValidationPipe(GenerateHrDocumentInputSchema)) body: GenerateHrDocumentInput,
+  ): ReturnType<AdminService['generateHrDocument']> {
+    return this.admin.generateHrDocument(employeeId, user.userId, body);
+  }
+
+  @Post('hr/salary-slips')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.salary_slip.generate',
+    resource: 'EmployeeSalarySlip',
+    resolveResourceId: (_req, result) =>
+      (result as { salarySlip?: { id?: string } }).salarySlip?.id,
+  })
+  generateHrSalarySlip(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(GenerateHrSalarySlipInputSchema))
+    body: GenerateHrSalarySlipInput,
+  ): ReturnType<AdminService['generateHrSalarySlip']> {
+    return this.admin.generateHrSalarySlip(user.userId, body);
+  }
+
+  @Post('hr/expenses')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.expense.create',
+    resource: 'EmployeeExpense',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+  })
+  createHrExpense(
+    @Body(new ZodValidationPipe(CreateHrExpenseInputSchema)) body: CreateHrExpenseInput,
+  ): ReturnType<AdminService['createHrExpense']> {
+    return this.admin.createHrExpense(body);
+  }
+
+  @Patch('hr/expenses/:id/review')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.expense.review',
+    resource: 'EmployeeExpense',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  reviewHrExpense(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ReviewHrExpenseInputSchema)) body: ReviewHrExpenseInput,
+  ): ReturnType<AdminService['reviewHrExpense']> {
+    return this.admin.reviewHrExpense(id, user.userId, body);
+  }
+
+  @Put('hr/work-logs')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.work_log.upsert',
+    resource: 'EmployeeWorkLog',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+  })
+  upsertHrWorkLog(
+    @Body(new ZodValidationPipe(UpsertHrWorkLogInputSchema)) body: UpsertHrWorkLogInput,
+  ): ReturnType<AdminService['upsertHrWorkLog']> {
+    return this.admin.upsertHrWorkLog(body);
   }
 
   @Get('leave-requests')

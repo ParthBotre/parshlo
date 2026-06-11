@@ -1,5 +1,6 @@
 export * from './auth.js';
 export * from './common.js';
+export * from './hr.js';
 export * from './kyc.js';
 export * from './leave.js';
 export * from './logistics.js';

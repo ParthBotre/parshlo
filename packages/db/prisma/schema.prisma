@@ -80,6 +80,14 @@ model User {
   inquiries        ContactInquiry[]
   leaveRequests    EmployeeLeaveRequest[] @relation("LeaveEmployee")
   leaveReviewed    EmployeeLeaveRequest[] @relation("LeaveReviewer")
+  hrRecord         EmployeeHrRecord?
+  hrSalarySlips    EmployeeSalarySlip[]    @relation("HrSalaryEmployee")
+  hrSalaryGenerated EmployeeSalarySlip[]    @relation("HrSalaryGenerator")
+  hrExpenses       EmployeeExpense[]       @relation("HrExpenseEmployee")
+  hrExpenseReviewed EmployeeExpense[]      @relation("HrExpenseReviewer")
+  hrWorkLogs       EmployeeWorkLog[]       @relation("HrWorkEmployee")
+  hrDocuments      EmployeeHrDocument[]    @relation("HrDocumentEmployee")
+  hrDocumentsGenerated EmployeeHrDocument[] @relation("HrDocumentGenerator")
 
   @@index([accountStatus])
   @@index([createdAt])
@@ -460,6 +468,171 @@ model EmployeeLeaveRequest {
   @@index([employeeId, startDate])
   @@index([status, startDate])
   @@index([reviewedById])
+}
+
+// -----------------------------------------------------------------------------
+// HR RECORDS / PAYROLL / EMPLOYEE DOCUMENTS (SUPER ADMIN ONLY)
+// -----------------------------------------------------------------------------
+
+enum HrDocumentType {
+  OFFER_LETTER
+  APPOINTMENT_LETTER
+  SALARY_SLIP
+  EXPENSE_BILL
+}
+
+enum HrExpenseType {
+  DAILY_ALLOWANCE
+  PETROL
+  MOBILE
+  MISCELLANEOUS
+}
+
+enum HrExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model EmployeeHrRecord {
+  id         String @id @default(cuid())
+  employeeId String @unique
+  employee   User   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  employeeCode String @unique
+  serialNumber Int?
+  roleTitle    String
+  address      String @db.Text
+  headQuarter  String
+  joiningDate  DateTime
+  offerDate    DateTime?
+  appointmentDate DateTime?
+  mobileNumber String?
+  mailId       String?
+  gender       String?
+  department   String?
+  region       String?
+  bankDetails  String?
+  bankAccountNumber String?
+  bloodGroup   String?
+  dateOfBirth  DateTime?
+  marriageAnniversary DateTime?
+  emergencyContactPerson String?
+  emergencyContactRelationship String?
+  emergencyContactNumber String?
+  panNumber String?
+
+  grossMonthlyPaise            BigInt
+  basicMonthlyPaise            BigInt
+  hraMonthlyPaise              BigInt
+  specialAllowanceMonthlyPaise BigInt
+  dailyAllowancePaise          BigInt @default(50000)
+  petrolAllowancePaise         BigInt @default(100000)
+  mobileAllowancePaise         BigInt @default(100000)
+  deductionPaise               BigInt @default(20000)
+
+  archivedAt     DateTime?
+  archiveReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([archivedAt])
+  @@index([employeeCode])
+  @@index([serialNumber])
+}
+
+model EmployeeHrDocument {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrDocumentEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?  @relation("HrDocumentGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  type            HrDocumentType
+  referenceNumber String
+  fileName        String
+  payload         Json
+  generatedAt     DateTime @default(now())
+
+  @@unique([type, referenceNumber])
+  @@index([employeeId, generatedAt])
+}
+
+model EmployeeSalarySlip {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrSalaryEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?  @relation("HrSalaryGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  periodMonth DateTime
+  workingDays Int
+  leaveDays   Int
+
+  basicPaise            BigInt
+  hraPaise              BigInt
+  specialAllowancePaise BigInt
+  grossPaise            BigInt
+  dailyAllowancePaise   BigInt
+  petrolAllowancePaise  BigInt
+  mobileAllowancePaise  BigInt
+  approvedExpensePaise  BigInt @default(0)
+  bonusPaise            BigInt @default(0)
+  deductionPaise        BigInt @default(20000)
+  netPayPaise           BigInt
+
+  transactionDate      DateTime?
+  transactionReference String?
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodMonth])
+  @@index([periodMonth])
+}
+
+model EmployeeExpense {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrExpenseEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  expenseDate DateTime
+  type        HrExpenseType
+  amountPaise BigInt
+  description String?
+  billBucket  String?
+  billKey     String?
+  billContentType String?
+  status      HrExpenseStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("HrExpenseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewerNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId, expenseDate])
+  @@index([status, expenseDate])
+}
+
+model EmployeeWorkLog {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrWorkEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  workDate DateTime
+  worked   Boolean @default(true)
+  note     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, workDate])
+  @@index([employeeId, workDate])
 }
 
 // -----------------------------------------------------------------------------

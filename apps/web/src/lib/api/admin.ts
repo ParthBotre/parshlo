@@ -1,23 +1,43 @@
 import {
   AdminCreateEmployeeInputSchema,
   AdminEmployeeView,
+  ArchiveHrEmployeeInputSchema,
+  CreateHrExpenseInputSchema,
   CreateLeaveRequestInputSchema,
   EmployeeLeaveDashboardView,
   EmployeeLeaveRequestView,
+  GenerateHrDocumentInputSchema,
+  GenerateHrDocumentResponse,
+  GenerateHrSalarySlipInputSchema,
+  GenerateHrSalarySlipResponse,
+  HrDashboardView,
+  HrEmployeeRecordView,
+  HrExpenseView,
+  HrWorkLogView,
   AdminProductView,
   ApiErrorResponse,
   OrderView,
+  ReviewHrExpenseInputSchema,
   ProductWriteInput,
   ReviewLeaveRequestInputSchema,
+  UpsertHrEmployeeRecordInputSchema,
+  UpsertHrWorkLogInputSchema,
+  type ArchiveHrEmployeeInput,
   type AdminCreateEmployeeInput,
   type AdminCreateBuyerInput,
+  type CreateHrExpenseInput,
   type CreateLeaveRequestInput,
+  type GenerateHrDocumentInput,
+  type GenerateHrSalarySlipInput,
   type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type PlaceOrderOnBehalfInput,
   type ProductWriteInput as ProductWriteInputType,
+  type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
   type UpdateOrderBeforeApprovalInput,
+  type UpsertHrEmployeeRecordInput,
+  type UpsertHrWorkLogInput,
 } from '@parshlo/types';
 import { z } from 'zod';
 
@@ -169,6 +189,7 @@ const AdminBuyerDetail = AdminBuyerRow.extend({
 const AdminEmployeeList = z.array(AdminEmployeeView);
 const AdminProductList = z.array(AdminProductView);
 const LeaveDashboard = EmployeeLeaveDashboardView;
+const HrDashboard = HrDashboardView;
 
 export function listPendingKyc(
   accessToken: string,
@@ -349,6 +370,10 @@ export type AdminEmployee = z.infer<typeof AdminEmployeeView>;
 export type AdminProduct = z.infer<typeof AdminProductView>;
 export type EmployeeLeaveDashboard = z.infer<typeof EmployeeLeaveDashboardView>;
 export type EmployeeLeaveRequest = z.infer<typeof EmployeeLeaveRequestView>;
+export type HrDashboard = z.infer<typeof HrDashboardView>;
+export type HrEmployeeRecord = z.infer<typeof HrEmployeeRecordView>;
+export type HrExpense = z.infer<typeof HrExpenseView>;
+export type HrWorkLog = z.infer<typeof HrWorkLogView>;
 
 export function listEmployees(
   accessToken: string,
@@ -428,6 +453,119 @@ export function reviewLeaveRequest(
       ...options,
     },
   );
+}
+
+export function getHrDashboard(
+  accessToken: string,
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<HrDashboard> {
+  return apiCall('/v1/admin/hr', HrDashboard, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function upsertHrRecord(
+  accessToken: string,
+  input: UpsertHrEmployeeRecordInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<HrEmployeeRecord> {
+  return apiCall('/v1/admin/hr/records', HrEmployeeRecordView, {
+    method: 'PUT',
+    accessToken,
+    body: UpsertHrEmployeeRecordInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function archiveHrRecord(
+  accessToken: string,
+  employeeId: string,
+  input: ArchiveHrEmployeeInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<HrEmployeeRecord> {
+  return apiCall(
+    `/v1/admin/hr/records/${encodeURIComponent(employeeId)}/archive`,
+    HrEmployeeRecordView,
+    {
+      method: 'PATCH',
+      accessToken,
+      body: ArchiveHrEmployeeInputSchema.parse(input),
+      ...options,
+    },
+  );
+}
+
+export function generateHrDocument(
+  accessToken: string,
+  employeeId: string,
+  input: GenerateHrDocumentInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof GenerateHrDocumentResponse>> {
+  return apiCall(
+    `/v1/admin/hr/records/${encodeURIComponent(employeeId)}/documents`,
+    GenerateHrDocumentResponse,
+    {
+      method: 'POST',
+      accessToken,
+      body: GenerateHrDocumentInputSchema.parse(input),
+      ...options,
+    },
+  );
+}
+
+export function generateHrSalarySlip(
+  accessToken: string,
+  input: GenerateHrSalarySlipInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof GenerateHrSalarySlipResponse>> {
+  return apiCall('/v1/admin/hr/salary-slips', GenerateHrSalarySlipResponse, {
+    method: 'POST',
+    accessToken,
+    body: GenerateHrSalarySlipInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function createHrExpense(
+  accessToken: string,
+  input: CreateHrExpenseInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<HrExpense> {
+  return apiCall('/v1/admin/hr/expenses', HrExpenseView, {
+    method: 'POST',
+    accessToken,
+    body: CreateHrExpenseInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function reviewHrExpense(
+  accessToken: string,
+  id: string,
+  input: ReviewHrExpenseInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<HrExpense> {
+  return apiCall(`/v1/admin/hr/expenses/${encodeURIComponent(id)}/review`, HrExpenseView, {
+    method: 'PATCH',
+    accessToken,
+    body: ReviewHrExpenseInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function upsertHrWorkLog(
+  accessToken: string,
+  input: UpsertHrWorkLogInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<HrWorkLog> {
+  return apiCall('/v1/admin/hr/work-logs', HrWorkLogView, {
+    method: 'PUT',
+    accessToken,
+    body: UpsertHrWorkLogInputSchema.parse(input),
+    ...options,
+  });
 }
 
 export function listAdminProducts(

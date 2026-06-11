@@ -8,9 +8,15 @@ import { ConfigService } from '@nestjs/config';
 import { type Prisma } from '@parshlo/db';
 import { JobProducer } from '@parshlo/queue';
 import {
+  type ArchiveHrEmployeeInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type CreateHrExpenseInput,
   type CreateLeaveRequestInput,
+  type GenerateHrDocumentInput,
+  type GenerateHrDocumentResponse,
+  type GenerateHrSalarySlipInput,
+  type GenerateHrSalarySlipResponse,
   type AdminUpdateBuyerInput,
   type AdminEmployeeView,
   type AdminUpdateEmployeeInput,
@@ -18,9 +24,19 @@ import {
   type EmployeeLeaveBalanceView,
   type EmployeeLeaveDashboardView,
   type EmployeeLeaveRequestView,
+  type HrDashboardView,
+  type HrDocumentView,
+  type HrEmployeeRecordView,
+  type HrExpenseView,
+  type HrSalarySlipView,
+  type HrWorkLogView,
   type OrderStatus,
+  type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
+  type UpsertHrEmployeeRecordInput,
+  type UpsertHrWorkLogInput,
 } from '@parshlo/types';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -103,6 +119,48 @@ function yearBounds(year: number): { start: Date; end: Date } {
     start: new Date(Date.UTC(year, 0, 1)),
     end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
   };
+}
+
+function monthBounds(month: string): { start: Date; end: Date; daysInMonth: number } {
+  const [year, monthNumber] = month.split('-').map((part) => Number.parseInt(part, 10));
+  const start = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const end = new Date(Date.UTC(year, monthNumber, 0, 23, 59, 59, 999));
+  return { start, end, daysInMonth: end.getUTCDate() };
+}
+
+function fiscalYearLabel(value: Date): string {
+  const year = value.getUTCFullYear();
+  const month = value.getUTCMonth() + 1;
+  const start = month >= 4 ? year : year - 1;
+  return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
+}
+
+function toNumber(value: bigint | number): number {
+  return Number(value);
+}
+
+function splitSalary(grossMonthlyPaise: number): {
+  basicMonthlyPaise: number;
+  hraMonthlyPaise: number;
+  specialAllowanceMonthlyPaise: number;
+} {
+  const basicMonthlyPaise = Math.round(grossMonthlyPaise * 0.5);
+  const hraMonthlyPaise = Math.round(grossMonthlyPaise * 0.4);
+  return {
+    basicMonthlyPaise,
+    hraMonthlyPaise,
+    specialAllowanceMonthlyPaise: Math.max(
+      0,
+      grossMonthlyPaise - basicMonthlyPaise - hraMonthlyPaise,
+    ),
+  };
+}
+
+function formatInr(paise: number): string {
+  return `Rs. ${(paise / 100).toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}`;
 }
 
 interface BuyerRecentOrder {
@@ -857,6 +915,360 @@ export class AdminService {
     return this.toEmployeeView(employee);
   }
 
+  async hrDashboard(): Promise<HrDashboardView> {
+    const [records, documents, salarySlips, expenses, workLogs] = await Promise.all([
+      this.prisma.employeeHrRecord.findMany({
+        include: { employee: { select: { id: true, fullName: true, email: true } } },
+        orderBy: [{ archivedAt: 'asc' }, { employeeCode: 'asc' }],
+      }),
+      this.prisma.employeeHrDocument.findMany({
+        take: 50,
+        orderBy: { generatedAt: 'desc' },
+      }),
+      this.prisma.employeeSalarySlip.findMany({
+        take: 50,
+        include: { employee: { select: { fullName: true } } },
+        orderBy: [{ periodMonth: 'desc' }, { createdAt: 'desc' }],
+      }),
+      this.prisma.employeeExpense.findMany({
+        take: 100,
+        include: { employee: { select: { fullName: true } } },
+        orderBy: [{ status: 'asc' }, { expenseDate: 'desc' }],
+      }),
+      this.prisma.employeeWorkLog.findMany({
+        take: 100,
+        include: { employee: { select: { fullName: true } } },
+        orderBy: { workDate: 'desc' },
+      }),
+    ]);
+
+    return {
+      records: records.map((record) => this.toHrRecordView(record)),
+      documents: documents.map((document) => this.toHrDocumentView(document)),
+      salarySlips: salarySlips.map((salarySlip) => this.toHrSalarySlipView(salarySlip)),
+      expenses: expenses.map((expense) => this.toHrExpenseView(expense)),
+      workLogs: workLogs.map((workLog) => this.toHrWorkLogView(workLog)),
+    };
+  }
+
+  async upsertHrRecord(input: UpsertHrEmployeeRecordInput): Promise<HrEmployeeRecordView> {
+    const employee = await this.prisma.user.findFirst({
+      where: {
+        id: input.employeeId,
+        deletedAt: null,
+        OR: EMPLOYEE_ROLES.map((role) => ({ roles: { has: role } })),
+      },
+      select: { id: true, fullName: true, email: true },
+    });
+    if (!employee) {
+      throw new NotFoundException({ code: 'EMPLOYEE_NOT_FOUND' });
+    }
+
+    const salary = splitSalary(input.grossMonthlyPaise);
+    const record = await this.prisma.employeeHrRecord.upsert({
+      where: { employeeId: input.employeeId },
+      create: {
+        employeeId: input.employeeId,
+        employeeCode: input.employeeCode.trim().toUpperCase(),
+        serialNumber: input.serialNumber ?? null,
+        roleTitle: input.roleTitle.trim().toUpperCase(),
+        address: input.address.trim().toUpperCase(),
+        headQuarter: input.headQuarter.trim().toUpperCase(),
+        joiningDate: parseDateOnly(input.joiningDate),
+        offerDate: input.offerDate ? parseDateOnly(input.offerDate) : null,
+        appointmentDate: input.appointmentDate ? parseDateOnly(input.appointmentDate) : null,
+        mobileNumber: this.normalizeOptionalText(input.mobileNumber),
+        mailId: input.mailId ? this.normalizeEmail(input.mailId) : null,
+        gender: this.normalizeOptionalUpper(input.gender),
+        department: this.normalizeOptionalUpper(input.department),
+        region: this.normalizeOptionalUpper(input.region),
+        bankDetails: this.normalizeOptionalUpper(input.bankDetails),
+        bankAccountNumber: this.normalizeOptionalText(input.bankAccountNumber),
+        bloodGroup: this.normalizeOptionalUpper(input.bloodGroup),
+        dateOfBirth: input.dateOfBirth ? parseDateOnly(input.dateOfBirth) : null,
+        marriageAnniversary: input.marriageAnniversary
+          ? parseDateOnly(input.marriageAnniversary)
+          : null,
+        emergencyContactPerson: this.normalizeOptionalUpper(input.emergencyContactPerson),
+        emergencyContactRelationship: this.normalizeOptionalUpper(
+          input.emergencyContactRelationship,
+        ),
+        emergencyContactNumber: this.normalizeOptionalText(input.emergencyContactNumber),
+        panNumber: this.normalizeOptionalUpper(input.panNumber),
+        grossMonthlyPaise: input.grossMonthlyPaise,
+        basicMonthlyPaise: salary.basicMonthlyPaise,
+        hraMonthlyPaise: salary.hraMonthlyPaise,
+        specialAllowanceMonthlyPaise: salary.specialAllowanceMonthlyPaise,
+        dailyAllowancePaise: input.dailyAllowancePaise,
+        petrolAllowancePaise: input.petrolAllowancePaise,
+        mobileAllowancePaise: input.mobileAllowancePaise,
+        deductionPaise: input.deductionPaise,
+      },
+      update: {
+        employeeCode: input.employeeCode.trim().toUpperCase(),
+        serialNumber: input.serialNumber ?? null,
+        roleTitle: input.roleTitle.trim().toUpperCase(),
+        address: input.address.trim().toUpperCase(),
+        headQuarter: input.headQuarter.trim().toUpperCase(),
+        joiningDate: parseDateOnly(input.joiningDate),
+        offerDate: input.offerDate ? parseDateOnly(input.offerDate) : null,
+        appointmentDate: input.appointmentDate ? parseDateOnly(input.appointmentDate) : null,
+        mobileNumber: this.normalizeOptionalText(input.mobileNumber),
+        mailId: input.mailId ? this.normalizeEmail(input.mailId) : null,
+        gender: this.normalizeOptionalUpper(input.gender),
+        department: this.normalizeOptionalUpper(input.department),
+        region: this.normalizeOptionalUpper(input.region),
+        bankDetails: this.normalizeOptionalUpper(input.bankDetails),
+        bankAccountNumber: this.normalizeOptionalText(input.bankAccountNumber),
+        bloodGroup: this.normalizeOptionalUpper(input.bloodGroup),
+        dateOfBirth: input.dateOfBirth ? parseDateOnly(input.dateOfBirth) : null,
+        marriageAnniversary: input.marriageAnniversary
+          ? parseDateOnly(input.marriageAnniversary)
+          : null,
+        emergencyContactPerson: this.normalizeOptionalUpper(input.emergencyContactPerson),
+        emergencyContactRelationship: this.normalizeOptionalUpper(
+          input.emergencyContactRelationship,
+        ),
+        emergencyContactNumber: this.normalizeOptionalText(input.emergencyContactNumber),
+        panNumber: this.normalizeOptionalUpper(input.panNumber),
+        grossMonthlyPaise: input.grossMonthlyPaise,
+        basicMonthlyPaise: salary.basicMonthlyPaise,
+        hraMonthlyPaise: salary.hraMonthlyPaise,
+        specialAllowanceMonthlyPaise: salary.specialAllowanceMonthlyPaise,
+        dailyAllowancePaise: input.dailyAllowancePaise,
+        petrolAllowancePaise: input.petrolAllowancePaise,
+        mobileAllowancePaise: input.mobileAllowancePaise,
+        deductionPaise: input.deductionPaise,
+        archivedAt: null,
+        archiveReason: null,
+      },
+      include: { employee: { select: { id: true, fullName: true, email: true } } },
+    });
+
+    return this.toHrRecordView(record);
+  }
+
+  async archiveHrRecord(
+    employeeId: string,
+    input: ArchiveHrEmployeeInput,
+  ): Promise<HrEmployeeRecordView> {
+    const record = await this.prisma.employeeHrRecord.update({
+      where: { employeeId },
+      data: {
+        archivedAt: new Date(),
+        archiveReason: input.archiveReason?.trim() ?? null,
+      },
+      include: { employee: { select: { id: true, fullName: true, email: true } } },
+    });
+    return this.toHrRecordView(record);
+  }
+
+  async createHrExpense(input: CreateHrExpenseInput): Promise<HrExpenseView> {
+    const expense = await this.prisma.employeeExpense.create({
+      data: {
+        employeeId: input.employeeId,
+        expenseDate: parseDateOnly(input.expenseDate),
+        type: input.type,
+        amountPaise: input.amountPaise,
+        description: input.description?.trim() ?? null,
+        billKey: input.billKey?.trim() ?? null,
+        billContentType: input.billContentType?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+    return this.toHrExpenseView(expense);
+  }
+
+  async reviewHrExpense(
+    id: string,
+    actorId: string,
+    input: ReviewHrExpenseInput,
+  ): Promise<HrExpenseView> {
+    const expense = await this.prisma.employeeExpense.update({
+      where: { id },
+      data: {
+        status: input.status,
+        reviewedById: actorId,
+        reviewedAt: new Date(),
+        reviewerNote: input.reviewerNote?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+    return this.toHrExpenseView(expense);
+  }
+
+  async upsertHrWorkLog(input: UpsertHrWorkLogInput): Promise<HrWorkLogView> {
+    const workDate = parseDateOnly(input.workDate);
+    const workLog = await this.prisma.employeeWorkLog.upsert({
+      where: { employeeId_workDate: { employeeId: input.employeeId, workDate } },
+      create: {
+        employeeId: input.employeeId,
+        workDate,
+        worked: input.worked,
+        note: input.note?.trim() ?? null,
+      },
+      update: {
+        worked: input.worked,
+        note: input.note?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+    return this.toHrWorkLogView(workLog);
+  }
+
+  async generateHrDocument(
+    employeeId: string,
+    actorId: string,
+    input: GenerateHrDocumentInput,
+  ): Promise<GenerateHrDocumentResponse> {
+    const record = await this.getHrRecordOrThrow(employeeId);
+    const referenceNumber = await this.nextHrReference(input.type, new Date());
+    const title = input.type === 'OFFER_LETTER' ? 'OFFER LETTER' : 'APPOINTMENT LETTER';
+    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const lines =
+      input.type === 'OFFER_LETTER'
+        ? this.offerLetterLines(record)
+        : this.appointmentLetterLines(record, referenceNumber);
+    const bytes = await this.renderHrPdf(title, lines);
+
+    const document = await this.prisma.employeeHrDocument.create({
+      data: {
+        employeeId,
+        generatedById: actorId,
+        type: input.type,
+        referenceNumber,
+        fileName,
+        payload: {
+          employeeName: record.employee.fullName,
+          employeeCode: record.employeeCode,
+          roleTitle: record.roleTitle,
+          generatedOn: formatDateOnly(new Date()),
+        },
+      },
+    });
+
+    return {
+      document: this.toHrDocumentView(document),
+      fileName,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async generateHrSalarySlip(
+    actorId: string,
+    input: GenerateHrSalarySlipInput,
+  ): Promise<GenerateHrSalarySlipResponse> {
+    const record = await this.getHrRecordOrThrow(input.employeeId);
+    const { start, end, daysInMonth } = monthBounds(input.periodMonth);
+    const approvedLeaveDays = await this.prisma.employeeLeaveRequest.aggregate({
+      where: {
+        employeeId: input.employeeId,
+        status: 'APPROVED',
+        startDate: { lte: end },
+        endDate: { gte: start },
+      },
+      _sum: { dayCount: true },
+    });
+    const loggedWorkDays = await this.prisma.employeeWorkLog.count({
+      where: {
+        employeeId: input.employeeId,
+        worked: true,
+        workDate: { gte: start, lte: end },
+      },
+    });
+    const leaveDays = approvedLeaveDays._sum.dayCount ?? 0;
+    const workingDays =
+      input.workingDays ??
+      (loggedWorkDays > 0 ? loggedWorkDays : Math.max(0, daysInMonth - leaveDays));
+    const approvedExpenses = await this.prisma.employeeExpense.aggregate({
+      where: {
+        employeeId: input.employeeId,
+        status: 'APPROVED',
+        expenseDate: { gte: start, lte: end },
+      },
+      _sum: { amountPaise: true },
+    });
+    const approvedExpensePaise = Number(approvedExpenses._sum.amountPaise ?? 0);
+    const dailyAllowancePaise = toNumber(record.dailyAllowancePaise) * workingDays;
+    const grossPaise = toNumber(record.grossMonthlyPaise);
+    const netPayPaise =
+      grossPaise +
+      dailyAllowancePaise +
+      toNumber(record.petrolAllowancePaise) +
+      toNumber(record.mobileAllowancePaise) +
+      approvedExpensePaise +
+      input.bonusPaise -
+      toNumber(record.deductionPaise);
+
+    const salarySlip = await this.prisma.employeeSalarySlip.upsert({
+      where: { employeeId_periodMonth: { employeeId: input.employeeId, periodMonth: start } },
+      create: {
+        employeeId: input.employeeId,
+        generatedById: actorId,
+        periodMonth: start,
+        workingDays,
+        leaveDays,
+        basicPaise: record.basicMonthlyPaise,
+        hraPaise: record.hraMonthlyPaise,
+        specialAllowancePaise: record.specialAllowanceMonthlyPaise,
+        grossPaise: record.grossMonthlyPaise,
+        dailyAllowancePaise,
+        petrolAllowancePaise: record.petrolAllowancePaise,
+        mobileAllowancePaise: record.mobileAllowancePaise,
+        approvedExpensePaise,
+        bonusPaise: input.bonusPaise,
+        deductionPaise: record.deductionPaise,
+        netPayPaise,
+        transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
+        transactionReference: input.transactionReference?.trim() ?? null,
+        notes: input.notes?.trim() ?? null,
+      },
+      update: {
+        generatedById: actorId,
+        workingDays,
+        leaveDays,
+        dailyAllowancePaise,
+        approvedExpensePaise,
+        bonusPaise: input.bonusPaise,
+        netPayPaise,
+        transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
+        transactionReference: input.transactionReference?.trim() ?? null,
+        notes: input.notes?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+
+    const referenceNumber = await this.nextHrReference('SALARY_SLIP', start);
+    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const slipView = this.toHrSalarySlipView(salarySlip);
+    const bytes = await this.renderHrPdf(
+      'SALARY SLIP',
+      this.salarySlipLines(record, slipView, input.periodMonth),
+    );
+    await this.prisma.employeeHrDocument.create({
+      data: {
+        employeeId: input.employeeId,
+        generatedById: actorId,
+        type: 'SALARY_SLIP',
+        referenceNumber,
+        fileName,
+        payload: {
+          periodMonth: input.periodMonth,
+          salarySlipId: salarySlip.id,
+          employeeName: record.employee.fullName,
+        },
+      },
+    });
+
+    return {
+      salarySlip: slipView,
+      fileName,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
   async leaveDashboard(actorId: string, actorRoles: string[]): Promise<EmployeeLeaveDashboardView> {
     const canReview = actorRoles.includes('SUPER_ADMIN');
     const year = new Date().getUTCFullYear();
@@ -1187,6 +1599,406 @@ export class AdminService {
       createdAt: request.createdAt.toISOString(),
       updatedAt: request.updatedAt.toISOString(),
     };
+  }
+
+  private async getHrRecordOrThrow(employeeId: string) {
+    const record = await this.prisma.employeeHrRecord.findUnique({
+      where: { employeeId },
+      include: { employee: { select: { id: true, fullName: true, email: true } } },
+    });
+    if (!record) {
+      throw new NotFoundException({
+        code: 'HR_RECORD_NOT_FOUND',
+        message: 'Create the employee HR record before generating HR documents.',
+      });
+    }
+    return record;
+  }
+
+  private async nextHrReference(type: string, value: Date): Promise<string> {
+    const fiscalYear = fiscalYearLabel(value);
+    const prefix = `PSH/HR/${type.replace(/_/g, '-')}/${fiscalYear}/`;
+    const count = await this.prisma.employeeHrDocument.count({
+      where: { referenceNumber: { startsWith: prefix } },
+    });
+    return `${prefix}${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private toHrRecordView(record: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string; email: string };
+    employeeCode: string;
+    serialNumber: number | null;
+    roleTitle: string;
+    address: string;
+    headQuarter: string;
+    joiningDate: Date;
+    offerDate: Date | null;
+    appointmentDate: Date | null;
+    mobileNumber: string | null;
+    mailId: string | null;
+    gender: string | null;
+    department: string | null;
+    region: string | null;
+    bankDetails: string | null;
+    bankAccountNumber: string | null;
+    bloodGroup: string | null;
+    dateOfBirth: Date | null;
+    marriageAnniversary: Date | null;
+    emergencyContactPerson: string | null;
+    emergencyContactRelationship: string | null;
+    emergencyContactNumber: string | null;
+    panNumber: string | null;
+    grossMonthlyPaise: bigint;
+    basicMonthlyPaise: bigint;
+    hraMonthlyPaise: bigint;
+    specialAllowanceMonthlyPaise: bigint;
+    dailyAllowancePaise: bigint;
+    petrolAllowancePaise: bigint;
+    mobileAllowancePaise: bigint;
+    deductionPaise: bigint;
+    archivedAt: Date | null;
+    archiveReason: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrEmployeeRecordView {
+    return {
+      id: record.id,
+      employeeId: record.employeeId,
+      employeeName: record.employee.fullName,
+      employeeEmail: record.employee.email,
+      employeeCode: record.employeeCode,
+      serialNumber: record.serialNumber,
+      roleTitle: record.roleTitle,
+      address: record.address,
+      headQuarter: record.headQuarter,
+      joiningDate: formatDateOnly(record.joiningDate),
+      offerDate: record.offerDate ? formatDateOnly(record.offerDate) : null,
+      appointmentDate: record.appointmentDate ? formatDateOnly(record.appointmentDate) : null,
+      mobileNumber: record.mobileNumber,
+      mailId: record.mailId,
+      gender: record.gender,
+      department: record.department,
+      region: record.region,
+      bankDetails: record.bankDetails,
+      bankAccountNumber: record.bankAccountNumber,
+      bloodGroup: record.bloodGroup,
+      dateOfBirth: record.dateOfBirth ? formatDateOnly(record.dateOfBirth) : null,
+      marriageAnniversary: record.marriageAnniversary
+        ? formatDateOnly(record.marriageAnniversary)
+        : null,
+      emergencyContactPerson: record.emergencyContactPerson,
+      emergencyContactRelationship: record.emergencyContactRelationship,
+      emergencyContactNumber: record.emergencyContactNumber,
+      panNumber: record.panNumber,
+      grossMonthlyPaise: toNumber(record.grossMonthlyPaise),
+      basicMonthlyPaise: toNumber(record.basicMonthlyPaise),
+      hraMonthlyPaise: toNumber(record.hraMonthlyPaise),
+      specialAllowanceMonthlyPaise: toNumber(record.specialAllowanceMonthlyPaise),
+      dailyAllowancePaise: toNumber(record.dailyAllowancePaise),
+      petrolAllowancePaise: toNumber(record.petrolAllowancePaise),
+      mobileAllowancePaise: toNumber(record.mobileAllowancePaise),
+      deductionPaise: toNumber(record.deductionPaise),
+      archivedAt: record.archivedAt?.toISOString() ?? null,
+      archiveReason: record.archiveReason,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    };
+  }
+
+  private toHrDocumentView(document: {
+    id: string;
+    employeeId: string;
+    type: string;
+    referenceNumber: string;
+    fileName: string;
+    generatedAt: Date;
+  }): HrDocumentView {
+    return {
+      id: document.id,
+      employeeId: document.employeeId,
+      type: document.type as HrDocumentView['type'],
+      referenceNumber: document.referenceNumber,
+      fileName: document.fileName,
+      generatedAt: document.generatedAt.toISOString(),
+    };
+  }
+
+  private toHrExpenseView(expense: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    expenseDate: Date;
+    type: string;
+    amountPaise: bigint;
+    description: string | null;
+    billKey: string | null;
+    billContentType: string | null;
+    status: string;
+    reviewerNote: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrExpenseView {
+    return {
+      id: expense.id,
+      employeeId: expense.employeeId,
+      employeeName: expense.employee.fullName,
+      expenseDate: formatDateOnly(expense.expenseDate),
+      type: expense.type as HrExpenseView['type'],
+      amountPaise: toNumber(expense.amountPaise),
+      description: expense.description,
+      billKey: expense.billKey,
+      billContentType: expense.billContentType,
+      status: expense.status as HrExpenseView['status'],
+      reviewerNote: expense.reviewerNote,
+      createdAt: expense.createdAt.toISOString(),
+      updatedAt: expense.updatedAt.toISOString(),
+    };
+  }
+
+  private toHrWorkLogView(workLog: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    workDate: Date;
+    worked: boolean;
+    note: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrWorkLogView {
+    return {
+      id: workLog.id,
+      employeeId: workLog.employeeId,
+      employeeName: workLog.employee.fullName,
+      workDate: formatDateOnly(workLog.workDate),
+      worked: workLog.worked,
+      note: workLog.note,
+      createdAt: workLog.createdAt.toISOString(),
+      updatedAt: workLog.updatedAt.toISOString(),
+    };
+  }
+
+  private toHrSalarySlipView(slip: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    periodMonth: Date;
+    workingDays: number;
+    leaveDays: number;
+    basicPaise: bigint;
+    hraPaise: bigint;
+    specialAllowancePaise: bigint;
+    grossPaise: bigint;
+    dailyAllowancePaise: bigint;
+    petrolAllowancePaise: bigint;
+    mobileAllowancePaise: bigint;
+    approvedExpensePaise: bigint;
+    bonusPaise: bigint;
+    deductionPaise: bigint;
+    netPayPaise: bigint;
+    transactionDate: Date | null;
+    transactionReference: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrSalarySlipView {
+    return {
+      id: slip.id,
+      employeeId: slip.employeeId,
+      employeeName: slip.employee.fullName,
+      periodMonth: formatDateOnly(slip.periodMonth),
+      workingDays: slip.workingDays,
+      leaveDays: slip.leaveDays,
+      basicPaise: toNumber(slip.basicPaise),
+      hraPaise: toNumber(slip.hraPaise),
+      specialAllowancePaise: toNumber(slip.specialAllowancePaise),
+      grossPaise: toNumber(slip.grossPaise),
+      dailyAllowancePaise: toNumber(slip.dailyAllowancePaise),
+      petrolAllowancePaise: toNumber(slip.petrolAllowancePaise),
+      mobileAllowancePaise: toNumber(slip.mobileAllowancePaise),
+      approvedExpensePaise: toNumber(slip.approvedExpensePaise),
+      bonusPaise: toNumber(slip.bonusPaise),
+      deductionPaise: toNumber(slip.deductionPaise),
+      netPayPaise: toNumber(slip.netPayPaise),
+      transactionDate: slip.transactionDate ? formatDateOnly(slip.transactionDate) : null,
+      transactionReference: slip.transactionReference,
+      notes: slip.notes,
+      createdAt: slip.createdAt.toISOString(),
+      updatedAt: slip.updatedAt.toISOString(),
+    };
+  }
+
+  private offerLetterLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+  ): string[] {
+    const annualGross = toNumber(record.grossMonthlyPaise) * 12;
+    return [
+      `Date: ${formatDateOnly(record.offerDate ?? new Date())}`,
+      'Place: Pune, MH, INDIA',
+      '',
+      `Mr/Mrs/Ms. ${record.employee.fullName}`,
+      record.address,
+      '',
+      `${record.employee.fullName},`,
+      '',
+      `With reference to your interview with Mr. Hemant Botre (CRM HEAD), we are happy to OFFER you the position of ${record.roleTitle} in our company w.e.f ${formatDateOnly(record.joiningDate)} or any other mutually acceptable date.`,
+      '',
+      `During the period, you will be paid a consolidated sum of ${formatInr(annualGross)} p.a. as a basic salary subject to tax deduction.`,
+      '',
+      'As per company rules you are not permitted to take up any other assignment, part time or casual, with any other company or agency. All normal working hours and relevant service rules will apply.',
+      '',
+      'The company will not make a full and final settlement if you resign during the probation period of 6 months and the company will deduct one month basic salary if you resign without serving a notice period of 1 month.',
+      '',
+      'Kindly confirm your acceptance by signing copy of this letter. We welcome you on board and wish you a long successful career with PARSHLO.',
+      '',
+      'Best Wishes.',
+      'For PARSHLO',
+      '',
+      '',
+      '(Authority Stamp)',
+    ];
+  }
+
+  private appointmentLetterLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    referenceNumber: string,
+  ): string[] {
+    return [
+      `Ref No: ${referenceNumber}`,
+      `Date: ${formatDateOnly(record.appointmentDate ?? new Date())}`,
+      '',
+      record.employee.fullName,
+      record.address,
+      '',
+      `${record.employee.fullName},`,
+      '',
+      'Ref: Letter of Appointment.',
+      '',
+      `With reference to your application and subsequent interview you had with us, we are pleased to appoint you as ${record.roleTitle} in our organization with Head Quarter at ${record.headQuarter} w.e.f ${formatDateOnly(record.joiningDate)}.`,
+      '',
+      'For undertaking the above assignment, you will be paid salary and allowance as mentioned below:',
+      `BASIC: ${formatInr(toNumber(record.basicMonthlyPaise))} Per Month`,
+      `H.R.A.: ${formatInr(toNumber(record.hraMonthlyPaise))} Per Month`,
+      `SPECIAL PAYEE ALLOWANCE: ${formatInr(toNumber(record.specialAllowanceMonthlyPaise))} Per Month`,
+      `TOTAL: ${formatInr(toNumber(record.grossMonthlyPaise))} Per Month`,
+      '',
+      'ALLOWANCES FOR FIELD WORK:',
+      `Head Quarter: ${formatInr(toNumber(record.dailyAllowancePaise))} per working day.`,
+      'While at H.Q. you will not be entitled to charge any allowance on Sunday and Holiday.',
+      `PETROL: ${formatInr(toNumber(record.petrolAllowancePaise))}`,
+      `MOBILE: ${formatInr(toNumber(record.mobileAllowancePaise))}`,
+      '',
+      'You will be on probation for 6 months from the date of joining duty. Confirmation will be subject to sales performance, work input, daily doctor calls, chemist calls, reporting, and overall conduct.',
+      '',
+      'Your service is liable to be transferred to any section, department, unit, branch, or affiliated subsidiary anywhere in India. You must follow KEY RESULT AREA, WORK NORMS, REPORTING SYSTEMS, and GUIDELINES issued by the Company.',
+      '',
+      'Your salary and package are strictly confidential. The Company reserves the right to terminate employment for indiscipline, misconduct, insubordination, dishonesty, absenteeism, negligence of duty, misuse of company belongings, or breach of service conditions.',
+      '',
+      'LEAVE - You will be entitled for leave and other benefits as per the rules of the Company.',
+      '',
+      'Thanking you,',
+      'Yours sincerely,',
+      'PARSHLO',
+      '',
+      '',
+      '(Authority Signatory)',
+    ];
+  }
+
+  private salarySlipLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    slip: HrSalarySlipView,
+    periodMonth: string,
+  ): string[] {
+    const monthYear = new Intl.DateTimeFormat('en-IN', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(`${periodMonth}-01T00:00:00.000Z`));
+    const totalEarnings = slip.basicPaise + slip.hraPaise + slip.specialAllowancePaise;
+    return [
+      'PRISURE MEDICARE',
+      `SALARY SLIP FOR THE MONTH OF ${monthYear}`,
+      '',
+      `EMPLOYEE NAME : ${record.employee.fullName}`,
+      `EMPLOYEE NO. : ${record.employeeCode}`,
+      `DESIGNATION : ${record.roleTitle}`,
+      `DEPARTMENT : ${record.department ?? '-'}`,
+      `GENDER : ${record.gender ?? '-'}`,
+      `REGION : ${record.region ?? record.headQuarter}`,
+      `PAN NO. : ${record.panNumber ?? '-'}`,
+      `PAID DAYS : ${slip.workingDays}`,
+      `BANK DETAILS : ${record.bankDetails ?? '-'}`,
+      `BANK A/C NO. : ${record.bankAccountNumber ?? '-'}`,
+      '',
+      'EARNINGS                          Payroll',
+      `BASIC                             ${formatInr(slip.basicPaise)}`,
+      `HRA                               ${formatInr(slip.hraPaise)}`,
+      `SPECIAL ALLOWANCE                 ${formatInr(slip.specialAllowancePaise)}`,
+      '',
+      'DEDUCTION                         Payroll',
+      `MH - PROF. TAX                    ${formatInr(slip.deductionPaise)}`,
+      'INCOME TAX (TDS)',
+      'LOAN',
+      'ADVANCE',
+      '',
+      `Total Earnings : ${formatInr(totalEarnings)}`,
+      `Total Deduction : ${formatInr(slip.deductionPaise)}`,
+      `Total Payable : ${formatInr(slip.netPayPaise)}`,
+      '',
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ?? '-'}`,
+      `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
+      `AMOUNT : ${formatInr(slip.netPayPaise)}`,
+      '',
+      `Remarks : ${slip.notes ?? '-'}`,
+      '',
+      'Since this is computer generated slip no need of signature.',
+      '',
+      '- - - - - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - - - - -',
+      'Kindly cut here and send HO',
+      `I have received salary for the month of ${monthYear}`,
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ?? '-'}`,
+      `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
+      `AMOUNT : ${formatInr(slip.netPayPaise)}`,
+      '',
+      `Name : ${record.employee.fullName}`,
+      'Division : PARSHLO',
+      `Region : ${record.region ?? record.headQuarter}`,
+    ];
+  }
+
+  private async renderHrPdf(title: string, lines: string[]): Promise<Uint8Array> {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    let page = pdf.addPage([595, 842]);
+    let y = 790;
+    page.drawText('PARSHLO', { x: 48, y, size: 16, font: bold, color: rgb(0.05, 0.28, 0.2) });
+    y -= 34;
+    page.drawText(title, { x: 48, y, size: 14, font: bold, color: rgb(0.05, 0.07, 0.09) });
+    y -= 28;
+
+    for (const line of lines) {
+      if (y < 60) {
+        page = pdf.addPage([595, 842]);
+        y = 790;
+      }
+      const chunks = line.match(/.{1,92}(\s|$)/g) ?? [''];
+      for (const chunk of chunks) {
+        page.drawText(chunk.trimEnd(), {
+          x: 48,
+          y,
+          size: 10,
+          font,
+          color: rgb(0.08, 0.1, 0.12),
+        });
+        y -= 15;
+      }
+      if (line === '') y -= 4;
+    }
+
+    return pdf.save();
   }
 
   async listPendingKyc(): Promise<

@@ -9,6 +9,7 @@ const NAV: readonly NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: 'dashboard' },
   { href: '/dashboard/catalog', label: 'Products', icon: 'catalog' },
   { href: '/dashboard/orders', label: 'Orders', icon: 'orders' },
+  { href: '/dashboard/salary-slips', label: 'Salary Slips', icon: 'salary' },
 ];
 
 export default async function DashboardLayout({
