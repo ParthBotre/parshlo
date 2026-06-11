@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import {
   BadRequestException,
   ConflictException,
@@ -1998,22 +2000,39 @@ export class AdminService {
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    let page = pdf.addPage([595, 842]);
-    let y = 790;
-    page.drawText('PARSHLO', { x: 48, y, size: 16, font: bold, color: rgb(0.05, 0.28, 0.2) });
-    y -= 34;
-    page.drawText(title, { x: 48, y, size: 14, font: bold, color: rgb(0.05, 0.07, 0.09) });
+    const letterheadBytes = await this.loadHrLetterhead();
+    const letterheadPage = letterheadBytes ? (await pdf.embedPdf(letterheadBytes, [0]))[0] : null;
+
+    const pageSize: [number, number] = letterheadPage
+      ? [letterheadPage.width, letterheadPage.height]
+      : [595, 842];
+    const createPage = () => {
+      const nextPage = pdf.addPage(pageSize);
+      if (letterheadPage) {
+        nextPage.drawPage(letterheadPage, {
+          x: 0,
+          y: 0,
+          width: pageSize[0],
+          height: pageSize[1],
+        });
+      }
+      return nextPage;
+    };
+
+    let page = createPage();
+    let y = letterheadPage ? pageSize[1] - 170 : pageSize[1] - 52;
+    page.drawText(title, { x: 58, y, size: 14, font: bold, color: rgb(0.05, 0.07, 0.09) });
     y -= 28;
 
     for (const line of lines) {
-      if (y < 60) {
-        page = pdf.addPage([595, 842]);
-        y = 790;
+      if (y < 76) {
+        page = createPage();
+        y = letterheadPage ? pageSize[1] - 170 : pageSize[1] - 52;
       }
-      const chunks = line.match(/.{1,92}(\s|$)/g) ?? [''];
+      const chunks = line.match(/.{1,88}(\s|$)/g) ?? [''];
       for (const chunk of chunks) {
         page.drawText(chunk.trimEnd(), {
-          x: 48,
+          x: 58,
           y,
           size: 10,
           font,
@@ -2025,6 +2044,19 @@ export class AdminService {
     }
 
     return pdf.save();
+  }
+
+  private async loadHrLetterhead(): Promise<Uint8Array | null> {
+    try {
+      return await readFile('assets/hr/letterhead.pdf');
+    } catch {
+      // Local repository fallback when the process runs from the repo root.
+    }
+    try {
+      return await readFile('apps/api/assets/hr/letterhead.pdf');
+    } catch {
+      return null;
+    }
   }
 
   async listPendingKyc(): Promise<

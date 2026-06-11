@@ -47,6 +47,7 @@ RUN groupadd -g 10001 app && useradd -u 10001 -g 10001 -s /usr/sbin/nologin -M a
 COPY --from=build --chown=app:app /repo/node_modules ./node_modules
 COPY --from=build --chown=app:app /repo/packages ./packages
 COPY --from=build --chown=app:app /repo/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build --chown=app:app /repo/apps/api/assets ./apps/api/assets
 COPY --from=build --chown=app:app /repo/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=app:app /repo/apps/api/package.json ./apps/api/package.json
 
