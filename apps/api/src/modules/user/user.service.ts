@@ -358,7 +358,7 @@ export class UserService {
       toNumber(slip.basicPaise) + toNumber(slip.hraPaise) + toNumber(slip.specialAllowancePaise);
     const totalDeduction = toNumber(slip.deductionPaise);
 
-    draw('PRISURE MEDICARE', 40, 558, 13, true);
+    draw('PARSHLO', 40, 558, 13, true);
     draw('SALARY SLIP FOR THE MONTH OF', 315, 558, 10, true);
     draw(monthYear, 505, 558, 10, true);
 

@@ -20,6 +20,20 @@ const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 const REQUIRED_HR_DOCUMENT_CC = 'hemantbotre@gmail.com';
+const MONTH_OPTIONS = [
+  ['01', 'January'],
+  ['02', 'February'],
+  ['03', 'March'],
+  ['04', 'April'],
+  ['05', 'May'],
+  ['06', 'June'],
+  ['07', 'July'],
+  ['08', 'August'],
+  ['09', 'September'],
+  ['10', 'October'],
+  ['11', 'November'],
+  ['12', 'December'],
+] as const;
 
 type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER';
 
@@ -184,6 +198,11 @@ function parseEmailList(value: string): string[] {
 
 function labelForLetterType(type: HrLetterType): string {
   return type === 'OFFER_LETTER' ? 'offer letter' : 'appointment letter';
+}
+
+function salaryYearOptions(): string[] {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, index) => String(currentYear - 1 + index));
 }
 
 export function HrManagement({
@@ -375,7 +394,7 @@ export function HrManagement({
         'POST',
         {
           employeeId: formString(form, 'employeeId'),
-          periodMonth: formString(form, 'periodMonth'),
+          periodMonth: `${formString(form, 'periodYear')}-${formString(form, 'periodMonth')}`,
           bonusPaise: rupeesToPaise(form.get('bonus')),
           transactionDate: formString(form, 'transactionDate'),
           transactionReference: formString(form, 'transactionReference'),
@@ -761,7 +780,28 @@ export function HrManagement({
           >
             <RecordSelect records={activeRecords} />
             <Field label="Month">
-              <Input name="periodMonth" type="month" required />
+              <select name="periodMonth" className={SELECT_CLASS} required defaultValue="">
+                <option value="" disabled>
+                  Choose month
+                </option>
+                {MONTH_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Year">
+              <select name="periodYear" className={SELECT_CLASS} required defaultValue="">
+                <option value="" disabled>
+                  Choose year
+                </option>
+                {salaryYearOptions().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Bonus">
               <Input name="bonus" type="number" min="0" step="0.01" defaultValue="0" />

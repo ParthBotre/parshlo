@@ -1407,31 +1407,46 @@ export class AdminService {
     bytes: Uint8Array;
   }> {
     const record = await this.getHrRecordOrThrow(employeeId);
-    const referenceNumber = await this.nextHrReference(input.type, new Date());
+    const existingDocument = await this.prisma.employeeHrDocument.findFirst({
+      where: { employeeId, type: input.type },
+      orderBy: { generatedAt: 'asc' },
+      select: {
+        id: true,
+        employeeId: true,
+        type: true,
+        referenceNumber: true,
+        fileName: true,
+        generatedAt: true,
+      },
+    });
+    const referenceNumber =
+      existingDocument?.referenceNumber ?? (await this.nextHrReference(input.type, new Date()));
     const title = input.type === 'OFFER_LETTER' ? 'OFFER LETTER' : 'APPOINTMENT LETTER';
-    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const fileName = existingDocument?.fileName ?? `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
     const lines =
       input.type === 'OFFER_LETTER'
         ? this.offerLetterLines(record)
         : this.appointmentLetterLines(record, referenceNumber);
     const bytes = await this.renderHrPdf(title, lines);
 
-    const document = await this.prisma.employeeHrDocument.create({
-      data: {
-        employeeId,
-        generatedById: actorId,
-        type: input.type,
-        referenceNumber,
-        fileName,
-        payload: {
-          employeeName: record.employee.fullName,
-          employeeCode: record.employeeCode,
-          roleTitle: record.roleTitle,
-          generatedOn: formatDateOnly(new Date()),
-          delivery,
+    const document =
+      existingDocument ??
+      (await this.prisma.employeeHrDocument.create({
+        data: {
+          employeeId,
+          generatedById: actorId,
+          type: input.type,
+          referenceNumber,
+          fileName,
+          payload: {
+            employeeName: record.employee.fullName,
+            employeeCode: record.employeeCode,
+            roleTitle: record.roleTitle,
+            generatedOn: formatDateOnly(new Date()),
+            delivery,
+          },
         },
-      },
-    });
+      }));
 
     return { record, document, fileName, bytes };
   }
@@ -2207,7 +2222,7 @@ export class AdminService {
     }).format(new Date(`${periodMonth}-01T00:00:00.000Z`));
     const totalEarnings = slip.basicPaise + slip.hraPaise + slip.specialAllowancePaise;
     return [
-      'PRISURE MEDICARE',
+      'PARSHLO',
       `SALARY SLIP FOR THE MONTH OF ${monthYear}`,
       '',
       `EMPLOYEE NAME : ${record.employee.fullName}`,
@@ -2330,11 +2345,11 @@ export class AdminService {
         continue;
       }
       if (
-        trimmed === 'PRISURE MEDICARE' ||
+        trimmed === 'PARSHLO' ||
         trimmed.startsWith('SALARY SLIP FOR THE MONTH OF') ||
         trimmed === 'OFFER LETTER'
       ) {
-        drawCentered(trimmed, trimmed === 'PRISURE MEDICARE' ? 12 : 11);
+        drawCentered(trimmed, trimmed === 'PARSHLO' ? 12 : 11);
         y -= 18;
         continue;
       }
