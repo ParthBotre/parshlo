@@ -32,7 +32,7 @@ export default async function HolidaysPage(): Promise<JSX.Element> {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Holidays</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Apply for annual PTO and review super-admin approvals.
+          Apply for PTO, review approvals, and maintain the company holiday calendar.
         </p>
       </div>
 

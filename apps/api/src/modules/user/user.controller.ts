@@ -3,10 +3,13 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   type AuthPrincipal,
   CreateMyHrExpenseInputSchema,
+  CreateMyHrWorkLogInputSchema,
   type CreateMyHrExpenseInput,
+  type CreateMyHrWorkLogInput,
   type EmployeeSalarySlipDownloadResponse,
   type HrExpenseView,
   type HrSalarySlipView,
+  type HrWorkLogView,
   type PublicUser,
 } from '@parshlo/types';
 
@@ -51,5 +54,19 @@ export class UserController {
     @Body(new ZodValidationPipe(CreateMyHrExpenseInputSchema)) body: CreateMyHrExpenseInput,
   ): Promise<HrExpenseView> {
     return this.userService.createExpense(user.userId, body);
+  }
+
+  @Get('me/work-logs')
+  workLogs(@CurrentUser() user: AuthPrincipal): Promise<HrWorkLogView[]> {
+    return this.userService.listWorkLogs(user.userId);
+  }
+
+  @Post('me/work-logs')
+  @HttpCode(201)
+  createWorkLog(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(CreateMyHrWorkLogInputSchema)) body: CreateMyHrWorkLogInput,
+  ): Promise<HrWorkLogView> {
+    return this.userService.upsertWorkLog(user.userId, body);
   }
 }

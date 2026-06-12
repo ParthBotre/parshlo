@@ -43,7 +43,7 @@ export class FinanceLogisticsController {
   createCourier(
     @Body(new ZodValidationPipe(CreateCourierPartnerSchema)) body: CreateCourierPartnerInput,
   ): ReturnType<FinanceLogisticsService['createCourierPartner']> {
-    return this.service.createCourierPartner(body.name);
+    return this.service.createCourierPartner(body);
   }
 
   @Patch('couriers/:id')

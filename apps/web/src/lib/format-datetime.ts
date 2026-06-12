@@ -20,7 +20,7 @@ export function formatDateTimeIst(iso: string): string {
   const v = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((p) => p.type === type)?.value ?? '';
 
-  return `${v('day')}-${v('month')}-${v('year')}, ${v('hour')}:${v('minute')}:${v('second')} IST`;
+  return `${v('day')}/${v('month')}/${v('year')}, ${v('hour')}:${v('minute')}:${v('second')} IST`;
 }
 
 export function formatDateIst(iso: string): string {
@@ -33,13 +33,13 @@ export function formatDateIst(iso: string): string {
   const v = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((part) => part.type === type)?.value ?? '';
 
-  return `${v('day')}-${v('month')}-${v('year')}`;
+  return `${v('day')}/${v('month')}/${v('year')}`;
 }
 
 export function formatDateKeyDisplay(dateKey: string): string {
   const [year = '', month = '', day = ''] = dateKey.split('-');
   if (!year || !month || !day) return dateKey;
-  return `${pad2(day)}-${pad2(month)}-${year}`;
+  return `${pad2(day)}/${pad2(month)}/${year}`;
 }
 
 export function dateInputKeyIst(date = new Date()): string {

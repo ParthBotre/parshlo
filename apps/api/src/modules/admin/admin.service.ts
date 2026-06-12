@@ -13,6 +13,7 @@ import {
   type ArchiveHrEmployeeInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
+  type CompanyHolidayView,
   type CreateHrExpenseInput,
   type EmailHrDocumentInput,
   type EmailHrDocumentResponse,
@@ -37,8 +38,10 @@ import {
   type OrderStatus,
   type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
+  type UpdateCompanyHolidayInput,
   type UpsertHrEmployeeRecordInput,
   type UpsertHrWorkLogInput,
+  type UpsertCompanyHolidayInput,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
@@ -115,9 +118,10 @@ function formatDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-function inclusiveDayCount(start: Date, end: Date): number {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1;
+function formatDateDisplay(value: Date | null): string {
+  if (!value) return '-';
+  const [year, month, day] = formatDateOnly(value).split('-');
+  return `${day}/${month}/${year}`;
 }
 
 function yearBounds(year: number): { start: Date; end: Date } {
@@ -132,6 +136,23 @@ function monthBounds(month: string): { start: Date; end: Date; daysInMonth: numb
   const start = new Date(Date.UTC(year, monthNumber - 1, 1));
   const end = new Date(Date.UTC(year, monthNumber, 0, 23, 59, 59, 999));
   return { start, end, daysInMonth: end.getUTCDate() };
+}
+
+function countWeekdaysInclusive(start: Date, end: Date): number {
+  let count = 0;
+  for (
+    let cursor = new Date(start);
+    cursor.getTime() <= end.getTime();
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)
+  ) {
+    const day = cursor.getUTCDay();
+    if (day !== 0) count += 1;
+  }
+  return count;
+}
+
+function dateKey(value: Date): string {
+  return formatDateOnly(value);
 }
 
 function fiscalYearLabel(value: Date): string {
@@ -178,6 +199,7 @@ interface BuyerRecentOrder {
   itemCount: number;
   courierService: string | null;
   courierPartnerName: string | null;
+  courierPartnerWebsiteUrl: string | null;
   courierDocketNumber: string | null;
 }
 
@@ -367,6 +389,7 @@ export class AdminService {
       hasCourierReceipt: boolean;
       courierService: string | null;
       courierPartnerName: string | null;
+      courierPartnerWebsiteUrl: string | null;
       courierDocketNumber: string | null;
       courierTrackingUpdatedAt: string | null;
     }[]
@@ -378,7 +401,7 @@ export class AdminService {
       include: {
         _count: { select: { items: true } },
         items: { select: { priceTier: true } },
-        courierPartner: { select: { name: true } },
+        courierPartner: { select: { name: true, websiteUrl: true } },
         buyer: {
           select: {
             fullName: true,
@@ -408,6 +431,7 @@ export class AdminService {
         hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
         courierService: o.courierService,
         courierPartnerName: o.courierPartner?.name ?? null,
+        courierPartnerWebsiteUrl: o.courierPartner?.websiteUrl ?? null,
         courierDocketNumber: o.courierDocketNumber,
         courierTrackingUpdatedAt: o.courierTrackingUpdatedAt?.toISOString() ?? null,
       };
@@ -598,7 +622,7 @@ export class AdminService {
         take: 100,
         include: {
           _count: { select: { items: true } },
-          courierPartner: { select: { name: true } },
+          courierPartner: { select: { name: true, websiteUrl: true } },
         },
       }),
     ]);
@@ -636,6 +660,7 @@ export class AdminService {
         itemCount: order._count.items,
         courierService: order.courierService,
         courierPartnerName: order.courierPartner?.name ?? null,
+        courierPartnerWebsiteUrl: order.courierPartner?.websiteUrl ?? null,
         courierDocketNumber: order.courierDocketNumber,
       })),
     };
@@ -1134,18 +1159,26 @@ export class AdminService {
 
   async upsertHrWorkLog(input: UpsertHrWorkLogInput): Promise<HrWorkLogView> {
     const workDate = parseDateOnly(input.workDate);
+    const totalDoctors = input.orthCalls + input.mdCalls + input.gpCalls + input.otherCalls;
+    const data = {
+      worked: input.worked,
+      location: this.normalizeOptionalUpper(input.location),
+      orthCalls: input.orthCalls,
+      mdCalls: input.mdCalls,
+      gpCalls: input.gpCalls,
+      otherCalls: input.otherCalls,
+      totalDoctors,
+      totalChemist: input.totalChemist,
+      note: input.note?.trim() ?? null,
+    };
     const workLog = await this.prisma.employeeWorkLog.upsert({
       where: { employeeId_workDate: { employeeId: input.employeeId, workDate } },
       create: {
         employeeId: input.employeeId,
         workDate,
-        worked: input.worked,
-        note: input.note?.trim() ?? null,
+        ...data,
       },
-      update: {
-        worked: input.worked,
-        note: input.note?.trim() ?? null,
-      },
+      update: data,
       include: { employee: { select: { fullName: true } } },
     });
     return this.toHrWorkLogView(workLog);
@@ -1230,15 +1263,15 @@ export class AdminService {
     input: GenerateHrSalarySlipInput,
   ): Promise<GenerateHrSalarySlipResponse> {
     const record = await this.getHrRecordOrThrow(input.employeeId);
-    const { start, end, daysInMonth } = monthBounds(input.periodMonth);
-    const approvedLeaveDays = await this.prisma.employeeLeaveRequest.aggregate({
+    const { start, end } = monthBounds(input.periodMonth);
+    const approvedLeaves = await this.prisma.employeeLeaveRequest.findMany({
       where: {
         employeeId: input.employeeId,
         status: 'APPROVED',
         startDate: { lte: end },
         endDate: { gte: start },
       },
-      _sum: { dayCount: true },
+      select: { startDate: true, endDate: true },
     });
     const loggedWorkDays = await this.prisma.employeeWorkLog.count({
       where: {
@@ -1247,10 +1280,12 @@ export class AdminService {
         workDate: { gte: start, lte: end },
       },
     });
-    const leaveDays = approvedLeaveDays._sum.dayCount ?? 0;
-    const workingDays =
-      input.workingDays ??
-      (loggedWorkDays > 0 ? loggedWorkDays : Math.max(0, daysInMonth - leaveDays));
+    const leaveDays = approvedLeaves.reduce((total, leave) => {
+      const overlapStart = leave.startDate > start ? leave.startDate : start;
+      const overlapEnd = leave.endDate < end ? leave.endDate : end;
+      return total + countWeekdaysInclusive(overlapStart, overlapEnd);
+    }, 0);
+    const workingDays = loggedWorkDays;
     const approvedExpenses = await this.prisma.employeeExpense.aggregate({
       where: {
         employeeId: input.employeeId,
@@ -1318,28 +1353,33 @@ export class AdminService {
       include: { employee: { select: { fullName: true } } },
     });
 
-    const referenceNumber = await this.nextHrReference('SALARY_SLIP', start);
-    const fileName = `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
     const slipView = this.toHrSalarySlipView(salarySlip);
+
+    return {
+      salarySlip: slipView,
+    };
+  }
+
+  async downloadHrSalarySlip(slipId: string): Promise<{
+    salarySlip: HrSalarySlipView;
+    fileName: string;
+    contentType: 'application/pdf';
+    contentBase64: string;
+  }> {
+    const slip = await this.prisma.employeeSalarySlip.findUnique({
+      where: { id: slipId },
+      include: { employee: { select: { fullName: true } } },
+    });
+    if (!slip) throw new NotFoundException({ code: 'SALARY_SLIP_NOT_FOUND' });
+
+    const record = await this.getHrRecordOrThrow(slip.employeeId);
+    const slipView = this.toHrSalarySlipView(slip);
+    const periodMonth = formatDateOnly(slip.periodMonth).slice(0, 7);
+    const fileName = `salary_slip_${record.employeeCode}_${periodMonth}.pdf`;
     const bytes = await this.renderHrPdf(
       'SALARY SLIP',
-      this.salarySlipLines(record, slipView, input.periodMonth),
+      this.salarySlipLines(record, slipView, periodMonth),
     );
-    await this.prisma.employeeHrDocument.create({
-      data: {
-        employeeId: input.employeeId,
-        generatedById: actorId,
-        type: 'SALARY_SLIP',
-        referenceNumber,
-        fileName,
-        payload: {
-          periodMonth: input.periodMonth,
-          salarySlipId: salarySlip.id,
-          employeeName: record.employee.fullName,
-        },
-      },
-    });
-
     return {
       salarySlip: slipView,
       fileName,
@@ -1396,23 +1436,72 @@ export class AdminService {
     return { record, document, fileName, bytes };
   }
 
+  async listCompanyHolidays(): Promise<CompanyHolidayView[]> {
+    const holidays = await this.prisma.companyHoliday.findMany({
+      orderBy: [{ holidayDate: 'asc' }, { name: 'asc' }],
+    });
+    return holidays.map((holiday) => this.toCompanyHolidayView(holiday));
+  }
+
+  async upsertCompanyHoliday(input: UpsertCompanyHolidayInput): Promise<CompanyHolidayView> {
+    const holidayDate = parseDateOnly(input.holidayDate);
+    const holiday = await this.prisma.companyHoliday.upsert({
+      where: { holidayDate },
+      create: {
+        holidayDate,
+        name: input.name.trim(),
+        fiscalYear: input.fiscalYear.trim(),
+        isActive: input.isActive ?? true,
+      },
+      update: {
+        name: input.name.trim(),
+        fiscalYear: input.fiscalYear.trim(),
+        isActive: input.isActive ?? true,
+      },
+    });
+    return this.toCompanyHolidayView(holiday);
+  }
+
+  async updateCompanyHoliday(
+    id: string,
+    input: UpdateCompanyHolidayInput,
+  ): Promise<CompanyHolidayView> {
+    const existing = await this.prisma.companyHoliday.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException({ code: 'COMPANY_HOLIDAY_NOT_FOUND' });
+
+    const holiday = await this.prisma.companyHoliday.update({
+      where: { id },
+      data: {
+        ...(input.holidayDate ? { holidayDate: parseDateOnly(input.holidayDate) } : {}),
+        ...(input.name === undefined ? {} : { name: input.name.trim() }),
+        ...(input.fiscalYear === undefined ? {} : { fiscalYear: input.fiscalYear.trim() }),
+        ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+      },
+    });
+    return this.toCompanyHolidayView(holiday);
+  }
+
   async leaveDashboard(actorId: string, actorRoles: string[]): Promise<EmployeeLeaveDashboardView> {
     const canReview = actorRoles.includes('SUPER_ADMIN');
     const year = new Date().getUTCFullYear();
-    const requests = await this.prisma.employeeLeaveRequest.findMany({
-      where: canReview ? {} : { employeeId: actorId },
-      include: {
-        employee: { select: { id: true, fullName: true, email: true } },
-        reviewedBy: { select: { id: true, fullName: true } },
-      },
-      orderBy: [{ status: 'asc' }, { startDate: 'asc' }, { createdAt: 'desc' }],
-    });
+    const [requests, companyHolidays] = await Promise.all([
+      this.prisma.employeeLeaveRequest.findMany({
+        where: canReview ? {} : { employeeId: actorId },
+        include: {
+          employee: { select: { id: true, fullName: true, email: true } },
+          reviewedBy: { select: { id: true, fullName: true } },
+        },
+        orderBy: [{ status: 'asc' }, { startDate: 'asc' }, { createdAt: 'desc' }],
+      }),
+      this.listCompanyHolidays(),
+    ]);
 
     return {
       currentUserId: actorId,
       canReview,
       balance: await this.leaveBalance(actorId, year),
       requests: requests.map((request) => this.toLeaveRequestView(request)),
+      companyHolidays,
     };
   }
 
@@ -1433,9 +1522,12 @@ export class AdminService {
       });
     }
 
-    const dayCount = inclusiveDayCount(startDate, endDate);
+    const dayCount = await this.countPtoDays(startDate, endDate);
     if (dayCount <= 0) {
-      throw new BadRequestException({ code: 'LEAVE_DATE_RANGE_INVALID' });
+      throw new BadRequestException({
+        code: 'LEAVE_DATE_RANGE_INVALID',
+        message: 'Selected dates do not include payable PTO days after Sundays and holidays.',
+      });
     }
 
     const balance = await this.leaveBalance(actorId, year);
@@ -1693,6 +1785,53 @@ export class AdminService {
     };
   }
 
+  private async countPtoDays(startDate: Date, endDate: Date): Promise<number> {
+    const holidayDates = await this.activeCompanyHolidayDateSet(startDate, endDate);
+    let count = 0;
+    for (
+      let cursor = new Date(startDate);
+      cursor.getTime() <= endDate.getTime();
+      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)
+    ) {
+      const day = cursor.getUTCDay();
+      if (day === 0) continue;
+      if (holidayDates.has(dateKey(cursor))) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  private async activeCompanyHolidayDateSet(startDate: Date, endDate: Date): Promise<Set<string>> {
+    const holidays = await this.prisma.companyHoliday.findMany({
+      where: {
+        isActive: true,
+        holidayDate: { gte: startDate, lte: endDate },
+      },
+      select: { holidayDate: true },
+    });
+    return new Set(holidays.map((holiday) => dateKey(holiday.holidayDate)));
+  }
+
+  private toCompanyHolidayView(holiday: {
+    id: string;
+    holidayDate: Date;
+    name: string;
+    fiscalYear: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }): CompanyHolidayView {
+    return {
+      id: holiday.id,
+      holidayDate: formatDateOnly(holiday.holidayDate),
+      name: holiday.name,
+      fiscalYear: holiday.fiscalYear,
+      isActive: holiday.isActive,
+      createdAt: holiday.createdAt.toISOString(),
+      updatedAt: holiday.updatedAt.toISOString(),
+    };
+  }
+
   private toLeaveRequestView(request: {
     id: string;
     employeeId: string;
@@ -1899,6 +2038,13 @@ export class AdminService {
     employee: { fullName: string };
     workDate: Date;
     worked: boolean;
+    location: string | null;
+    orthCalls: number;
+    mdCalls: number;
+    gpCalls: number;
+    otherCalls: number;
+    totalDoctors: number;
+    totalChemist: number;
     note: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -1909,6 +2055,13 @@ export class AdminService {
       employeeName: workLog.employee.fullName,
       workDate: formatDateOnly(workLog.workDate),
       worked: workLog.worked,
+      location: workLog.location,
+      orthCalls: workLog.orthCalls,
+      mdCalls: workLog.mdCalls,
+      gpCalls: workLog.gpCalls,
+      otherCalls: workLog.otherCalls,
+      totalDoctors: workLog.totalDoctors,
+      totalChemist: workLog.totalChemist,
       note: workLog.note,
       createdAt: workLog.createdAt.toISOString(),
       updatedAt: workLog.updatedAt.toISOString(),
@@ -1970,7 +2123,7 @@ export class AdminService {
   ): string[] {
     const annualGross = toNumber(record.grossMonthlyPaise) * 12;
     return [
-      `Date: ${formatDateOnly(record.offerDate ?? new Date())}`,
+      `Date: ${formatDateDisplay(record.offerDate ?? new Date())}`,
       'Place: Pune, MH, INDIA',
       '',
       `Mr/Mrs/Ms. ${record.employee.fullName}`,
@@ -1978,7 +2131,7 @@ export class AdminService {
       '',
       `${record.employee.fullName},`,
       '',
-      `With reference to your interview with Mr. Hemant Botre (CRM HEAD), we are happy to OFFER you the position of ${record.roleTitle} in our company w.e.f ${formatDateOnly(record.joiningDate)} or any other mutually acceptable date.`,
+      `With reference to your interview with Mr. Hemant Botre (CRM HEAD), we are happy to OFFER you the position of ${record.roleTitle} in our company w.e.f ${formatDateDisplay(record.joiningDate)} or any other mutually acceptable date.`,
       '',
       `During the period, you will be paid a consolidated sum of ${formatInr(annualGross)} p.a. as a basic salary subject to tax deduction.`,
       '',
@@ -2002,7 +2155,7 @@ export class AdminService {
   ): string[] {
     return [
       `Ref No: ${referenceNumber}`,
-      `Date: ${formatDateOnly(record.appointmentDate ?? new Date())}`,
+      `Date: ${formatDateDisplay(record.appointmentDate ?? new Date())}`,
       '',
       record.employee.fullName,
       record.address,
@@ -2011,7 +2164,7 @@ export class AdminService {
       '',
       'Ref: Letter of Appointment.',
       '',
-      `With reference to your application and subsequent interview you had with us, we are pleased to appoint you as ${record.roleTitle} in our organization with Head Quarter at ${record.headQuarter} w.e.f ${formatDateOnly(record.joiningDate)}.`,
+      `With reference to your application and subsequent interview you had with us, we are pleased to appoint you as ${record.roleTitle} in our organization with Head Quarter at ${record.headQuarter} w.e.f ${formatDateDisplay(record.joiningDate)}.`,
       '',
       'For undertaking the above assignment, you will be paid salary and allowance as mentioned below:',
       `BASIC: ${formatInr(toNumber(record.basicMonthlyPaise))} Per Month`,
@@ -2069,12 +2222,12 @@ export class AdminService {
       `BANK A/C NO. : ${record.bankAccountNumber ?? '-'}`,
       '',
       'EARNINGS                          Payroll',
-      `BASIC                             ${formatInr(slip.basicPaise)}`,
-      `HRA                               ${formatInr(slip.hraPaise)}`,
-      `SPECIAL ALLOWANCE                 ${formatInr(slip.specialAllowancePaise)}`,
+      `BASIC : ${formatInr(slip.basicPaise)}`,
+      `HRA : ${formatInr(slip.hraPaise)}`,
+      `SPECIAL ALLOWANCE : ${formatInr(slip.specialAllowancePaise)}`,
       '',
       'DEDUCTION                         Payroll',
-      `MH - PROF. TAX                    ${formatInr(slip.deductionPaise)}`,
+      `MH - PROF. TAX : ${formatInr(slip.deductionPaise)}`,
       'INCOME TAX (TDS)',
       'LOAN',
       'ADVANCE',
@@ -2083,7 +2236,7 @@ export class AdminService {
       `Total Deduction : ${formatInr(slip.deductionPaise)}`,
       `Total Payable : ${formatInr(slip.netPayPaise)}`,
       '',
-      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ?? '-'}`,
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ? formatDateDisplay(parseDateOnly(slip.transactionDate)) : '-'}`,
       `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
       `AMOUNT : ${formatInr(slip.netPayPaise)}`,
       '',
@@ -2094,7 +2247,7 @@ export class AdminService {
       '- - - - - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - - - - -',
       'Kindly cut here and send HO',
       `I have received salary for the month of ${monthYear}`,
-      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ?? '-'}`,
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ? formatDateDisplay(parseDateOnly(slip.transactionDate)) : '-'}`,
       `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
       `AMOUNT : ${formatInr(slip.netPayPaise)}`,
       '',
@@ -2129,7 +2282,41 @@ export class AdminService {
 
     let page = createPage();
     let y = letterheadPage ? pageSize[1] - 170 : pageSize[1] - 52;
-    page.drawText(title, { x: 58, y, size: 14, font: bold, color: rgb(0.05, 0.07, 0.09) });
+    const drawCentered = (text: string, size: number): void => {
+      const width = bold.widthOfTextAtSize(text, size);
+      page.drawText(text, {
+        x: Math.max(58, (pageSize[0] - width) / 2),
+        y,
+        size,
+        font: bold,
+        color: rgb(0.05, 0.07, 0.09),
+      });
+    };
+    const drawKeyValue = (line: string): boolean => {
+      const separator = line.includes(' : ') ? ' : ' : line.includes(': ') ? ': ' : null;
+      if (!separator) return false;
+      const [key, ...rest] = line.split(separator);
+      const value = rest.join(separator).trim();
+      if (!key || key.length > 36 || value.length > 90) return false;
+      page.drawText(key.trim(), {
+        x: 58,
+        y,
+        size: 9.5,
+        font: bold,
+        color: rgb(0.08, 0.1, 0.12),
+      });
+      page.drawText(value || '-', {
+        x: 260,
+        y,
+        size: 9.5,
+        font,
+        color: rgb(0.08, 0.1, 0.12),
+      });
+      y -= 16;
+      return true;
+    };
+
+    drawCentered(title, 14);
     y -= 28;
 
     for (const line of lines) {
@@ -2137,6 +2324,36 @@ export class AdminService {
         page = createPage();
         y = letterheadPage ? pageSize[1] - 170 : pageSize[1] - 52;
       }
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        y -= 14;
+        continue;
+      }
+      if (
+        trimmed === 'PRISURE MEDICARE' ||
+        trimmed.startsWith('SALARY SLIP FOR THE MONTH OF') ||
+        trimmed === 'OFFER LETTER'
+      ) {
+        drawCentered(trimmed, trimmed === 'PRISURE MEDICARE' ? 12 : 11);
+        y -= 18;
+        continue;
+      }
+      if (
+        trimmed === 'EARNINGS                          Payroll' ||
+        trimmed === 'DEDUCTION                         Payroll' ||
+        trimmed === 'ALLOWANCES FOR FIELD WORK:'
+      ) {
+        page.drawText(trimmed.replace(/\s{2,}/g, ' '), {
+          x: 58,
+          y,
+          size: 10,
+          font: bold,
+          color: rgb(0.05, 0.07, 0.09),
+        });
+        y -= 18;
+        continue;
+      }
+      if (drawKeyValue(line)) continue;
       const chunks = line.match(/.{1,88}(\s|$)/g) ?? [''];
       for (const chunk of chunks) {
         page.drawText(chunk.trimEnd(), {
@@ -2148,7 +2365,6 @@ export class AdminService {
         });
         y -= 15;
       }
-      if (line === '') y -= 4;
     }
 
     return pdf.save();

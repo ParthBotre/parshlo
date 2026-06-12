@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   type CreateMyHrExpenseInput,
+  type CreateMyHrWorkLogInput,
   type EmployeeSalarySlipDownloadResponse,
   type HrExpenseView,
   type HrSalarySlipView,
+  type HrWorkLogView,
   type PublicUser,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -28,7 +30,7 @@ function expenseMonthBounds(value: string): { start: Date; end: Date } {
 function formatDisplayDate(value: Date | null): string {
   if (!value) return '';
   const [year, month, day] = formatDateOnly(value).split('-');
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
 }
 
 function formatMonthYear(value: Date): string {
@@ -86,6 +88,39 @@ export class UserService {
       orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
     });
     return expenses.map((expense) => this.toExpenseView(expense));
+  }
+
+  async listWorkLogs(employeeId: string): Promise<HrWorkLogView[]> {
+    const logs = await this.prisma.employeeWorkLog.findMany({
+      where: { employeeId },
+      include: { employee: { select: { fullName: true } } },
+      orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
+      take: 120,
+    });
+    return logs.map((log) => this.toWorkLogView(log));
+  }
+
+  async upsertWorkLog(employeeId: string, input: CreateMyHrWorkLogInput): Promise<HrWorkLogView> {
+    const workDate = parseDateOnly(input.workDate);
+    const totalDoctors = input.orthCalls + input.mdCalls + input.gpCalls + input.otherCalls;
+    const data = {
+      worked: input.worked,
+      location: input.location?.trim().toUpperCase() ?? null,
+      orthCalls: input.orthCalls,
+      mdCalls: input.mdCalls,
+      gpCalls: input.gpCalls,
+      otherCalls: input.otherCalls,
+      totalDoctors,
+      totalChemist: input.totalChemist,
+      note: input.note?.trim() ?? null,
+    };
+    const log = await this.prisma.employeeWorkLog.upsert({
+      where: { employeeId_workDate: { employeeId, workDate } },
+      create: { employeeId, workDate, ...data },
+      update: data,
+      include: { employee: { select: { fullName: true } } },
+    });
+    return this.toWorkLogView(log);
   }
 
   async createExpense(employeeId: string, input: CreateMyHrExpenseInput): Promise<HrExpenseView> {
@@ -232,6 +267,42 @@ export class UserService {
       reviewerNote: expense.reviewerNote,
       createdAt: expense.createdAt.toISOString(),
       updatedAt: expense.updatedAt.toISOString(),
+    };
+  }
+
+  private toWorkLogView(workLog: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    workDate: Date;
+    worked: boolean;
+    location: string | null;
+    orthCalls: number;
+    mdCalls: number;
+    gpCalls: number;
+    otherCalls: number;
+    totalDoctors: number;
+    totalChemist: number;
+    note: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrWorkLogView {
+    return {
+      id: workLog.id,
+      employeeId: workLog.employeeId,
+      employeeName: workLog.employee.fullName,
+      workDate: formatDateOnly(workLog.workDate),
+      worked: workLog.worked,
+      location: workLog.location,
+      orthCalls: workLog.orthCalls,
+      mdCalls: workLog.mdCalls,
+      gpCalls: workLog.gpCalls,
+      otherCalls: workLog.otherCalls,
+      totalDoctors: workLog.totalDoctors,
+      totalChemist: workLog.totalChemist,
+      note: workLog.note,
+      createdAt: workLog.createdAt.toISOString(),
+      updatedAt: workLog.updatedAt.toISOString(),
     };
   }
 

@@ -11,11 +11,13 @@ type CourierServiceType = z.infer<typeof CourierService>;
 export function CourierTrackingCell({
   courierService,
   courierPartnerName,
+  courierPartnerWebsiteUrl,
   courierDocketNumber,
   courierTrackingUpdatedAt,
 }: {
   courierService: string | null;
   courierPartnerName?: string | null;
+  courierPartnerWebsiteUrl?: string | null;
   courierDocketNumber: string | null;
   courierTrackingUpdatedAt?: string | null;
 }): JSX.Element {
@@ -24,7 +26,8 @@ export function CourierTrackingCell({
   }
 
   const service = courierService as CourierServiceType | null;
-  const trackingUrl = buildCourierTrackingUrl(service, courierDocketNumber);
+  const trackingUrl =
+    courierPartnerWebsiteUrl ?? buildCourierTrackingUrl(service, courierDocketNumber);
   const recordedLabel = courierTrackingUpdatedAt
     ? courierTrackingDateLabel(undefined, courierTrackingUpdatedAt)
     : null;

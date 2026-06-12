@@ -39,11 +39,23 @@ export const EmployeeLeaveBalanceView = z.object({
 });
 export type EmployeeLeaveBalanceView = z.infer<typeof EmployeeLeaveBalanceView>;
 
+export const CompanyHolidayView = z.object({
+  id: EntityId,
+  holidayDate: LeaveDateString,
+  name: z.string(),
+  fiscalYear: z.string(),
+  isActive: z.boolean(),
+  createdAt: IsoDateString,
+  updatedAt: IsoDateString,
+});
+export type CompanyHolidayView = z.infer<typeof CompanyHolidayView>;
+
 export const EmployeeLeaveDashboardView = z.object({
   currentUserId: EntityId,
   canReview: z.boolean(),
   balance: EmployeeLeaveBalanceView,
   requests: z.array(EmployeeLeaveRequestView),
+  companyHolidays: z.array(CompanyHolidayView),
 });
 export type EmployeeLeaveDashboardView = z.infer<typeof EmployeeLeaveDashboardView>;
 
@@ -64,3 +76,14 @@ export const ReviewLeaveRequestInputSchema = z.object({
   reviewerNote: z.string().trim().max(500).optional().nullable(),
 });
 export type ReviewLeaveRequestInput = z.infer<typeof ReviewLeaveRequestInputSchema>;
+
+export const UpsertCompanyHolidayInputSchema = z.object({
+  holidayDate: LeaveDateString,
+  name: z.string().trim().min(2).max(160),
+  fiscalYear: z.string().trim().min(4).max(20),
+  isActive: z.boolean().optional(),
+});
+export type UpsertCompanyHolidayInput = z.infer<typeof UpsertCompanyHolidayInputSchema>;
+
+export const UpdateCompanyHolidayInputSchema = UpsertCompanyHolidayInputSchema.partial();
+export type UpdateCompanyHolidayInput = z.infer<typeof UpdateCompanyHolidayInputSchema>;

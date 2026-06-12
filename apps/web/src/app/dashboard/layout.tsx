@@ -3,12 +3,11 @@ import { redirect } from 'next/navigation';
 import { DashboardNav, type NavItem } from '@/components/dashboard/dashboard-nav';
 import { getSession } from '@/lib/auth/session';
 
-const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
-
 const NAV: readonly NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: 'dashboard' },
   { href: '/dashboard/catalog', label: 'Products', icon: 'catalog' },
   { href: '/dashboard/orders', label: 'Orders', icon: 'orders' },
+  { href: '/dashboard/reports', label: 'Work Reports', icon: 'reports' },
   { href: '/dashboard/salary-slips', label: 'Salary Slips', icon: 'salary' },
   { href: '/dashboard/expenses', label: 'Expenses', icon: 'expenses' },
 ];
@@ -21,9 +20,6 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session) {
     redirect('/auth/sign-in?next=/dashboard');
-  }
-  if (session.user.roles.some((r) => ADMIN_ROLES.has(r))) {
-    redirect('/admin');
   }
 
   return (

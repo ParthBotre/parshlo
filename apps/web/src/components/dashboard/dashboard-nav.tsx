@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   CalendarDays,
+  ClipboardList,
   IndianRupee,
   LayoutDashboard,
   type LucideIcon,
@@ -37,6 +38,7 @@ export type NavIconKey =
   | 'hr'
   | 'salary'
   | 'expenses'
+  | 'reports'
   | 'holidays';
 
 const ICONS: Record<NavIconKey, LucideIcon> = {
@@ -52,6 +54,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   hr: BriefcaseBusiness,
   salary: IndianRupee,
   expenses: ReceiptText,
+  reports: ClipboardList,
   holidays: CalendarDays,
 };
 

@@ -240,13 +240,23 @@ export class FinanceLogisticsService {
     }
   }
 
-  async createCourierPartner(name: string) {
-    const trimmed = name.trim();
-    await this.assertUniqueCourierName(trimmed);
-    return this.prisma.courierPartner.create({ data: { name: trimmed } });
+  private normalizeOptionalUrl(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
   }
 
-  async updateCourierPartner(id: string, input: { name?: string; isActive?: boolean }) {
+  async createCourierPartner(input: { name: string; websiteUrl?: string | null }) {
+    const trimmed = input.name.trim();
+    await this.assertUniqueCourierName(trimmed);
+    return this.prisma.courierPartner.create({
+      data: { name: trimmed, websiteUrl: this.normalizeOptionalUrl(input.websiteUrl) },
+    });
+  }
+
+  async updateCourierPartner(
+    id: string,
+    input: { name?: string; websiteUrl?: string | null; isActive?: boolean },
+  ) {
     const existing = await this.prisma.courierPartner.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException({ code: 'COURIER_NOT_FOUND' });
 
@@ -259,6 +269,9 @@ export class FinanceLogisticsService {
       where: { id },
       data: {
         ...(nextName ? { name: nextName } : {}),
+        ...(input.websiteUrl === undefined
+          ? {}
+          : { websiteUrl: this.normalizeOptionalUrl(input.websiteUrl) }),
         ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
       },
     });

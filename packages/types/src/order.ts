@@ -117,6 +117,7 @@ export const OrderView = z.object({
     .object({
       courierId: EntityId.optional(),
       courierName: z.string(),
+      courierWebsiteUrl: z.string().nullable().optional(),
       service: CourierService.nullable().optional(),
       docketNumber: z.string(),
       /** When courier + docket were first saved (omitted on rows saved before timestamps existed). */

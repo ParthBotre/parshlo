@@ -249,7 +249,7 @@ export default function LogisticsPageClient({
   const [editingConsignmentId, setEditingConsignmentId] = useState<string | null>(null);
   const [editingStatementId, setEditingStatementId] = useState<string | null>(null);
   const [editingCourierId, setEditingCourierId] = useState<string | null>(null);
-  const [courierForm, setCourierForm] = useState({ name: '', isActive: true });
+  const [courierForm, setCourierForm] = useState({ name: '', websiteUrl: '', isActive: true });
   const yearOptions = useMemo(() => billingYearOptions(), []);
   const activeCouriers = useMemo(() => couriers.filter((courier) => courier.isActive), [couriers]);
 
@@ -407,10 +407,14 @@ export default function LogisticsPageClient({
       const saved = editingCourierId
         ? await apiPatch(
             `/v1/admin/finance/logistics/couriers/${editingCourierId}`,
-            { name, isActive: courierForm.isActive },
+            { name, websiteUrl: courierForm.websiteUrl || null, isActive: courierForm.isActive },
             CourierPartnerRow,
           )
-        : await apiPost('/v1/admin/finance/logistics/couriers', { name }, CourierPartnerRow);
+        : await apiPost(
+            '/v1/admin/finance/logistics/couriers',
+            { name, websiteUrl: courierForm.websiteUrl || null },
+            CourierPartnerRow,
+          );
       const nextCouriers = (
         editingCourierId
           ? couriers.map((courier) => (courier.id === saved.id ? saved : courier))
@@ -419,7 +423,7 @@ export default function LogisticsPageClient({
       setCouriers(nextCouriers);
       ensureCourierSelection(nextCouriers);
       setEditingCourierId(null);
-      setCourierForm({ name: '', isActive: true });
+      setCourierForm({ name: '', websiteUrl: '', isActive: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save courier partner.');
     } finally {
@@ -430,7 +434,11 @@ export default function LogisticsPageClient({
   function beginCourierEdit(courier: CourierPartner): void {
     setTab('couriers');
     setEditingCourierId(courier.id);
-    setCourierForm({ name: courier.name, isActive: courier.isActive });
+    setCourierForm({
+      name: courier.name,
+      websiteUrl: courier.websiteUrl ?? '',
+      isActive: courier.isActive,
+    });
   }
 
   async function toggleCourierActive(courier: CourierPartner): Promise<void> {
@@ -811,7 +819,7 @@ export default function LogisticsPageClient({
               <CardContent>
                 <form
                   onSubmit={(e) => void submitCourier(e)}
-                  className="grid gap-4 sm:grid-cols-[1fr_auto_auto]"
+                  className="grid gap-4 sm:grid-cols-[1fr_1fr_auto_auto]"
                 >
                   <div>
                     <label htmlFor="courier-partner-name" className={labelCls}>
@@ -826,6 +834,23 @@ export default function LogisticsPageClient({
                       }
                       placeholder="e.g. DTDC"
                       required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="courier-partner-website" className={labelCls}>
+                      Website / Tracking URL
+                    </label>
+                    <input
+                      id="courier-partner-website"
+                      className={inputCls}
+                      value={courierForm.websiteUrl}
+                      onChange={(e) =>
+                        setCourierForm((current) => ({
+                          ...current,
+                          websiteUrl: e.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
                     />
                   </div>
                   <label className="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm">
@@ -848,7 +873,7 @@ export default function LogisticsPageClient({
                         variant="outline"
                         onClick={() => {
                           setEditingCourierId(null);
-                          setCourierForm({ name: '', isActive: true });
+                          setCourierForm({ name: '', websiteUrl: '', isActive: true });
                         }}
                       >
                         Cancel
@@ -877,6 +902,7 @@ export default function LogisticsPageClient({
                   <thead>
                     <tr className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
                       <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Website</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
@@ -885,6 +911,20 @@ export default function LogisticsPageClient({
                     {couriers.map((courier) => (
                       <tr key={courier.id} className="border-b last:border-0">
                         <td className="px-4 py-3 font-medium">{courier.name}</td>
+                        <td className="px-4 py-3">
+                          {courier.websiteUrl ? (
+                            <a
+                              href={courier.websiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Open
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge variant={courier.isActive ? 'default' : 'outline'}>
                             {courier.isActive ? 'Active' : 'Inactive'}

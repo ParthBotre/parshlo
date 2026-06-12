@@ -182,6 +182,13 @@ export const HrWorkLogView = z.object({
   employeeName: z.string(),
   workDate: LeaveDateString,
   worked: z.boolean(),
+  location: z.string().nullable(),
+  orthCalls: z.number().int().min(0),
+  mdCalls: z.number().int().min(0),
+  gpCalls: z.number().int().min(0),
+  otherCalls: z.number().int().min(0),
+  totalDoctors: z.number().int().min(0),
+  totalChemist: z.number().int().min(0),
   note: z.string().nullable(),
   createdAt: IsoDateString,
   updatedAt: IsoDateString,
@@ -192,9 +199,20 @@ export const UpsertHrWorkLogInputSchema = z.object({
   employeeId: EntityId,
   workDate: LeaveDateString,
   worked: z.boolean().default(true),
+  location: z.string().trim().max(160).optional().nullable(),
+  orthCalls: z.coerce.number().int().min(0).max(999).default(0),
+  mdCalls: z.coerce.number().int().min(0).max(999).default(0),
+  gpCalls: z.coerce.number().int().min(0).max(999).default(0),
+  otherCalls: z.coerce.number().int().min(0).max(999).default(0),
+  totalChemist: z.coerce.number().int().min(0).max(9999).default(0),
   note: z.string().trim().max(500).optional().nullable(),
 });
 export type UpsertHrWorkLogInput = z.infer<typeof UpsertHrWorkLogInputSchema>;
+
+export const CreateMyHrWorkLogInputSchema = UpsertHrWorkLogInputSchema.omit({
+  employeeId: true,
+});
+export type CreateMyHrWorkLogInput = z.infer<typeof CreateMyHrWorkLogInputSchema>;
 
 export const HrSalarySlipView = z.object({
   id: EntityId,
@@ -225,7 +243,6 @@ export type HrSalarySlipView = z.infer<typeof HrSalarySlipView>;
 export const GenerateHrSalarySlipInputSchema = z.object({
   employeeId: EntityId,
   periodMonth: z.string().regex(/^\d{4}-\d{2}$/, { message: 'Use YYYY-MM month format.' }),
-  workingDays: z.coerce.number().int().min(0).max(31).optional(),
   bonusPaise: HrMoneyPaise.default(0),
   transactionDate: LeaveDateString.optional().nullable(),
   transactionReference: z.string().trim().max(120).optional().nullable(),
@@ -235,9 +252,6 @@ export type GenerateHrSalarySlipInput = z.infer<typeof GenerateHrSalarySlipInput
 
 export const GenerateHrSalarySlipResponse = z.object({
   salarySlip: HrSalarySlipView,
-  fileName: z.string(),
-  contentType: z.literal('application/pdf'),
-  contentBase64: z.string(),
 });
 export type GenerateHrSalarySlipResponse = z.infer<typeof GenerateHrSalarySlipResponse>;
 

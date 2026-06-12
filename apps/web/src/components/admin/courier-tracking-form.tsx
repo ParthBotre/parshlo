@@ -73,7 +73,9 @@ export function CourierTrackingForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const trackingUrl = existing && buildCourierTrackingUrl(existing.service, existing.docketNumber);
+  const trackingUrl =
+    existing?.courierWebsiteUrl ??
+    (existing && buildCourierTrackingUrl(existing.service, existing.docketNumber));
   const recordedLabel = existing
     ? courierTrackingDateLabel(existing.bookedAt, existing.updatedAt)
     : null;

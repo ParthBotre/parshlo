@@ -61,11 +61,13 @@ export type UpdateMonthlyStatementInput = z.infer<typeof UpdateMonthlyStatementS
 
 export const CreateCourierPartnerSchema = z.object({
   name: z.string().min(1).trim(),
+  websiteUrl: z.string().trim().url().optional().nullable(),
 });
 export type CreateCourierPartnerInput = z.infer<typeof CreateCourierPartnerSchema>;
 
 export const UpdateCourierPartnerSchema = z.object({
   name: z.string().min(1).trim().optional(),
+  websiteUrl: z.string().trim().url().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 export type UpdateCourierPartnerInput = z.infer<typeof UpdateCourierPartnerSchema>;

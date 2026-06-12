@@ -30,8 +30,10 @@ import {
   ProductWriteInput,
   ReviewHrExpenseInputSchema,
   ReviewLeaveRequestInputSchema,
+  UpdateCompanyHolidayInputSchema,
   UpdateCourierTrackingInput,
   UpdateOrderBeforeApprovalInput,
+  UpsertCompanyHolidayInputSchema,
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
   type ArchiveHrEmployeeInput,
@@ -49,6 +51,8 @@ import {
   type OrderView,
   type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
+  type UpdateCompanyHolidayInput,
+  type UpsertCompanyHolidayInput,
   type UpsertHrEmployeeRecordInput,
   type UpsertHrWorkLogInput,
 } from '@parshlo/types';
@@ -427,6 +431,12 @@ export class AdminController {
     return this.admin.generateHrSalarySlip(user.userId, body);
   }
 
+  @Get('hr/salary-slips/:id/download')
+  @RequireRoles('SUPER_ADMIN')
+  downloadHrSalarySlip(@Param('id') id: string): ReturnType<AdminService['downloadHrSalarySlip']> {
+    return this.admin.downloadHrSalarySlip(id);
+  }
+
   @Post('hr/expenses')
   @Throttle(THROTTLE_MUTATION)
   @RequireRoles('SUPER_ADMIN')
@@ -474,6 +484,38 @@ export class AdminController {
   @Get('leave-requests')
   leaveRequests(@CurrentUser() user: AuthPrincipal): ReturnType<AdminService['leaveDashboard']> {
     return this.admin.leaveDashboard(user.userId, user.roles);
+  }
+
+  @Post('company-holidays')
+  @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'company_holiday.upsert',
+    resource: 'CompanyHoliday',
+    resolveResourceId: (_req, result) => (result as { id?: string }).id,
+  })
+  upsertCompanyHoliday(
+    @Body(new ZodValidationPipe(UpsertCompanyHolidayInputSchema))
+    body: UpsertCompanyHolidayInput,
+  ): ReturnType<AdminService['upsertCompanyHoliday']> {
+    return this.admin.upsertCompanyHoliday(body);
+  }
+
+  @Patch('company-holidays/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'company_holiday.update',
+    resource: 'CompanyHoliday',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  updateCompanyHoliday(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateCompanyHolidayInputSchema))
+    body: UpdateCompanyHolidayInput,
+  ): ReturnType<AdminService['updateCompanyHoliday']> {
+    return this.admin.updateCompanyHoliday(id, body);
   }
 
   @Post('leave-requests')

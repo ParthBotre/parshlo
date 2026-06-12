@@ -7,14 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { type AdminEmployee, type HrDashboard, type HrEmployeeRecord } from '@/lib/api/admin';
+import {
+  type AdminEmployee,
+  type HrDashboard,
+  type HrEmployeeRecord,
+  type HrSalarySlip,
+} from '@/lib/api/admin';
 import { formatDateIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-const ROLE_OPTIONS = ['SALES MANAGER', 'ADMIN', 'SUPER ADMIN'] as const;
 const REQUIRED_HR_DOCUMENT_CC = 'hemantbotre@gmail.com';
 
 type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER';
@@ -190,6 +194,7 @@ export function HrManagement({
   dashboard: HrDashboard;
 }): JSX.Element {
   const [records, setRecords] = useState(dashboard.records);
+  const [salarySlips, setSalarySlips] = useState(dashboard.salarySlips);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
@@ -221,7 +226,7 @@ export function HrManagement({
     const res = await fetch(url, {
       method,
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const json: unknown = await res.json().catch(() => null);
     if (!res.ok) {
@@ -361,17 +366,16 @@ export function HrManagement({
     }
   }
 
-  async function generateSalarySlip(event: FormEvent<HTMLFormElement>): Promise<void> {
+  async function saveSalarySlip(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+      const result = await submitJson<{ salarySlip: HrSalarySlip }>(
         '/api/admin/hr/salary-slips',
         'POST',
         {
           employeeId: formString(form, 'employeeId'),
           periodMonth: formString(form, 'periodMonth'),
-          workingDays: Number(formString(form, 'workingDays', '0')) || undefined,
           bonusPaise: rupeesToPaise(form.get('bonus')),
           transactionDate: formString(form, 'transactionDate'),
           transactionReference: formString(form, 'transactionReference'),
@@ -379,10 +383,27 @@ export function HrManagement({
         },
         'Could not generate salary slip.',
       );
-      downloadBase64Pdf(result.fileName, result.contentBase64);
-      setMessage('Salary slip generated and downloaded.');
+      setSalarySlips((current) => [
+        result.salarySlip,
+        ...current.filter((slip) => slip.id !== result.salarySlip.id),
+      ]);
+      setMessage('Salary slip saved. Employees can now download it from their Salary Slips page.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not generate salary slip.');
+    }
+  }
+
+  async function downloadSalarySlip(slipId: string): Promise<void> {
+    try {
+      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+        `/api/admin/hr/salary-slips/${encodeURIComponent(slipId)}/download`,
+        'GET',
+        undefined,
+        'Could not download salary slip.',
+      );
+      downloadBase64Pdf(result.fileName, result.contentBase64);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download salary slip.');
     }
   }
 
@@ -496,20 +517,13 @@ export function HrManagement({
               />
             </Field>
             <Field label="Role">
-              <select
+              <Input
                 name="roleTitle"
                 required
+                placeholder="e.g. SALES MANAGER"
                 value={recordForm.roleTitle}
-                className={SELECT_CLASS}
                 onChange={(event) => updateRecordForm('roleTitle', event.target.value)}
-              >
-                <option value="">Choose role</option>
-                {ROLE_OPTIONS.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
             <Field label="Head Quarter">
               <Input
@@ -743,14 +757,11 @@ export function HrManagement({
         <CardContent>
           <form
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            onSubmit={(event) => void generateSalarySlip(event)}
+            onSubmit={(event) => void saveSalarySlip(event)}
           >
             <RecordSelect records={activeRecords} />
             <Field label="Month">
               <Input name="periodMonth" type="month" required />
-            </Field>
-            <Field label="Working days">
-              <Input name="workingDays" type="number" min="0" max="31" />
             </Field>
             <Field label="Bonus">
               <Input name="bonus" type="number" min="0" step="0.01" defaultValue="0" />
@@ -765,9 +776,52 @@ export function HrManagement({
               <Textarea name="notes" rows={2} />
             </Field>
             <div className="sm:col-span-2 lg:col-span-3">
-              <Button type="submit">Generate Salary Slip PDF</Button>
+              <Button type="submit">Save Salary Slip</Button>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Paid days are calculated from submitted Work Reports. Approved holidays reduce daily
+                allowance automatically.
+              </p>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Saved Salary Slips</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table
+            headers={[
+              'Month',
+              'Employee',
+              'Paid Days',
+              'Leave Days',
+              'Transaction',
+              'Amount',
+              'Action',
+            ]}
+            rows={salarySlips.map((slip) => [
+              new Intl.DateTimeFormat('en-IN', {
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'UTC',
+              }).format(new Date(`${slip.periodMonth.slice(0, 7)}-01T00:00:00.000Z`)),
+              slip.employeeName,
+              slip.workingDays,
+              slip.leaveDays,
+              slip.transactionReference ?? '-',
+              formatINR(slip.netPayPaise),
+              <Button
+                key={slip.id}
+                size="sm"
+                variant="outline"
+                onClick={() => void downloadSalarySlip(slip.id)}
+              >
+                Download
+              </Button>,
+            ])}
+          />
         </CardContent>
       </Card>
 

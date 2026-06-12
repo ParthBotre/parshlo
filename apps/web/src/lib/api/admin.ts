@@ -1,9 +1,6 @@
 import {
-  type AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
   AdminEmployeeView,
-  type AdminUpdateBuyerInputSchema,
-  type AdminUpdateEmployeeInputSchema,
   ArchiveHrEmployeeInputSchema,
   CreateHrExpenseInputSchema,
   EmailHrDocumentInputSchema,
@@ -11,10 +8,12 @@ import {
   CreateLeaveRequestInputSchema,
   EmployeeLeaveDashboardView,
   EmployeeLeaveRequestView,
+  CompanyHolidayView,
   GenerateHrDocumentInputSchema,
   GenerateHrDocumentResponse,
   GenerateHrSalarySlipInputSchema,
   GenerateHrSalarySlipResponse,
+  EmployeeSalarySlipDownloadResponse,
   HrDashboardView,
   HrEmployeeRecordView,
   HrExpenseView,
@@ -22,13 +21,19 @@ import {
   AdminProductView,
   ApiErrorResponse,
   OrderView,
-  type PlaceOrderOnBehalfInput,
   ReviewHrExpenseInputSchema,
   ProductWriteInput,
   ReviewLeaveRequestInputSchema,
-  type UpdateOrderBeforeApprovalInput,
+  UpdateCompanyHolidayInputSchema,
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
+  UpsertCompanyHolidayInputSchema,
+  type AdminCreateBuyerInputSchema,
+  type AdminUpdateBuyerInputSchema,
+  type AdminUpdateEmployeeInputSchema,
+  type HrSalarySlipView,
+  type PlaceOrderOnBehalfInput,
+  type UpdateOrderBeforeApprovalInput,
 } from '@parshlo/types';
 import { z } from 'zod';
 
@@ -48,9 +53,11 @@ type PlaceOrderOnBehalfInputType = z.infer<typeof PlaceOrderOnBehalfInput>;
 type ProductWriteInputType = z.infer<typeof ProductWriteInput>;
 type ReviewHrExpenseInput = z.infer<typeof ReviewHrExpenseInputSchema>;
 type ReviewLeaveRequestInput = z.infer<typeof ReviewLeaveRequestInputSchema>;
+type UpdateCompanyHolidayInput = z.infer<typeof UpdateCompanyHolidayInputSchema>;
 type UpdateOrderBeforeApprovalInputType = z.infer<typeof UpdateOrderBeforeApprovalInput>;
 type UpsertHrEmployeeRecordInput = z.infer<typeof UpsertHrEmployeeRecordInputSchema>;
 type UpsertHrWorkLogInput = z.infer<typeof UpsertHrWorkLogInputSchema>;
+type UpsertCompanyHolidayInput = z.infer<typeof UpsertCompanyHolidayInputSchema>;
 
 const PendingKycAddress = z.object({
   line1: z.string(),
@@ -121,6 +128,7 @@ const AdminOrderRow = z.object({
   hasCourierReceipt: z.boolean().default(false),
   courierService: z.string().nullable().optional(),
   courierPartnerName: z.string().nullable().optional(),
+  courierPartnerWebsiteUrl: z.string().nullable().optional(),
   courierDocketNumber: z.string().nullable().optional(),
   courierTrackingUpdatedAt: z.string().nullable().optional(),
 });
@@ -192,6 +200,7 @@ const AdminBuyerDetail = AdminBuyerRow.extend({
       itemCount: z.number(),
       courierService: z.string().nullable(),
       courierPartnerName: z.string().nullable().optional(),
+      courierPartnerWebsiteUrl: z.string().nullable().optional(),
       courierDocketNumber: z.string().nullable(),
     }),
   ),
@@ -379,11 +388,13 @@ export type AdminBuyer = z.infer<typeof AdminBuyerRow>;
 
 export type AdminEmployee = z.infer<typeof AdminEmployeeView>;
 export type AdminProduct = z.infer<typeof AdminProductView>;
+export type CompanyHoliday = z.infer<typeof CompanyHolidayView>;
 export type EmployeeLeaveDashboard = z.infer<typeof EmployeeLeaveDashboardView>;
 export type EmployeeLeaveRequest = z.infer<typeof EmployeeLeaveRequestView>;
 export type HrDashboard = z.infer<typeof HrDashboardView>;
 export type HrEmployeeRecord = z.infer<typeof HrEmployeeRecordView>;
 export type HrExpense = z.infer<typeof HrExpenseView>;
+export type HrSalarySlip = z.infer<typeof HrSalarySlipView>;
 export type HrWorkLog = z.infer<typeof HrWorkLogView>;
 
 export function listEmployees(
@@ -464,6 +475,33 @@ export function reviewLeaveRequest(
       ...options,
     },
   );
+}
+
+export function upsertCompanyHoliday(
+  accessToken: string,
+  input: UpsertCompanyHolidayInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<CompanyHoliday> {
+  return apiCall('/v1/admin/company-holidays', CompanyHolidayView, {
+    method: 'POST',
+    accessToken,
+    body: UpsertCompanyHolidayInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function updateCompanyHoliday(
+  accessToken: string,
+  id: string,
+  input: UpdateCompanyHolidayInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<CompanyHoliday> {
+  return apiCall(`/v1/admin/company-holidays/${encodeURIComponent(id)}`, CompanyHolidayView, {
+    method: 'PATCH',
+    accessToken,
+    body: UpdateCompanyHolidayInputSchema.parse(input),
+    ...options,
+  });
 }
 
 export function getHrDashboard(
@@ -555,6 +593,22 @@ export function generateHrSalarySlip(
     body: GenerateHrSalarySlipInputSchema.parse(input),
     ...options,
   });
+}
+
+export function downloadHrSalarySlip(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof EmployeeSalarySlipDownloadResponse>> {
+  return apiCall(
+    `/v1/admin/hr/salary-slips/${encodeURIComponent(id)}/download`,
+    EmployeeSalarySlipDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
 }
 
 export function createHrExpense(
@@ -739,6 +793,7 @@ export async function placeOrderOnBehalfFromBrowser(
 export const CourierPartnerRow = z.object({
   id: z.string(),
   name: z.string(),
+  websiteUrl: z.string().nullable().optional(),
   isActive: z.boolean(),
 });
 export const CourierPartnerList = z.array(CourierPartnerRow);
@@ -746,6 +801,7 @@ export type CourierPartner = z.infer<typeof CourierPartnerRow>;
 
 export const CourierPartnerInput = z.object({
   name: z.string().min(1),
+  websiteUrl: z.string().url().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -803,7 +859,7 @@ export function createCourierPartner(
   return apiCall('/v1/admin/finance/logistics/couriers', CourierPartnerRow, {
     method: 'POST',
     accessToken,
-    body: CourierPartnerInput.pick({ name: true }).parse(input),
+    body: CourierPartnerInput.pick({ name: true, websiteUrl: true }).parse(input),
     ...options,
   });
 }

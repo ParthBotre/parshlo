@@ -293,6 +293,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                                 <CourierTrackingCell
                                   courierService={o.courierService ?? null}
                                   courierPartnerName={o.courierPartnerName ?? null}
+                                  courierPartnerWebsiteUrl={o.courierPartnerWebsiteUrl ?? null}
                                   courierDocketNumber={o.courierDocketNumber ?? null}
                                   courierTrackingUpdatedAt={o.courierTrackingUpdatedAt ?? null}
                                 />

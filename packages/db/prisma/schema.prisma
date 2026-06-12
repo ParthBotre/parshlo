@@ -473,6 +473,20 @@ model EmployeeLeaveRequest {
   @@index([reviewedById])
 }
 
+model CompanyHoliday {
+  id          String   @id @default(cuid())
+  holidayDate DateTime @unique
+  name        String
+  fiscalYear  String
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fiscalYear, holidayDate])
+  @@index([isActive, holidayDate])
+}
+
 // -----------------------------------------------------------------------------
 // HR RECORDS / PAYROLL / EMPLOYEE DOCUMENTS (SUPER ADMIN ONLY)
 // -----------------------------------------------------------------------------
@@ -628,9 +642,16 @@ model EmployeeWorkLog {
   employeeId String
   employee   User   @relation("HrWorkEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
 
-  workDate DateTime
-  worked   Boolean  @default(true)
-  note     String?
+  workDate     DateTime
+  worked       Boolean  @default(true)
+  location     String?
+  orthCalls    Int      @default(0)
+  mdCalls      Int      @default(0)
+  gpCalls      Int      @default(0)
+  otherCalls   Int      @default(0)
+  totalDoctors Int      @default(0)
+  totalChemist Int      @default(0)
+  note         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -726,9 +747,10 @@ enum AdminStatementStatus {
 }
 
 model CourierPartner {
-  id       String  @id @default(cuid())
-  name     String
-  isActive Boolean @default(true)
+  id         String  @id @default(cuid())
+  name       String
+  websiteUrl String?
+  isActive   Boolean @default(true)
 
   orders       Order[]
   consignments AdminConsignmentLog[]

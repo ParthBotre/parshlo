@@ -308,7 +308,10 @@ export class OrderService {
   async getOrder(orderId: string, requesterId: string): Promise<OrderView> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true, courierPartner: { select: { id: true, name: true } } },
+      include: {
+        items: true,
+        courierPartner: { select: { id: true, name: true, websiteUrl: true } },
+      },
     });
     if (!order) {
       throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
@@ -323,7 +326,10 @@ export class OrderService {
   async getOrderById(orderId: string): Promise<OrderView> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true, courierPartner: { select: { id: true, name: true } } },
+      include: {
+        items: true,
+        courierPartner: { select: { id: true, name: true, websiteUrl: true } },
+      },
     });
     if (!order) {
       throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
@@ -335,7 +341,10 @@ export class OrderService {
     const orders = await this.prisma.order.findMany({
       where: { buyerId },
       orderBy: { placedAt: 'desc' },
-      include: { items: true, courierPartner: { select: { id: true, name: true } } },
+      include: {
+        items: true,
+        courierPartner: { select: { id: true, name: true, websiteUrl: true } },
+      },
     });
     return orders.map((o) => this.toView(o, o.items));
   }
@@ -467,7 +476,10 @@ export class OrderService {
           courierTrackingUpdatedAt: now,
           ...(order.courierTrackingSetAt == null ? { courierTrackingSetAt: now } : {}),
         },
-        include: { items: true, courierPartner: { select: { id: true, name: true } } },
+        include: {
+          items: true,
+          courierPartner: { select: { id: true, name: true, websiteUrl: true } },
+        },
       });
     });
 
@@ -736,7 +748,7 @@ export class OrderService {
       courierReceiptUploadedAt: Date | null;
       courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA' | null;
       courierPartnerId?: string | null;
-      courierPartner?: { id: string; name: string } | null;
+      courierPartner?: { id: string; name: string; websiteUrl: string | null } | null;
       courierDocketNumber: string | null;
       courierTrackingSetAt: Date | null;
       courierTrackingUpdatedAt: Date | null;
@@ -797,6 +809,7 @@ export class OrderService {
           ? {
               courierId: order.courierPartner?.id ?? order.courierPartnerId ?? undefined,
               courierName: order.courierPartner?.name ?? order.courierService ?? 'Courier',
+              courierWebsiteUrl: order.courierPartner?.websiteUrl ?? null,
               service: order.courierService,
               docketNumber: order.courierDocketNumber,
               bookedAt:
