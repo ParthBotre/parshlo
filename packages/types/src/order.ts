@@ -80,7 +80,7 @@ export const CourierService = z.enum(['PROFESSIONAL', 'MARK', 'TEJ', 'SHIPKART',
 export type CourierService = z.infer<typeof CourierService>;
 
 export const UpdateCourierTrackingInput = z.object({
-  courierService: CourierService,
+  courierId: EntityId,
   docketNumber: z.string().trim().min(1).max(80),
   freightAmountPaise: z.number().int().nonnegative().optional(),
   weightKg: z.number().positive().optional(),
@@ -115,7 +115,9 @@ export const OrderView = z.object({
     .default(null),
   courierTracking: z
     .object({
-      service: CourierService,
+      courierId: EntityId.optional(),
+      courierName: z.string(),
+      service: CourierService.nullable().optional(),
       docketNumber: z.string(),
       /** When courier + docket were first saved (omitted on rows saved before timestamps existed). */
       bookedAt: IsoDateString.optional(),

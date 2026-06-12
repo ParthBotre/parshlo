@@ -13,10 +13,9 @@ import { OrderStatusActions } from '@/components/admin/order-status-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getAdminOrder, listAdminProducts } from '@/lib/api/admin';
+import { getAdminOrder, listAdminProducts, listCourierPartners } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
-import { courierServiceLabel } from '@/lib/courier-services';
 import { courierTrackingDateLabel } from '@/lib/courier-tracking-dates';
 import { formatDateTimeIst } from '@/lib/format-datetime';
 import { isTerminalOrderStatus, orderStatusLabel } from '@/lib/order-workflow';
@@ -58,10 +57,14 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
 
   let order: Awaited<ReturnType<typeof getAdminOrder>>;
   let products: Awaited<ReturnType<typeof listAdminProducts>> = [];
+  let courierPartners: Awaited<ReturnType<typeof listCourierPartners>> = [];
   try {
     order = await getAdminOrder(session.accessToken, id, { next: { revalidate: 0 } });
     if (session.user.roles.includes('SUPER_ADMIN')) {
       products = await listAdminProducts(session.accessToken, { next: { revalidate: 0 } });
+    }
+    if (session.user.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+      courierPartners = await listCourierPartners(session.accessToken, { next: { revalidate: 0 } });
     }
   } catch (err) {
     if (err instanceof ApiError) {
@@ -170,6 +173,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
               <CourierTrackingForm
                 orderId={order.id}
                 existing={order.courierTracking ?? null}
+                courierPartners={courierPartners}
                 canEdit={canManageShipment}
               />
             </CardContent>
@@ -211,7 +215,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps): Promi
             {order.courierTracking ? (
               <div>
                 <p className="text-muted-foreground text-xs uppercase tracking-wider">Shipment</p>
-                <p className="font-medium">{courierServiceLabel(order.courierTracking.service)}</p>
+                <p className="font-medium">{order.courierTracking.courierName}</p>
                 <p className="font-mono text-xs">{order.courierTracking.docketNumber}</p>
                 {shipmentRecordedLabel ? (
                   <p className="text-muted-foreground mt-1 text-xs">{shipmentRecordedLabel}</p>

@@ -38,16 +38,6 @@ const GST_RATE_MAP: Record<PrismaGstRate, GstRate> = {
   EIGHTEEN: '18',
   TWENTYEIGHT: '28',
 };
-const COURIER_PARTNER_NAMES: Record<
-  'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA',
-  string
-> = {
-  PROFESSIONAL: 'Professional Couriers',
-  MARK: 'Mark Couriers',
-  TEJ: 'Tej Couriers',
-  SHIPKART: 'SHIPKART',
-  VISHWA: 'VISHWA COURIERS',
-};
 const ADMIN_APPROVAL_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 function priceTierForBusinessType(businessType?: PrismaBusinessType | null): ProductPriceTier {
@@ -318,7 +308,7 @@ export class OrderService {
   async getOrder(orderId: string, requesterId: string): Promise<OrderView> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: { items: true, courierPartner: { select: { id: true, name: true } } },
     });
     if (!order) {
       throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
@@ -333,7 +323,7 @@ export class OrderService {
   async getOrderById(orderId: string): Promise<OrderView> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: { items: true, courierPartner: { select: { id: true, name: true } } },
     });
     if (!order) {
       throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
@@ -345,7 +335,7 @@ export class OrderService {
     const orders = await this.prisma.order.findMany({
       where: { buyerId },
       orderBy: { placedAt: 'desc' },
-      include: { items: true },
+      include: { items: true, courierPartner: { select: { id: true, name: true } } },
     });
     return orders.map((o) => this.toView(o, o.items));
   }
@@ -381,7 +371,7 @@ export class OrderService {
   async updateCourierTracking(
     orderId: string,
     input: {
-      courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA';
+      courierId: string;
       docketNumber: string;
       freightAmountPaise?: number;
       weightKg?: number;
@@ -398,10 +388,15 @@ export class OrderService {
         throw new NotFoundException({ code: 'ORDER_NOT_FOUND' });
       }
 
-      const courierName = COURIER_PARTNER_NAMES[input.courierService];
-      const courier =
-        (await tx.courierPartner.findFirst({ where: { name: courierName, isActive: true } })) ??
-        (await tx.courierPartner.create({ data: { name: courierName } }));
+      const courier = await tx.courierPartner.findFirst({
+        where: { id: input.courierId, isActive: true },
+      });
+      if (!courier) {
+        throw new NotFoundException({
+          code: 'COURIER_NOT_FOUND',
+          message: 'Selected courier partner is not available.',
+        });
+      }
 
       const existingForOrder = await tx.adminConsignmentLog.findFirst({
         where: { type: 'OUTGOING', associatedOrderNumber: order.orderNumber },
@@ -466,12 +461,13 @@ export class OrderService {
       return tx.order.update({
         where: { id: orderId },
         data: {
-          courierService: input.courierService,
+          courierService: null,
+          courierPartnerId: courier.id,
           courierDocketNumber: input.docketNumber,
           courierTrackingUpdatedAt: now,
           ...(order.courierTrackingSetAt == null ? { courierTrackingSetAt: now } : {}),
         },
-        include: { items: true },
+        include: { items: true, courierPartner: { select: { id: true, name: true } } },
       });
     });
 
@@ -739,6 +735,8 @@ export class OrderService {
       courierReceiptContentType: string | null;
       courierReceiptUploadedAt: Date | null;
       courierService: 'PROFESSIONAL' | 'MARK' | 'TEJ' | 'SHIPKART' | 'VISHWA' | null;
+      courierPartnerId?: string | null;
+      courierPartner?: { id: string; name: string } | null;
       courierDocketNumber: string | null;
       courierTrackingSetAt: Date | null;
       courierTrackingUpdatedAt: Date | null;
@@ -795,8 +793,10 @@ export class OrderService {
             }
           : null,
       courierTracking:
-        order.courierService && order.courierDocketNumber
+        (order.courierPartner || order.courierService) && order.courierDocketNumber
           ? {
+              courierId: order.courierPartner?.id ?? order.courierPartnerId ?? undefined,
+              courierName: order.courierPartner?.name ?? order.courierService ?? 'Courier',
               service: order.courierService,
               docketNumber: order.courierDocketNumber,
               bookedAt:

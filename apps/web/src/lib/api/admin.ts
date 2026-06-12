@@ -120,6 +120,7 @@ const AdminOrderRow = z.object({
   rateTierSummary: z.enum(['RATE_A', 'RATE_B', 'MIXED']).default('MIXED'),
   hasCourierReceipt: z.boolean().default(false),
   courierService: z.string().nullable().optional(),
+  courierPartnerName: z.string().nullable().optional(),
   courierDocketNumber: z.string().nullable().optional(),
   courierTrackingUpdatedAt: z.string().nullable().optional(),
 });
@@ -190,6 +191,7 @@ const AdminBuyerDetail = AdminBuyerRow.extend({
       totalPaise: z.number(),
       itemCount: z.number(),
       courierService: z.string().nullable(),
+      courierPartnerName: z.string().nullable().optional(),
       courierDocketNumber: z.string().nullable(),
     }),
   ),
@@ -734,13 +736,18 @@ export async function placeOrderOnBehalfFromBrowser(
 
 // ─── Logistics Finance API ────────────────────────────────────────────────────
 
-const CourierPartnerRow = z.object({
+export const CourierPartnerRow = z.object({
   id: z.string(),
   name: z.string(),
   isActive: z.boolean(),
 });
 export const CourierPartnerList = z.array(CourierPartnerRow);
 export type CourierPartner = z.infer<typeof CourierPartnerRow>;
+
+export const CourierPartnerInput = z.object({
+  name: z.string().min(1),
+  isActive: z.boolean().optional(),
+});
 
 export const ConsignmentRow = z.object({
   id: z.string(),
@@ -786,6 +793,37 @@ export function listCourierPartners(
     accessToken,
     ...options,
   });
+}
+
+export function createCourierPartner(
+  accessToken: string,
+  input: z.infer<typeof CourierPartnerInput>,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<CourierPartner> {
+  return apiCall('/v1/admin/finance/logistics/couriers', CourierPartnerRow, {
+    method: 'POST',
+    accessToken,
+    body: CourierPartnerInput.pick({ name: true }).parse(input),
+    ...options,
+  });
+}
+
+export function updateCourierPartner(
+  accessToken: string,
+  id: string,
+  input: z.infer<typeof CourierPartnerInput>,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<CourierPartner> {
+  return apiCall(
+    `/v1/admin/finance/logistics/couriers/${encodeURIComponent(id)}`,
+    CourierPartnerRow,
+    {
+      method: 'PATCH',
+      accessToken,
+      body: CourierPartnerInput.partial().parse(input),
+      ...options,
+    },
+  );
 }
 
 export function listLogisticsConsignments(

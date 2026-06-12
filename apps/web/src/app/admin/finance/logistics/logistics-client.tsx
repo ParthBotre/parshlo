@@ -11,6 +11,7 @@ import {
   ConsignmentList,
   ConsignmentRow,
   type CourierPartner,
+  CourierPartnerRow,
   type LogisticsStatement,
   StatementList,
   StatementRow,
@@ -237,8 +238,8 @@ export default function LogisticsPageClient({
   statements: initStatements,
   canManageLogistics,
 }: Props): JSX.Element {
-  const [tab, setTab] = useState<'consignments' | 'statements'>('consignments');
-  const [couriers] = useState(initCouriers);
+  const [tab, setTab] = useState<'consignments' | 'statements' | 'couriers'>('consignments');
+  const [couriers, setCouriers] = useState(initCouriers);
   const [consignments, setConsignments] = useState(initConsignments);
   const [statements, setStatements] = useState(initStatements);
   const [consignmentPeriod, setConsignmentPeriod] = useState<ConsignmentPeriod>('month');
@@ -247,7 +248,10 @@ export default function LogisticsPageClient({
   const [saving, setSaving] = useState(false);
   const [editingConsignmentId, setEditingConsignmentId] = useState<string | null>(null);
   const [editingStatementId, setEditingStatementId] = useState<string | null>(null);
+  const [editingCourierId, setEditingCourierId] = useState<string | null>(null);
+  const [courierForm, setCourierForm] = useState({ name: '', isActive: true });
   const yearOptions = useMemo(() => billingYearOptions(), []);
+  const activeCouriers = useMemo(() => couriers.filter((courier) => courier.isActive), [couriers]);
 
   // Add Consignment form state
   const [form, setForm] = useState<{
@@ -261,7 +265,7 @@ export default function LogisticsPageClient({
     associatedOrderNumber: string;
     associatedPoNumber: string;
   }>({
-    courierId: couriers[0]?.id ?? '',
+    courierId: activeCouriers[0]?.id ?? '',
     type: 'OUTGOING',
     docketNumber: '',
     consignmentDate: '',
@@ -274,7 +278,7 @@ export default function LogisticsPageClient({
 
   // Reconcile form state
   const [rForm, setRForm] = useState({
-    courierId: couriers[0]?.id ?? '',
+    courierId: activeCouriers[0]?.id ?? '',
     statementInvoiceNumber: '',
     billingMonth: '',
     billingYear: String(new Date().getUTCFullYear()),
@@ -369,6 +373,84 @@ export default function LogisticsPageClient({
     ]);
     setConsignments(nextConsignments);
     setStatements(nextStatements);
+  }
+
+  function ensureCourierSelection(nextCouriers: CourierPartner[]): void {
+    const nextActive = nextCouriers.filter((courier) => courier.isActive);
+    const fallbackId = nextActive[0]?.id ?? '';
+    setForm((current) =>
+      current.courierId && nextActive.some((courier) => courier.id === current.courierId)
+        ? current
+        : { ...current, courierId: fallbackId },
+    );
+    setRForm((current) =>
+      current.courierId && nextActive.some((courier) => courier.id === current.courierId)
+        ? current
+        : { ...current, courierId: fallbackId },
+    );
+  }
+
+  async function submitCourier(e: FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can manage courier partners.');
+      return;
+    }
+    const name = courierForm.name.trim();
+    if (!name) {
+      setError('Enter a courier partner name.');
+      return;
+    }
+    setError('');
+    setSaving(true);
+    try {
+      const saved = editingCourierId
+        ? await apiPatch(
+            `/v1/admin/finance/logistics/couriers/${editingCourierId}`,
+            { name, isActive: courierForm.isActive },
+            CourierPartnerRow,
+          )
+        : await apiPost('/v1/admin/finance/logistics/couriers', { name }, CourierPartnerRow);
+      const nextCouriers = (
+        editingCourierId
+          ? couriers.map((courier) => (courier.id === saved.id ? saved : courier))
+          : [...couriers, saved]
+      ).sort((a, b) => a.name.localeCompare(b.name));
+      setCouriers(nextCouriers);
+      ensureCourierSelection(nextCouriers);
+      setEditingCourierId(null);
+      setCourierForm({ name: '', isActive: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save courier partner.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function beginCourierEdit(courier: CourierPartner): void {
+    setTab('couriers');
+    setEditingCourierId(courier.id);
+    setCourierForm({ name: courier.name, isActive: courier.isActive });
+  }
+
+  async function toggleCourierActive(courier: CourierPartner): Promise<void> {
+    if (!canManageLogistics) {
+      setError('Only admins and super admins can manage courier partners.');
+      return;
+    }
+    setError('');
+    try {
+      const saved = await apiPatch(
+        `/v1/admin/finance/logistics/couriers/${courier.id}`,
+        { isActive: !courier.isActive },
+        CourierPartnerRow,
+      );
+      const nextCouriers = couriers.map((item) => (item.id === saved.id ? saved : item));
+      setCouriers(nextCouriers);
+      ensureCourierSelection(nextCouriers);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update courier partner.');
+    }
   }
 
   async function submitConsignment(e: FormEvent) {
@@ -706,7 +788,7 @@ export default function LogisticsPageClient({
 
       {/* Tabs */}
       <div className="flex gap-2 border-b pb-0">
-        {(['consignments', 'statements'] as const).map((t) => (
+        {(['consignments', 'statements', 'couriers'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -716,6 +798,131 @@ export default function LogisticsPageClient({
           </button>
         ))}
       </div>
+
+      {tab === 'couriers' && (
+        <div className="space-y-6">
+          {canManageLogistics ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {editingCourierId ? 'Edit Courier Partner' : 'Add Courier Partner'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={(e) => void submitCourier(e)}
+                  className="grid gap-4 sm:grid-cols-[1fr_auto_auto]"
+                >
+                  <div>
+                    <label htmlFor="courier-partner-name" className={labelCls}>
+                      Courier Partner Name
+                    </label>
+                    <input
+                      id="courier-partner-name"
+                      className={inputCls}
+                      value={courierForm.name}
+                      onChange={(e) =>
+                        setCourierForm((current) => ({ ...current, name: e.target.value }))
+                      }
+                      placeholder="e.g. DTDC"
+                      required
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={courierForm.isActive}
+                      onChange={(e) =>
+                        setCourierForm((current) => ({
+                          ...current,
+                          isActive: e.target.checked,
+                        }))
+                      }
+                    />
+                    Active
+                  </label>
+                  <div className="flex gap-2 self-end">
+                    {editingCourierId ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingCourierId(null);
+                          setCourierForm({ name: '', isActive: true });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                    <Button type="submit" disabled={saving}>
+                      {editingCourierId ? 'Save Courier' : 'Add Courier'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
+              Only admins and super admins can manage courier partners.
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Courier Partners</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {couriers.map((courier) => (
+                      <tr key={courier.id} className="border-b last:border-0">
+                        <td className="px-4 py-3 font-medium">{courier.name}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={courier.isActive ? 'default' : 'outline'}>
+                            {courier.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            {canManageLogistics ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => beginCourierEdit(courier)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void toggleCourierActive(courier)}
+                                >
+                                  {courier.isActive ? 'Deactivate' : 'Activate'}
+                                </Button>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── CONSIGNMENTS TAB ── */}
       {tab === 'consignments' && (

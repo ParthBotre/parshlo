@@ -63,3 +63,9 @@ export const CreateCourierPartnerSchema = z.object({
   name: z.string().min(1).trim(),
 });
 export type CreateCourierPartnerInput = z.infer<typeof CreateCourierPartnerSchema>;
+
+export const UpdateCourierPartnerSchema = z.object({
+  name: z.string().min(1).trim().optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateCourierPartnerInput = z.infer<typeof UpdateCourierPartnerSchema>;

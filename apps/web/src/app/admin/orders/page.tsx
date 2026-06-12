@@ -1,6 +1,7 @@
 import { type OrderStatus } from '@parshlo/types';
 import { type Metadata } from 'next';
 import Link from 'next/link';
+import { type z } from 'zod';
 
 import { CourierTrackingCell } from '@/components/admin/courier-tracking-cell';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,8 @@ const STATUS_FILTERS = [
   { label: 'Cancelled', value: 'CANCELLED' },
   { label: 'Rejected', value: 'REJECTED' },
 ] as const;
+
+type OrderStatusType = z.infer<typeof OrderStatus>;
 
 interface PageProps {
   searchParams: Promise<{ status?: string; period?: string }>;
@@ -274,7 +277,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 <Badge variant="secondary">
-                                  {orderStatusLabel(o.status as OrderStatus)}
+                                  {orderStatusLabel(o.status as OrderStatusType)}
                                 </Badge>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold">
@@ -289,6 +292,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps): Prom
                               <td className="whitespace-nowrap px-4 py-3">
                                 <CourierTrackingCell
                                   courierService={o.courierService ?? null}
+                                  courierPartnerName={o.courierPartnerName ?? null}
                                   courierDocketNumber={o.courierDocketNumber ?? null}
                                   courierTrackingUpdatedAt={o.courierTrackingUpdatedAt ?? null}
                                 />

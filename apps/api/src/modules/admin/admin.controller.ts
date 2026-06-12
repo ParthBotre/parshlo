@@ -224,7 +224,7 @@ export class AdminController {
     @Body(new ZodValidationPipe(UpdateCourierTrackingInput)) body: UpdateCourierTrackingInput,
   ): Promise<OrderView> {
     return this.orderService.updateCourierTracking(orderId, {
-      courierService: body.courierService,
+      courierId: body.courierId,
       docketNumber: body.docketNumber,
       freightAmountPaise: body.freightAmountPaise,
       weightKg: body.weightKg,

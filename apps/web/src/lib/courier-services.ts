@@ -1,7 +1,10 @@
 import { type CourierService } from '@parshlo/types';
+import { type z } from 'zod';
+
+type CourierServiceType = z.infer<typeof CourierService>;
 
 export interface CourierServiceConfig {
-  id: CourierService;
+  id: CourierServiceType;
   label: string;
   /** Tracking page or homepage — used when no deep-link template is set. */
   websiteUrl: string | null;
@@ -45,16 +48,28 @@ export const COURIER_SERVICES: readonly CourierServiceConfig[] = [
   },
 ] as const;
 
-export function courierServiceLabel(id: CourierService): string {
+export function courierServiceLabel(id?: CourierServiceType | null, fallback = 'Courier'): string {
+  if (!id) {
+    return fallback;
+  }
   return COURIER_SERVICES.find((s) => s.id === id)?.label ?? id;
 }
 
-export function courierServiceWebsite(id: CourierService): string | null {
+export function courierServiceWebsite(id?: CourierServiceType | null): string | null {
+  if (!id) {
+    return null;
+  }
   return COURIER_SERVICES.find((s) => s.id === id)?.websiteUrl ?? null;
 }
 
 /** Link for staff to track a shipment (deep link when configured, else courier site). */
-export function buildCourierTrackingUrl(serviceId: CourierService, docketNumber: string): string {
+export function buildCourierTrackingUrl(
+  serviceId: CourierServiceType | null | undefined,
+  docketNumber: string,
+): string {
+  if (!serviceId) {
+    return `https://www.google.com/search?q=${encodeURIComponent(`${docketNumber.trim()} courier tracking`)}`;
+  }
   const config = COURIER_SERVICES.find((s) => s.id === serviceId);
   if (!config?.websiteUrl) {
     return 'https://www.tpcindia.com';
@@ -65,6 +80,9 @@ export function buildCourierTrackingUrl(serviceId: CourierService, docketNumber:
   return config.websiteUrl;
 }
 
-export function hasCourierDeepLink(serviceId: CourierService): boolean {
+export function hasCourierDeepLink(serviceId?: CourierServiceType | null): boolean {
+  if (!serviceId) {
+    return false;
+  }
   return Boolean(COURIER_SERVICES.find((s) => s.id === serviceId)?.trackingUrlTemplate);
 }

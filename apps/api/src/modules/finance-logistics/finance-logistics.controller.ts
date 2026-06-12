@@ -5,11 +5,13 @@ import {
   CreateConsignmentSchema,
   CreateCourierPartnerSchema,
   CreateMonthlyStatementSchema,
+  UpdateCourierPartnerSchema,
   UpdateConsignmentSchema,
   UpdateMonthlyStatementSchema,
   type CreateConsignmentInput,
   type CreateCourierPartnerInput,
   type CreateMonthlyStatementInput,
+  type UpdateCourierPartnerInput,
   type UpdateConsignmentInput,
   type UpdateMonthlyStatementInput,
 } from '@parshlo/types';
@@ -42,6 +44,16 @@ export class FinanceLogisticsController {
     @Body(new ZodValidationPipe(CreateCourierPartnerSchema)) body: CreateCourierPartnerInput,
   ): ReturnType<FinanceLogisticsService['createCourierPartner']> {
     return this.service.createCourierPartner(body.name);
+  }
+
+  @Patch('couriers/:id')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('ADMIN', 'SUPER_ADMIN')
+  updateCourier(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(UpdateCourierPartnerSchema)) body: UpdateCourierPartnerInput,
+  ): ReturnType<FinanceLogisticsService['updateCourierPartner']> {
+    return this.service.updateCourierPartner(id, body);
   }
 
   // ─── Consignment Logs ────────────────────────────────────────────────────────

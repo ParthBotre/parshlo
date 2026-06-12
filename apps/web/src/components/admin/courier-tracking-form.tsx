@@ -1,20 +1,16 @@
 'use client';
 
-import { type CourierService, type OrderView } from '@parshlo/types';
+import { type OrderView } from '@parshlo/types';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { CopyDocketButton } from '@/components/admin/copy-docket-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  buildCourierTrackingUrl,
-  COURIER_SERVICES,
-  courierServiceLabel,
-  hasCourierDeepLink,
-} from '@/lib/courier-services';
+import { type CourierPartner } from '@/lib/api/admin';
+import { buildCourierTrackingUrl, hasCourierDeepLink } from '@/lib/courier-services';
 import { courierTrackingDateLabel } from '@/lib/courier-tracking-dates';
 
 function optionalRupeesToPaise(input: string): number | null | undefined {
@@ -44,14 +40,32 @@ function parsePositiveDecimal(input: string): number | null {
 export function CourierTrackingForm({
   orderId,
   existing,
+  courierPartners,
   canEdit = true,
 }: {
   orderId: string;
   existing: OrderView['courierTracking'];
+  courierPartners: CourierPartner[];
   canEdit?: boolean;
 }): JSX.Element {
   const router = useRouter();
-  const [service, setService] = useState<CourierService>(existing?.service ?? 'PROFESSIONAL');
+  const courierOptions = useMemo(() => {
+    const active = courierPartners.filter((courier) => courier.isActive);
+    if (existing?.courierId && !active.some((courier) => courier.id === existing.courierId)) {
+      const existingCourier = courierPartners.find((courier) => courier.id === existing.courierId);
+      return active.concat(
+        existingCourier ?? {
+          id: existing.courierId,
+          name: existing.courierName,
+          isActive: false,
+        },
+      );
+    }
+    return active.length > 0 ? active : courierPartners;
+  }, [courierPartners, existing?.courierId, existing?.courierName]);
+  const initialCourierId =
+    existing?.courierId ?? (courierOptions.length > 0 ? courierOptions[0].id : '');
+  const [courierId, setCourierId] = useState(initialCourierId);
   const [docket, setDocket] = useState(existing?.docketNumber ?? '');
   const [freightAmount, setFreightAmount] = useState('');
   const [weightKg, setWeightKg] = useState('');
@@ -66,6 +80,10 @@ export function CourierTrackingForm({
 
   const save = async (): Promise<void> => {
     const trimmed = docket.trim();
+    if (!courierId) {
+      setError('Choose a courier service.');
+      return;
+    }
     if (!trimmed) {
       setError('Enter a docket number.');
       return;
@@ -100,7 +118,7 @@ export function CourierTrackingForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          courierService: service,
+          courierId,
           docketNumber: trimmed,
           ...(freightAmountPaise === undefined ? {} : { freightAmountPaise }),
           weightKg: parsedWeightKg,
@@ -133,7 +151,7 @@ export function CourierTrackingForm({
         <div className="bg-secondary/40 space-y-2 rounded-lg border p-3 text-sm">
           <p>
             <span className="text-muted-foreground">Courier:</span>{' '}
-            <span className="font-medium">{courierServiceLabel(existing.service)}</span>
+            <span className="font-medium">{existing.courierName}</span>
           </p>
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-muted-foreground">Docket:</span>
@@ -180,13 +198,17 @@ export function CourierTrackingForm({
             <select
               id="courier-service"
               className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-              value={service}
-              disabled={busy}
-              onChange={(e) => setService(e.target.value as CourierService)}
+              value={courierId}
+              disabled={busy || courierOptions.length === 0}
+              onChange={(e) => setCourierId(e.target.value)}
             >
-              {COURIER_SERVICES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
+              {courierOptions.length === 0 ? (
+                <option value="">Add an active courier provider first</option>
+              ) : null}
+              {courierOptions.map((courier) => (
+                <option key={courier.id} value={courier.id}>
+                  {courier.name}
+                  {courier.isActive ? '' : ' (inactive)'}
                 </option>
               ))}
             </select>

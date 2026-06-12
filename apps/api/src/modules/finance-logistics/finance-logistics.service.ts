@@ -224,8 +224,44 @@ export class FinanceLogisticsService {
     return this.prisma.courierPartner.findMany({ orderBy: { name: 'asc' } });
   }
 
-  createCourierPartner(name: string) {
-    return this.prisma.courierPartner.create({ data: { name } });
+  private async assertUniqueCourierName(name: string, excludeId?: string): Promise<void> {
+    const existing = await this.prisma.courierPartner.findFirst({
+      where: {
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException({
+        code: 'COURIER_PARTNER_EXISTS',
+        message: 'A courier partner with this name already exists.',
+      });
+    }
+  }
+
+  async createCourierPartner(name: string) {
+    const trimmed = name.trim();
+    await this.assertUniqueCourierName(trimmed);
+    return this.prisma.courierPartner.create({ data: { name: trimmed } });
+  }
+
+  async updateCourierPartner(id: string, input: { name?: string; isActive?: boolean }) {
+    const existing = await this.prisma.courierPartner.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException({ code: 'COURIER_NOT_FOUND' });
+
+    const nextName = input.name?.trim();
+    if (nextName && nextName !== existing.name) {
+      await this.assertUniqueCourierName(nextName, id);
+    }
+
+    return this.prisma.courierPartner.update({
+      where: { id },
+      data: {
+        ...(nextName ? { name: nextName } : {}),
+        ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+      },
+    });
   }
 
   // ─── Consignment Logs ────────────────────────────────────────────────────────

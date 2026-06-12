@@ -177,6 +177,7 @@ interface BuyerRecentOrder {
   totalPaise: number;
   itemCount: number;
   courierService: string | null;
+  courierPartnerName: string | null;
   courierDocketNumber: string | null;
 }
 
@@ -365,6 +366,7 @@ export class AdminService {
       rateTierSummary: 'RATE_A' | 'RATE_B' | 'MIXED';
       hasCourierReceipt: boolean;
       courierService: string | null;
+      courierPartnerName: string | null;
       courierDocketNumber: string | null;
       courierTrackingUpdatedAt: string | null;
     }[]
@@ -376,6 +378,7 @@ export class AdminService {
       include: {
         _count: { select: { items: true } },
         items: { select: { priceTier: true } },
+        courierPartner: { select: { name: true } },
         buyer: {
           select: {
             fullName: true,
@@ -404,6 +407,7 @@ export class AdminService {
         rateTierSummary,
         hasCourierReceipt: Boolean(o.courierReceiptBucket && o.courierReceiptKey),
         courierService: o.courierService,
+        courierPartnerName: o.courierPartner?.name ?? null,
         courierDocketNumber: o.courierDocketNumber,
         courierTrackingUpdatedAt: o.courierTrackingUpdatedAt?.toISOString() ?? null,
       };
@@ -592,7 +596,10 @@ export class AdminService {
         where: { buyerId: id },
         orderBy: { placedAt: 'desc' },
         take: 100,
-        include: { _count: { select: { items: true } } },
+        include: {
+          _count: { select: { items: true } },
+          courierPartner: { select: { name: true } },
+        },
       }),
     ]);
 
@@ -628,6 +635,7 @@ export class AdminService {
         totalPaise: Number(order.totalPaise),
         itemCount: order._count.items,
         courierService: order.courierService,
+        courierPartnerName: order.courierPartner?.name ?? null,
         courierDocketNumber: order.courierDocketNumber,
       })),
     };
