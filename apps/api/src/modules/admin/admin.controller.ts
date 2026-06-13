@@ -437,6 +437,18 @@ export class AdminController {
     return this.admin.downloadHrSalarySlip(id);
   }
 
+  @Delete('hr/salary-slips/:id')
+  @HttpCode(204)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.salary_slip.delete',
+    resource: 'EmployeeSalarySlip',
+    resolveResourceId: (req) => (req.params as { id?: string }).id,
+  })
+  deleteHrSalarySlip(@Param('id') id: string): ReturnType<AdminService['deleteHrSalarySlip']> {
+    return this.admin.deleteHrSalarySlip(id);
+  }
+
   @Post('hr/expenses')
   @Throttle(THROTTLE_MUTATION)
   @RequireRoles('SUPER_ADMIN')

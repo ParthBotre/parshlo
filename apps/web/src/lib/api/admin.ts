@@ -611,6 +611,18 @@ export function downloadHrSalarySlip(
   );
 }
 
+export async function deleteHrSalarySlip(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  await apiCall(`/v1/admin/hr/salary-slips/${encodeURIComponent(id)}`, z.undefined().optional(), {
+    method: 'DELETE',
+    accessToken,
+    ...options,
+  });
+}
+
 export function createHrExpense(
   accessToken: string,
   input: CreateHrExpenseInput,

@@ -212,6 +212,20 @@ function salaryYearOptions(): string[] {
   return Array.from({ length: 5 }, (_, index) => String(currentYear - 1 + index));
 }
 
+function currentPeriodMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthName(month: string): string {
+  return MONTH_OPTIONS.find(([value]) => value === month)?.[1] ?? month;
+}
+
+function periodLabel(periodMonth: string): string {
+  const [year, month] = periodMonth.slice(0, 7).split('-');
+  return `${monthName(month)} ${year}`.trim();
+}
+
 function promptIncrementDetails(): { incrementAmountPaise: number; effectiveDate: string } | null {
   const amount = window.prompt('Increment amount in rupees');
   if (amount === null) return null;
@@ -242,10 +256,9 @@ export function HrManagement({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
-  const [holidayPeriod, setHolidayPeriod] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [salaryPeriod, setSalaryPeriod] = useState(currentPeriodMonth);
+  const [holidayPeriod, setHolidayPeriod] = useState(currentPeriodMonth);
+  const [workPeriod, setWorkPeriod] = useState(currentPeriodMonth);
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
@@ -259,33 +272,49 @@ export function HrManagement({
       ),
     [dashboard.leaveRequests, holidayPeriod],
   );
+  const selectedSalarySlips = useMemo(
+    () => salarySlips.filter((slip) => slip.periodMonth.slice(0, 7) === salaryPeriod),
+    [salarySlips, salaryPeriod],
+  );
   const workSummaryRows = useMemo(() => {
     const rows = new Map<
       string,
       {
         employeeName: string;
-        month: string;
         reports: number;
         doctors: number;
         chemists: number;
+        locations: Set<string>;
       }
     >();
     for (const log of dashboard.workLogs) {
-      const key = `${log.employeeId}:${log.workDate.slice(0, 7)}`;
+      if (log.workDate.slice(0, 7) !== workPeriod) continue;
+      const key = log.employeeId;
       const current = rows.get(key) ?? {
         employeeName: log.employeeName,
-        month: log.workDate.slice(0, 7),
         reports: 0,
         doctors: 0,
         chemists: 0,
+        locations: new Set<string>(),
       };
       current.reports += log.worked ? 1 : 0;
       current.doctors += log.totalDoctors;
       current.chemists += log.totalChemist;
+      if (log.location) current.locations.add(log.location);
       rows.set(key, current);
     }
-    return Array.from(rows.values()).sort((a, b) => b.month.localeCompare(a.month));
-  }, [dashboard.workLogs]);
+    return Array.from(rows.values())
+      .map((row) => ({
+        ...row,
+        locationCount: row.locations.size,
+        avgDoctors: row.reports > 0 ? row.doctors / row.reports : 0,
+        avgChemists: row.reports > 0 ? row.chemists / row.reports : 0,
+      }))
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }, [dashboard.workLogs, workPeriod]);
+  const maxWorkReports = Math.max(1, ...workSummaryRows.map((row) => row.reports));
+  const maxWorkDoctors = Math.max(1, ...workSummaryRows.map((row) => row.doctors));
+  const maxWorkChemists = Math.max(1, ...workSummaryRows.map((row) => row.chemists));
 
   function updateRecordForm<K extends keyof HrRecordFormState>(
     key: K,
@@ -491,6 +520,7 @@ export function HrManagement({
         result.salarySlip,
         ...current.filter((slip) => slip.id !== result.salarySlip.id),
       ]);
+      setSalaryPeriod(result.salarySlip.periodMonth.slice(0, 7));
       setMessage('Salary slip saved. Employees can now download it from their Salary Slips page.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not generate salary slip.');
@@ -508,6 +538,26 @@ export function HrManagement({
       downloadBase64Pdf(result.fileName, result.contentBase64);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not download salary slip.');
+    }
+  }
+
+  async function deleteSalarySlip(slip: HrSalarySlip): Promise<void> {
+    const confirmed = window.confirm(
+      `Delete ${periodLabel(slip.periodMonth)} salary slip for ${slip.employeeName}? It will disappear from the employee Salary Slips page too.`,
+    );
+    if (!confirmed) return;
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/hr/salary-slips/${encodeURIComponent(slip.id)}`, {
+        method: 'DELETE',
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(readProblem(json, 'Could not delete salary slip.'));
+      setSalarySlips((current) => current.filter((item) => item.id !== slip.id));
+      setMessage('Salary slip deleted.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete salary slip.');
     }
   }
 
@@ -926,7 +976,15 @@ export function HrManagement({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Saved Salary Slips</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Saved Salary Slips</CardTitle>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Select a month and year to keep saved slips organized.
+              </p>
+            </div>
+            <MonthYearSelect value={salaryPeriod} onChange={setSalaryPeriod} />
+          </div>
         </CardHeader>
         <CardContent>
           <Table
@@ -939,25 +997,25 @@ export function HrManagement({
               'Amount',
               'Action',
             ]}
-            rows={salarySlips.map((slip) => [
-              new Intl.DateTimeFormat('en-IN', {
-                month: 'long',
-                year: 'numeric',
-                timeZone: 'UTC',
-              }).format(new Date(`${slip.periodMonth.slice(0, 7)}-01T00:00:00.000Z`)),
+            rows={selectedSalarySlips.map((slip) => [
+              periodLabel(slip.periodMonth),
               slip.employeeName,
               slip.workingDays,
               slip.leaveDays,
               slip.transactionReference ?? '-',
               formatINR(slip.netPayPaise),
-              <Button
-                key={slip.id}
-                size="sm"
-                variant="outline"
-                onClick={() => void downloadSalarySlip(slip.id)}
-              >
-                Download
-              </Button>,
+              <div key={slip.id} className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void downloadSalarySlip(slip.id)}
+                >
+                  Download
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => void deleteSalarySlip(slip)}>
+                  Delete
+                </Button>
+              </div>,
             ])}
           />
         </CardContent>
@@ -972,12 +1030,7 @@ export function HrManagement({
                 Super Admin visibility by month and year.
               </p>
             </div>
-            <Input
-              type="month"
-              className="w-full sm:w-48"
-              value={holidayPeriod}
-              onChange={(event) => setHolidayPeriod(event.target.value)}
-            />
+            <MonthYearSelect value={holidayPeriod} onChange={setHolidayPeriod} />
           </div>
         </CardHeader>
         <CardContent>
@@ -997,24 +1050,87 @@ export function HrManagement({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Work Activity Summary</CardTitle>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Monthly roll-up from employee daily reports. Use the Work Reports page for daily entry.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Work Activity Summary</CardTitle>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Employee-wise roll-up from daily reports for the selected month.
+              </p>
+            </div>
+            <MonthYearSelect value={workPeriod} onChange={setWorkPeriod} />
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <MetricCard
+              label="Reported Days"
+              value={String(workSummaryRows.reduce((total, row) => total + row.reports, 0))}
+            />
+            <MetricCard
+              label="Total Doctors"
+              value={String(workSummaryRows.reduce((total, row) => total + row.doctors, 0))}
+            />
+            <MetricCard
+              label="Total Chemists"
+              value={String(workSummaryRows.reduce((total, row) => total + row.chemists, 0))}
+            />
+          </div>
+          <div className="space-y-3">
+            {workSummaryRows.length === 0 ? (
+              <div className="text-muted-foreground rounded-lg border p-6 text-center text-sm">
+                No work reports for {periodLabel(workPeriod)}.
+              </div>
+            ) : (
+              workSummaryRows.map((row) => (
+                <div key={row.employeeName} className="rounded-lg border p-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <h3 className="font-medium">{row.employeeName}</h3>
+                    <p className="text-muted-foreground text-xs">
+                      {row.reports} reported days · {row.locationCount} locations
+                    </p>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    <ActivityBar
+                      label="Reported days"
+                      value={row.reports}
+                      max={maxWorkReports}
+                      tone="emerald"
+                    />
+                    <ActivityBar
+                      label="Doctors"
+                      value={row.doctors}
+                      max={maxWorkDoctors}
+                      tone="sky"
+                    />
+                    <ActivityBar
+                      label="Chemists"
+                      value={row.chemists}
+                      max={maxWorkChemists}
+                      tone="amber"
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
           <Table
-            headers={['Month', 'Employee', 'Reported Days', 'Total DR', 'Total Chemist']}
+            headers={[
+              'Employee',
+              'Reported Days',
+              'Locations',
+              'Total DR',
+              'Avg DR/Day',
+              'Total Chemist',
+              'Avg Chemist/Day',
+            ]}
             rows={workSummaryRows.map((row) => [
-              new Intl.DateTimeFormat('en-IN', {
-                month: 'long',
-                year: 'numeric',
-                timeZone: 'UTC',
-              }).format(new Date(`${row.month}-01T00:00:00.000Z`)),
               row.employeeName,
               row.reports,
+              row.locationCount,
               row.doctors,
+              row.avgDoctors.toFixed(1),
               row.chemists,
+              row.avgChemists.toFixed(1),
             ])}
           />
         </CardContent>
@@ -1127,6 +1243,80 @@ function Field({
     <div className={className ? `space-y-1.5 ${className}` : 'space-y-1.5'}>
       <Label>{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function MonthYearSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const [year, month] = value.split('-');
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:w-[260px]">
+      <select
+        aria-label="Month"
+        className={SELECT_CLASS}
+        value={month}
+        onChange={(event) => onChange(`${year}-${event.target.value}`)}
+      >
+        {MONTH_OPTIONS.map(([monthValue, label]) => (
+          <option key={monthValue} value={monthValue}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Year"
+        className={SELECT_CLASS}
+        value={year}
+        onChange={(event) => onChange(`${event.target.value}-${month}`)}
+      >
+        {salaryYearOptions().map((yearOption) => (
+          <option key={yearOption} value={yearOption}>
+            {yearOption}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function ActivityBar({
+  label,
+  value,
+  max,
+  tone,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  tone: 'emerald' | 'sky' | 'amber';
+}): JSX.Element {
+  const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
+  const colorClass =
+    tone === 'emerald' ? 'bg-emerald-600' : tone === 'sky' ? 'bg-sky-600' : 'bg-amber-500';
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{value}</span>
+      </div>
+      <div className="bg-secondary h-2 overflow-hidden rounded-full">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${width}%` }} />
+      </div>
     </div>
   );
 }

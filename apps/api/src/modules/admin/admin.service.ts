@@ -1401,6 +1401,15 @@ export class AdminService {
     };
   }
 
+  async deleteHrSalarySlip(slipId: string): Promise<void> {
+    const slip = await this.prisma.employeeSalarySlip.findUnique({
+      where: { id: slipId },
+      select: { id: true },
+    });
+    if (!slip) throw new NotFoundException({ code: 'SALARY_SLIP_NOT_FOUND' });
+    await this.prisma.employeeSalarySlip.delete({ where: { id: slipId } });
+  }
+
   private async createHrDocumentPdf(
     employeeId: string,
     actorId: string,

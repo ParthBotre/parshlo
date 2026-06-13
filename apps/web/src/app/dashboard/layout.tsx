@@ -26,6 +26,7 @@ function staffNav(roles: string[]): NavItem[] {
     { href: '/admin/place-order', label: 'Place order', icon: 'place-order' },
     { href: '/dashboard/reports', label: 'Work Reports', icon: 'reports' },
     { href: '/dashboard/salary-slips', label: 'Salary Slips', icon: 'salary' },
+    { href: '/dashboard/expenses', label: 'My Expenses', icon: 'expenses' },
     { href: '/admin/buyers', label: 'Buyers', icon: 'buyers' },
   ];
   if (canManageProducts) {
