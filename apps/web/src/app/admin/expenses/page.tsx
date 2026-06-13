@@ -26,6 +26,7 @@ export default async function AdminExpensesPage(): Promise<JSX.Element> {
     salarySlips: [],
     expenses: [],
     workLogs: [],
+    leaveRequests: [],
   };
   try {
     dashboard = await getHrDashboard(session.accessToken, { next: { revalidate: 0 } });

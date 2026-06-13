@@ -85,7 +85,7 @@ export function createEmailWorker({
         cc: data.cc,
         bcc: data.bcc,
         from: senderForKind(data.kind),
-        replyTo: config.EMAIL_REPLY_TO,
+        replyTo: data.replyTo ?? config.EMAIL_REPLY_TO,
         subject: data.subjectOverride ?? rendered.subject,
         html: rendered.html,
         text: rendered.text,

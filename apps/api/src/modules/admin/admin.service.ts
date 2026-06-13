@@ -60,6 +60,7 @@ const ORDER_STATUSES: OrderStatus[] = [
 ];
 
 const HR_DOCUMENT_REQUIRED_CC = ['hemantbotre@gmail.com'];
+const HR_DOCUMENT_REPLY_TO = 'superadmin@parshlo.com';
 
 const BUYER_ANALYTICS_PERIODS = ['day', 'week', 'month', 'year'] as const;
 type BuyerAnalyticsPeriod = (typeof BUYER_ANALYTICS_PERIODS)[number];
@@ -968,7 +969,7 @@ export class AdminService {
   }
 
   async hrDashboard(): Promise<HrDashboardView> {
-    const [records, documents, salarySlips, expenses, workLogs] = await Promise.all([
+    const [records, documents, salarySlips, expenses, workLogs, leaveRequests] = await Promise.all([
       this.prisma.employeeHrRecord.findMany({
         include: { employee: { select: { id: true, fullName: true, email: true } } },
         orderBy: [{ archivedAt: 'asc' }, { employeeCode: 'asc' }],
@@ -992,6 +993,14 @@ export class AdminService {
         include: { employee: { select: { fullName: true } } },
         orderBy: { workDate: 'desc' },
       }),
+      this.prisma.employeeLeaveRequest.findMany({
+        take: 200,
+        include: {
+          employee: { select: { id: true, fullName: true, email: true } },
+          reviewedBy: { select: { id: true, fullName: true } },
+        },
+        orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+      }),
     ]);
 
     return {
@@ -1000,6 +1009,7 @@ export class AdminService {
       salarySlips: salarySlips.map((salarySlip) => this.toHrSalarySlipView(salarySlip)),
       expenses: expenses.map((expense) => this.toHrExpenseView(expense)),
       workLogs: workLogs.map((workLog) => this.toHrWorkLogView(workLog)),
+      leaveRequests: leaveRequests.map((request) => this.toLeaveRequestView(request)),
     };
   }
 
@@ -1029,6 +1039,7 @@ export class AdminService {
         employeeId: input.employeeId,
         employeeCode: input.employeeCode.trim().toUpperCase(),
         serialNumber: nextSerialNumber,
+        namePrefix: this.normalizeOptionalText(input.namePrefix),
         roleTitle: input.roleTitle.trim().toUpperCase(),
         address: input.address.trim().toUpperCase(),
         headQuarter: input.headQuarter.trim().toUpperCase(),
@@ -1066,6 +1077,7 @@ export class AdminService {
       update: {
         employeeCode: input.employeeCode.trim().toUpperCase(),
         serialNumber: nextSerialNumber,
+        namePrefix: this.normalizeOptionalText(input.namePrefix),
         roleTitle: input.roleTitle.trim().toUpperCase(),
         address: input.address.trim().toUpperCase(),
         headQuarter: input.headQuarter.trim().toUpperCase(),
@@ -1159,6 +1171,7 @@ export class AdminService {
 
   async upsertHrWorkLog(input: UpsertHrWorkLogInput): Promise<HrWorkLogView> {
     const workDate = parseDateOnly(input.workDate);
+    await this.assertCanSubmitWorkLog(input.employeeId, workDate);
     const totalDoctors = input.orthCalls + input.mdCalls + input.gpCalls + input.otherCalls;
     const data = {
       worked: input.worked,
@@ -1236,6 +1249,7 @@ export class AdminService {
       to: recipientEmail,
       cc: ccEmails.length > 0 ? ccEmails : undefined,
       bcc: bccEmails.length > 0 ? bccEmails : undefined,
+      replyTo: HR_DOCUMENT_REPLY_TO,
       attachments: [
         {
           filename: fileName,
@@ -1311,7 +1325,6 @@ export class AdminService {
       dailyAllowancePaise +
       petrolAllowancePaise +
       mobileAllowancePaise +
-      approvedExpensePaise +
       input.bonusPaise -
       toNumber(record.deductionPaise);
 
@@ -1407,7 +1420,7 @@ export class AdminService {
     bytes: Uint8Array;
   }> {
     const record = await this.getHrRecordOrThrow(employeeId);
-    const existingDocument = await this.prisma.employeeHrDocument.findFirst({
+    const existingDocuments = await this.prisma.employeeHrDocument.findMany({
       where: { employeeId, type: input.type },
       orderBy: { generatedAt: 'asc' },
       select: {
@@ -1417,16 +1430,43 @@ export class AdminService {
         referenceNumber: true,
         fileName: true,
         generatedAt: true,
+        payload: true,
       },
     });
+    const existingDocument =
+      input.type === 'INCREMENT_LETTER'
+        ? existingDocuments.find((document) => {
+            const payload = document.payload as {
+              incrementAmountPaise?: unknown;
+              effectiveDate?: unknown;
+            };
+            return (
+              payload.incrementAmountPaise === (input.incrementAmountPaise ?? 0) &&
+              payload.effectiveDate === (input.effectiveDate ?? formatDateOnly(new Date()))
+            );
+          })
+        : (existingDocuments[0] ?? null);
     const referenceNumber =
       existingDocument?.referenceNumber ?? (await this.nextHrReference(input.type, new Date()));
-    const title = input.type === 'OFFER_LETTER' ? 'OFFER LETTER' : 'APPOINTMENT LETTER';
-    const fileName = existingDocument?.fileName ?? `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
-    const lines =
+    const title =
       input.type === 'OFFER_LETTER'
-        ? this.offerLetterLines(record)
-        : this.appointmentLetterLines(record, referenceNumber);
+        ? 'OFFER LETTER'
+        : input.type === 'INCREMENT_LETTER'
+          ? 'INCREMENT LETTER'
+          : 'APPOINTMENT LETTER';
+    const fileName = existingDocument?.fileName ?? `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const lines = (() => {
+      if (input.type === 'OFFER_LETTER') return this.offerLetterLines(record);
+      if (input.type === 'INCREMENT_LETTER') {
+        return this.incrementLetterLines(
+          record,
+          referenceNumber,
+          input.incrementAmountPaise ?? 0,
+          input.effectiveDate ? parseDateOnly(input.effectiveDate) : new Date(),
+        );
+      }
+      return this.appointmentLetterLines(record, referenceNumber);
+    })();
     const bytes = await this.renderHrPdf(title, lines);
 
     const document =
@@ -1442,6 +1482,8 @@ export class AdminService {
             employeeName: record.employee.fullName,
             employeeCode: record.employeeCode,
             roleTitle: record.roleTitle,
+            incrementAmountPaise: input.incrementAmountPaise ?? undefined,
+            effectiveDate: input.effectiveDate ?? undefined,
             generatedOn: formatDateOnly(new Date()),
             delivery,
           },
@@ -1896,6 +1938,36 @@ export class AdminService {
     return record;
   }
 
+  private hrDisplayName(record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>): string {
+    const prefix = record.namePrefix?.trim();
+    return prefix ? `${prefix} ${record.employee.fullName}` : record.employee.fullName;
+  }
+
+  private async assertCanSubmitWorkLog(employeeId: string, workDate: Date): Promise<void> {
+    const [leaveCount, holidayCount] = await Promise.all([
+      this.prisma.employeeLeaveRequest.count({
+        where: {
+          employeeId,
+          status: 'APPROVED',
+          startDate: { lte: workDate },
+          endDate: { gte: workDate },
+        },
+      }),
+      this.prisma.companyHoliday.count({
+        where: {
+          isActive: true,
+          holidayDate: workDate,
+        },
+      }),
+    ]);
+    if (leaveCount > 0 || holidayCount > 0) {
+      throw new BadRequestException({
+        code: 'WORK_LOG_BLOCKED_ON_HOLIDAY',
+        message: 'Work reports cannot be submitted for approved leave or company holidays.',
+      });
+    }
+  }
+
   private async nextHrReference(type: string, value: Date): Promise<string> {
     const fiscalYear = fiscalYearLabel(value);
     const prefix = `PSH/HR/${type.replace(/_/g, '-')}/${fiscalYear}/`;
@@ -1918,6 +1990,7 @@ export class AdminService {
     employee: { fullName: string; email: string };
     employeeCode: string;
     serialNumber: number | null;
+    namePrefix: string | null;
     roleTitle: string;
     address: string;
     headQuarter: string;
@@ -1959,6 +2032,7 @@ export class AdminService {
       employeeEmail: record.employee.email,
       employeeCode: record.employeeCode,
       serialNumber: record.serialNumber,
+      namePrefix: record.namePrefix,
       roleTitle: record.roleTitle,
       address: record.address,
       headQuarter: record.headQuarter,
@@ -2137,14 +2211,15 @@ export class AdminService {
     record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
   ): string[] {
     const annualGross = toNumber(record.grossMonthlyPaise) * 12;
+    const displayName = this.hrDisplayName(record);
     return [
       `Date: ${formatDateDisplay(record.offerDate ?? new Date())}`,
       'Place: Pune, MH, INDIA',
       '',
-      `Mr/Mrs/Ms. ${record.employee.fullName}`,
+      displayName,
       record.address,
       '',
-      `${record.employee.fullName},`,
+      `${displayName},`,
       '',
       `With reference to your interview with Mr. Hemant Botre (CRM HEAD), we are happy to OFFER you the position of ${record.roleTitle} in our company w.e.f ${formatDateDisplay(record.joiningDate)} or any other mutually acceptable date.`,
       '',
@@ -2157,7 +2232,7 @@ export class AdminService {
       'Kindly confirm your acceptance by signing copy of this letter. We welcome you on board and wish you a long successful career with PARSHLO.',
       '',
       'Best Wishes.',
-      'For PARSHLO',
+      'PARSHLO',
       '',
       '',
       '(Authority Stamp)',
@@ -2168,14 +2243,32 @@ export class AdminService {
     record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
     referenceNumber: string,
   ): string[] {
+    const displayName = this.hrDisplayName(record);
+    const terms = [
+      'That from the date of joining duty you will be on probation for 6 months. Your service after the expiry of this probation will be confirmed subject to your sales performance and work input like average daily doctors calls, chemist calls, and reporting being found up to the mark and regular. Your probation period can be further extended if your performance is not found satisfactory.',
+      'That while on probation this service agreement can be terminated by giving 24 hours notice from either side without assigning any reason. After confirmation of your service, one-month notice will be necessary to terminate this service agreement from either side without assigning any reason.',
+      'Your service is liable to be transferred to any section, department, unit, branch, or affiliated subsidiary anywhere in India, existing or which may come into existence at any time. In case you fail to report for duties at the transferred place, the management may presume that you have abandoned the job on your own accord and suitable action will be taken accordingly.',
+      'You will strictly follow the KEY RESULT AREA, WORK NORMS, REPORTING SYSTEMS, and GUIDELINES as per the Annexure I, II, III, and IV respectively enclosed.',
+      'You may be required to promote products of associate concerns or work for associate concerns wherever the parent Company has business interest. For these services no additional salary or allowances shall be considered or reimbursed.',
+      'It is obligatory on your part to abide strictly by all instructions given to you by the Company either verbally or in writing from time to time and discharge your duties faithfully, honestly, and sincerely to the best of your ability.',
+      'If at any time you are certified to be unfit by a Medical Doctor or Practitioner appointed by the Company for the duties for which you have been engaged, it will be open to the Company to terminate your service.',
+      'The Company follows the system of yearly appraisal of your performance in the job.',
+      'You will be responsible for the safekeeping and return in good condition all Company property such as books, manuals, samples, circulars, and statements of sales statistics which may be in your use or charge.',
+      'Your appointment, control, and settlement of duties will be done from the Mumbai office. Any dispute arising from this appointment will be subject to the jurisdiction of courts at Mumbai only.',
+      'The company will not make a full and final settlement if you resign during the probation period of 6 months and the company will deduct one month basic salary if you resign without serving a notice period of 1 month.',
+      'Your salary and package are strictly confidential and are not to be divulged to anybody. Any non-compliance in this matter will be treated as breach of trust.',
+      'You will retire from the Company services on reaching the age of 58 years.',
+      'The Company reserves the right to dispense with your services and terminate your employment for acts of indiscipline, misconduct, insubordination, dishonesty, absenteeism, negligence of duty, misuse of company belongings, or breach of service conditions.',
+      'Such acts of indiscipline or misconduct are to be judged by your seniors or management. The decision of the Company in this regard shall be final and binding.',
+    ];
     return [
       `Ref No: ${referenceNumber}`,
       `Date: ${formatDateDisplay(record.appointmentDate ?? new Date())}`,
       '',
-      record.employee.fullName,
+      displayName,
       record.address,
       '',
-      `${record.employee.fullName},`,
+      `${displayName},`,
       '',
       'Ref: Letter of Appointment.',
       '',
@@ -2193,16 +2286,47 @@ export class AdminService {
       `PETROL: ${formatInr(toNumber(record.petrolAllowancePaise))}`,
       `MOBILE: ${formatInr(toNumber(record.mobileAllowancePaise))}`,
       '',
-      'You will be on probation for 6 months from the date of joining duty. Confirmation will be subject to sales performance, work input, daily doctor calls, chemist calls, reporting, and overall conduct.',
+      'This appointment letter, apart from above, has been issued on the following terms & conditions:',
       '',
-      'Your service is liable to be transferred to any section, department, unit, branch, or affiliated subsidiary anywhere in India. You must follow KEY RESULT AREA, WORK NORMS, REPORTING SYSTEMS, and GUIDELINES issued by the Company.',
-      '',
-      'Your salary and package are strictly confidential. The Company reserves the right to terminate employment for indiscipline, misconduct, insubordination, dishonesty, absenteeism, negligence of duty, misuse of company belongings, or breach of service conditions.',
-      '',
+      ...terms.flatMap((term, index) => [`${index + 1}. ${term}`, '']),
       'LEAVE - You will be entitled for leave and other benefits as per the rules of the Company.',
+      '(Enclosed Annexure - V)',
       '',
-      'Thanking you,',
+      'We appreciate the interest shown by you in the Company and take this opportunity to assure you that you will find your work exciting and interesting with congenial atmosphere to progress with the Company to a great extent.',
+      '',
       'Yours sincerely,',
+      'PARSHLO',
+      '',
+      '',
+      '(Authority Signatory)',
+    ];
+  }
+
+  private incrementLetterLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    referenceNumber: string,
+    incrementAmountPaise: number,
+    effectiveDate: Date,
+  ): string[] {
+    const displayName = this.hrDisplayName(record);
+    return [
+      `Ref No: ${referenceNumber}`,
+      `Date: ${formatDateDisplay(new Date())}`,
+      '',
+      displayName,
+      record.address,
+      '',
+      `${displayName},`,
+      '',
+      'Sub: Increment Letter',
+      '',
+      `We are pleased to inform you that your monthly compensation has been revised with an increment of ${formatInr(incrementAmountPaise)} effective from ${formatDateDisplay(effectiveDate)}.`,
+      '',
+      'This revision is based on your role, responsibilities, performance, and the business requirements of the Company. All other terms and conditions of your appointment remain unchanged unless communicated separately in writing.',
+      '',
+      'Your salary and package remain strictly confidential and must not be divulged to anybody.',
+      '',
+      'Best Wishes,',
       'PARSHLO',
       '',
       '',
@@ -2344,12 +2468,8 @@ export class AdminService {
         y -= 14;
         continue;
       }
-      if (
-        trimmed === 'PARSHLO' ||
-        trimmed.startsWith('SALARY SLIP FOR THE MONTH OF') ||
-        trimmed === 'OFFER LETTER'
-      ) {
-        drawCentered(trimmed, trimmed === 'PARSHLO' ? 12 : 11);
+      if (trimmed.startsWith('SALARY SLIP FOR THE MONTH OF') || trimmed === 'OFFER LETTER') {
+        drawCentered(trimmed, 11);
         y -= 18;
         continue;
       }

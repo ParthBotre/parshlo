@@ -20,6 +20,7 @@ export default async function HrPage(): Promise<JSX.Element> {
     salarySlips: [],
     expenses: [],
     workLogs: [],
+    leaveRequests: [],
   };
 
   if (session && canManageHr) {

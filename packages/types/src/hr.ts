@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 import { EntityId, IsoDateString } from './common.js';
-import { LeaveDateString } from './leave.js';
+import { EmployeeLeaveRequestView, LeaveDateString } from './leave.js';
 
 export const HrDocumentType = z.enum([
   'OFFER_LETTER',
   'APPOINTMENT_LETTER',
+  'INCREMENT_LETTER',
   'SALARY_SLIP',
   'EXPENSE_BILL',
 ]);
@@ -27,6 +28,7 @@ export const HrEmployeeRecordView = z.object({
   employeeEmail: z.string().email(),
   employeeCode: z.string(),
   serialNumber: z.number().int().min(1).nullable(),
+  namePrefix: z.string().nullable(),
   roleTitle: z.string(),
   address: z.string(),
   headQuarter: z.string(),
@@ -67,6 +69,7 @@ export const UpsertHrEmployeeRecordInputSchema = z.object({
   employeeId: EntityId,
   employeeCode: z.string().trim().min(2).max(40),
   serialNumber: z.coerce.number().int().min(1).optional().nullable(),
+  namePrefix: z.string().trim().max(20).optional().nullable(),
   roleTitle: z.string().trim().min(2).max(120),
   address: z.string().trim().min(2).max(2000),
   headQuarter: z.string().trim().min(2).max(120),
@@ -112,7 +115,9 @@ export const HrDocumentView = z.object({
 export type HrDocumentView = z.infer<typeof HrDocumentView>;
 
 export const GenerateHrDocumentInputSchema = z.object({
-  type: HrDocumentType.extract(['OFFER_LETTER', 'APPOINTMENT_LETTER']),
+  type: HrDocumentType.extract(['OFFER_LETTER', 'APPOINTMENT_LETTER', 'INCREMENT_LETTER']),
+  incrementAmountPaise: HrMoneyPaise.optional().nullable(),
+  effectiveDate: LeaveDateString.optional().nullable(),
 });
 export type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
 
@@ -153,6 +158,23 @@ export const HrExpenseView = z.object({
   updatedAt: IsoDateString,
 });
 export type HrExpenseView = z.infer<typeof HrExpenseView>;
+
+export const HrExpenseAllowanceSummaryView = z.object({
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
+  employeeId: EntityId,
+  employeeName: z.string(),
+  workingDays: z.number().int().min(0),
+  dailyAllowancePaise: HrMoneyPaise,
+  petrolAllowancePaise: HrMoneyPaise,
+  mobileAllowancePaise: HrMoneyPaise,
+  monthlyAllowanceCapPaise: HrMoneyPaise,
+  calculatedDailyAllowancePaise: HrMoneyPaise,
+  calculatedAllowancePaise: HrMoneyPaise,
+  approvedExtraExpensePaise: HrMoneyPaise,
+  pendingExtraExpensePaise: HrMoneyPaise,
+  totalApprovedPayablePaise: HrMoneyPaise,
+});
+export type HrExpenseAllowanceSummaryView = z.infer<typeof HrExpenseAllowanceSummaryView>;
 
 export const CreateHrExpenseInputSchema = z.object({
   employeeId: EntityId,
@@ -263,11 +285,23 @@ export const EmployeeSalarySlipDownloadResponse = z.object({
 });
 export type EmployeeSalarySlipDownloadResponse = z.infer<typeof EmployeeSalarySlipDownloadResponse>;
 
+export const EmployeeExpenseSlipDownloadResponse = z.object({
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
+  summary: HrExpenseAllowanceSummaryView,
+  fileName: z.string(),
+  contentType: z.literal('application/pdf'),
+  contentBase64: z.string(),
+});
+export type EmployeeExpenseSlipDownloadResponse = z.infer<
+  typeof EmployeeExpenseSlipDownloadResponse
+>;
+
 export const HrDashboardView = z.object({
   records: z.array(HrEmployeeRecordView),
   documents: z.array(HrDocumentView),
   salarySlips: z.array(HrSalarySlipView),
   expenses: z.array(HrExpenseView),
   workLogs: z.array(HrWorkLogView),
+  leaveRequests: z.array(EmployeeLeaveRequestView),
 });
 export type HrDashboardView = z.infer<typeof HrDashboardView>;

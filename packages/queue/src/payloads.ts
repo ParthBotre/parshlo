@@ -36,6 +36,8 @@ export const SendEmailJob = z.object({
   bcc: z.array(z.string().email()).min(1).optional(),
   /** Optional override of the default template subject. */
   subjectOverride: z.string().optional(),
+  /** Optional reply-to override for confidential HR messages. */
+  replyTo: z.string().email().optional(),
   attachments: z.array(EmailAttachment).max(5).optional(),
   /** Arbitrary template data; validated per-kind inside the worker. */
   data: z.record(z.unknown()),

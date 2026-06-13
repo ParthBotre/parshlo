@@ -35,7 +35,7 @@ const MONTH_OPTIONS = [
   ['12', 'December'],
 ] as const;
 
-type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER';
+type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'INCREMENT_LETTER';
 
 interface EmailDocumentDraft {
   employeeId: string;
@@ -43,11 +43,14 @@ interface EmailDocumentDraft {
   recipientEmail: string;
   ccEmails: string;
   bccEmails: string;
+  incrementAmountPaise?: number;
+  effectiveDate?: string;
 }
 
 interface HrRecordFormState {
   employeeId: string;
   employeeCode: string;
+  namePrefix: string;
   roleTitle: string;
   address: string;
   headQuarter: string;
@@ -106,6 +109,7 @@ function blankRecordForm(employeeId: string): HrRecordFormState {
   return {
     employeeId,
     employeeCode: '',
+    namePrefix: '',
     roleTitle: '',
     address: '',
     headQuarter: '',
@@ -139,6 +143,7 @@ function formFromRecord(record: HrEmployeeRecord): HrRecordFormState {
   return {
     employeeId: record.employeeId,
     employeeCode: record.employeeCode,
+    namePrefix: record.namePrefix ?? '',
     roleTitle: record.roleTitle,
     address: record.address,
     headQuarter: record.headQuarter,
@@ -197,12 +202,32 @@ function parseEmailList(value: string): string[] {
 }
 
 function labelForLetterType(type: HrLetterType): string {
-  return type === 'OFFER_LETTER' ? 'offer letter' : 'appointment letter';
+  if (type === 'OFFER_LETTER') return 'offer letter';
+  if (type === 'INCREMENT_LETTER') return 'increment letter';
+  return 'appointment letter';
 }
 
 function salaryYearOptions(): string[] {
   const currentYear = new Date().getFullYear();
   return Array.from({ length: 5 }, (_, index) => String(currentYear - 1 + index));
+}
+
+function promptIncrementDetails(): { incrementAmountPaise: number; effectiveDate: string } | null {
+  const amount = window.prompt('Increment amount in rupees');
+  if (amount === null) return null;
+  const parsed = Number.parseFloat(amount);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    window.alert('Enter a valid increment amount.');
+    return null;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const effectiveDate = window.prompt('Effective date (YYYY-MM-DD)', today);
+  if (effectiveDate === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    window.alert('Enter effective date as YYYY-MM-DD.');
+    return null;
+  }
+  return { incrementAmountPaise: Math.round(parsed * 100), effectiveDate };
 }
 
 export function HrManagement({
@@ -217,10 +242,50 @@ export function HrManagement({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
+  const [holidayPeriod, setHolidayPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
     records.find((record) => record.employeeId === recordForm.employeeId) ?? null;
+  const selectedLeaveRequests = useMemo(
+    () =>
+      dashboard.leaveRequests.filter(
+        (request) =>
+          request.startDate.slice(0, 7) <= holidayPeriod &&
+          request.endDate.slice(0, 7) >= holidayPeriod,
+      ),
+    [dashboard.leaveRequests, holidayPeriod],
+  );
+  const workSummaryRows = useMemo(() => {
+    const rows = new Map<
+      string,
+      {
+        employeeName: string;
+        month: string;
+        reports: number;
+        doctors: number;
+        chemists: number;
+      }
+    >();
+    for (const log of dashboard.workLogs) {
+      const key = `${log.employeeId}:${log.workDate.slice(0, 7)}`;
+      const current = rows.get(key) ?? {
+        employeeName: log.employeeName,
+        month: log.workDate.slice(0, 7),
+        reports: 0,
+        doctors: 0,
+        chemists: 0,
+      };
+      current.reports += log.worked ? 1 : 0;
+      current.doctors += log.totalDoctors;
+      current.chemists += log.totalChemist;
+      rows.set(key, current);
+    }
+    return Array.from(rows.values()).sort((a, b) => b.month.localeCompare(a.month));
+  }, [dashboard.workLogs]);
 
   function updateRecordForm<K extends keyof HrRecordFormState>(
     key: K,
@@ -263,6 +328,7 @@ export function HrManagement({
         {
           employeeId: recordForm.employeeId,
           employeeCode: recordForm.employeeCode,
+          namePrefix: recordForm.namePrefix || null,
           roleTitle: recordForm.roleTitle,
           address: recordForm.address,
           headQuarter: recordForm.headQuarter,
@@ -303,18 +369,25 @@ export function HrManagement({
   async function fetchDocumentPdf(
     employeeId: string,
     type: HrLetterType,
+    options?: { incrementAmountPaise?: number; effectiveDate?: string },
   ): Promise<{ fileName: string; contentBase64: string }> {
     return submitJson<{ fileName: string; contentBase64: string }>(
       `/api/admin/hr/records/${encodeURIComponent(employeeId)}/documents`,
       'POST',
-      { type },
+      { type, ...options },
       'Could not generate HR document.',
     );
   }
 
   async function generateDocument(employeeId: string, type: HrLetterType) {
     try {
-      const result = await fetchDocumentPdf(employeeId, type);
+      let options: { incrementAmountPaise?: number; effectiveDate?: string } | undefined;
+      if (type === 'INCREMENT_LETTER') {
+        const details = promptIncrementDetails();
+        if (!details) return;
+        options = details;
+      }
+      const result = await fetchDocumentPdf(employeeId, type, options);
       downloadBase64Pdf(result.fileName, result.contentBase64);
       setMessage('PDF generated and downloaded.');
     } catch (err) {
@@ -323,6 +396,12 @@ export function HrManagement({
   }
 
   function startEmailDocument(record: HrEmployeeRecord, type: HrLetterType): void {
+    let options: { incrementAmountPaise?: number; effectiveDate?: string } | undefined;
+    if (type === 'INCREMENT_LETTER') {
+      const details = promptIncrementDetails();
+      if (!details) return;
+      options = details;
+    }
     setError(null);
     setMessage(null);
     setEmailDraft({
@@ -331,13 +410,17 @@ export function HrManagement({
       recipientEmail: record.mailId ?? record.employeeEmail,
       ccEmails: '',
       bccEmails: '',
+      ...options,
     });
   }
 
   async function previewEmailAttachment(): Promise<void> {
     if (!emailDraft) return;
     try {
-      const result = await fetchDocumentPdf(emailDraft.employeeId, emailDraft.type);
+      const result = await fetchDocumentPdf(emailDraft.employeeId, emailDraft.type, {
+        incrementAmountPaise: emailDraft.incrementAmountPaise,
+        effectiveDate: emailDraft.effectiveDate,
+      });
       previewBase64Pdf(result.contentBase64);
       setMessage(`Preview opened for ${labelForLetterType(emailDraft.type)}.`);
     } catch (err) {
@@ -353,6 +436,8 @@ export function HrManagement({
         'POST',
         {
           type: emailDraft.type,
+          incrementAmountPaise: emailDraft.incrementAmountPaise,
+          effectiveDate: emailDraft.effectiveDate,
           recipientEmail: emailDraft.recipientEmail,
           ccEmails: parseEmailList(emailDraft.ccEmails),
           bccEmails: parseEmailList(emailDraft.bccEmails),
@@ -534,6 +619,19 @@ export function HrManagement({
                 value={recordForm.employeeCode}
                 onChange={(event) => updateRecordForm('employeeCode', event.target.value)}
               />
+            </Field>
+            <Field label="Name prefix">
+              <select
+                name="namePrefix"
+                value={recordForm.namePrefix}
+                className={SELECT_CLASS}
+                onChange={(event) => updateRecordForm('namePrefix', event.target.value)}
+              >
+                <option value="">No prefix</option>
+                <option value="Mr.">Mr.</option>
+                <option value="Mrs.">Mrs.</option>
+                <option value="Miss">Miss</option>
+              </select>
             </Field>
             <Field label="Role">
               <Input
@@ -867,6 +965,63 @@ export function HrManagement({
 
       <Card>
         <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Employee Holidays</CardTitle>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Super Admin visibility by month and year.
+              </p>
+            </div>
+            <Input
+              type="month"
+              className="w-full sm:w-48"
+              value={holidayPeriod}
+              onChange={(event) => setHolidayPeriod(event.target.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table
+            headers={['Employee', 'From', 'To', 'Days', 'Status', 'Reason']}
+            rows={selectedLeaveRequests.map((request) => [
+              request.employeeName,
+              formatDateIst(request.startDate),
+              formatDateIst(request.endDate),
+              request.dayCount,
+              request.status,
+              request.reason ?? '-',
+            ])}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Work Activity Summary</CardTitle>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Monthly roll-up from employee daily reports. Use the Work Reports page for daily entry.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Table
+            headers={['Month', 'Employee', 'Reported Days', 'Total DR', 'Total Chemist']}
+            rows={workSummaryRows.map((row) => [
+              new Intl.DateTimeFormat('en-IN', {
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'UTC',
+              }).format(new Date(`${row.month}-01T00:00:00.000Z`)),
+              row.employeeName,
+              row.reports,
+              row.doctors,
+              row.chemists,
+            ])}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">HR Records</CardTitle>
         </CardHeader>
         <CardContent>
@@ -926,6 +1081,20 @@ export function HrManagement({
                   onClick={() => startEmailDocument(record, 'APPOINTMENT_LETTER')}
                 >
                   Email Appointment
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void generateDocument(record.employeeId, 'INCREMENT_LETTER')}
+                >
+                  Increment
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startEmailDocument(record, 'INCREMENT_LETTER')}
+                >
+                  Email Increment
                 </Button>
                 {!record.archivedAt ? (
                   <Button

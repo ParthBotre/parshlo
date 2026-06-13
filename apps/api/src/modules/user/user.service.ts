@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import {
   type CreateMyHrExpenseInput,
   type CreateMyHrWorkLogInput,
+  type EmployeeExpenseSlipDownloadResponse,
   type EmployeeSalarySlipDownloadResponse,
+  type HrExpenseAllowanceSummaryView,
   type HrExpenseView,
   type HrSalarySlipView,
   type HrWorkLogView,
@@ -20,11 +22,18 @@ function parseDateOnly(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function expenseMonthBounds(value: string): { start: Date; end: Date } {
-  const date = parseDateOnly(value);
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-  return { start, end };
+function monthBounds(value: string): { start: Date; end: Date } {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    throw new BadRequestException({
+      code: 'INVALID_PERIOD_MONTH',
+      message: 'Use YYYY-MM month format.',
+    });
+  }
+  const [year, month] = value.split('-').map((part) => Number.parseInt(part, 10));
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
+  };
 }
 
 function formatDisplayDate(value: Date | null): string {
@@ -102,6 +111,7 @@ export class UserService {
 
   async upsertWorkLog(employeeId: string, input: CreateMyHrWorkLogInput): Promise<HrWorkLogView> {
     const workDate = parseDateOnly(input.workDate);
+    await this.assertCanSubmitWorkLog(employeeId, workDate);
     const totalDoctors = input.orthCalls + input.mdCalls + input.gpCalls + input.otherCalls;
     const data = {
       worked: input.worked,
@@ -124,23 +134,6 @@ export class UserService {
   }
 
   async createExpense(employeeId: string, input: CreateMyHrExpenseInput): Promise<HrExpenseView> {
-    const { start, end } = expenseMonthBounds(input.expenseDate);
-    const monthlyTotal = await this.prisma.employeeExpense.aggregate({
-      where: {
-        employeeId,
-        status: { not: 'REJECTED' },
-        expenseDate: { gte: start, lte: end },
-      },
-      _sum: { amountPaise: true },
-    });
-    const nextTotalPaise = toNumber(monthlyTotal._sum.amountPaise ?? 0) + input.amountPaise;
-    if (nextTotalPaise > 1_500_000) {
-      throw new BadRequestException({
-        code: 'EXPENSE_LIMIT_EXCEEDED',
-        message: 'Monthly expenses cannot exceed Rs. 15,000.',
-      });
-    }
-
     const expense = await this.prisma.employeeExpense.create({
       data: {
         employeeId,
@@ -154,6 +147,13 @@ export class UserService {
       include: { employee: { select: { fullName: true } } },
     });
     return this.toExpenseView(expense);
+  }
+
+  async expenseAllowanceSummary(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<HrExpenseAllowanceSummaryView> {
+    return this.buildExpenseAllowanceSummary(employeeId, periodMonth);
   }
 
   async downloadSalarySlip(
@@ -182,6 +182,47 @@ export class UserService {
 
     return {
       salarySlip,
+      fileName,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async downloadExpenseSlip(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<EmployeeExpenseSlipDownloadResponse> {
+    const { start, end } = monthBounds(periodMonth);
+    const [summary, employee, expenses] = await Promise.all([
+      this.buildExpenseAllowanceSummary(employeeId, periodMonth),
+      this.prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { fullName: true, email: true, hrRecord: { select: { employeeCode: true } } },
+      }),
+      this.prisma.employeeExpense.findMany({
+        where: {
+          employeeId,
+          status: 'APPROVED',
+          expenseDate: { gte: start, lte: end },
+        },
+        include: { employee: { select: { fullName: true } } },
+        orderBy: [{ expenseDate: 'asc' }, { createdAt: 'asc' }],
+      }),
+    ]);
+    if (!employee) {
+      throw new NotFoundException({ code: 'USER_NOT_FOUND' });
+    }
+    const fileName = `expense_slip_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`;
+    const bytes = await this.renderExpenseSlipPdf(
+      employee.fullName,
+      employee.hrRecord?.employeeCode ?? '-',
+      periodMonth,
+      summary,
+      expenses,
+    );
+    return {
+      periodMonth,
+      summary,
       fileName,
       contentType: 'application/pdf',
       contentBase64: Buffer.from(bytes).toString('base64'),
@@ -236,6 +277,99 @@ export class UserService {
       createdAt: slip.createdAt.toISOString(),
       updatedAt: slip.updatedAt.toISOString(),
     };
+  }
+
+  private async buildExpenseAllowanceSummary(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<HrExpenseAllowanceSummaryView> {
+    const { start, end } = monthBounds(periodMonth);
+    const [record, workingDays, approvedExtras, pendingExtras] = await Promise.all([
+      this.prisma.employeeHrRecord.findUnique({
+        where: { employeeId },
+        include: { employee: { select: { fullName: true } } },
+      }),
+      this.prisma.employeeWorkLog.count({
+        where: { employeeId, worked: true, workDate: { gte: start, lte: end } },
+      }),
+      this.prisma.employeeExpense.aggregate({
+        where: {
+          employeeId,
+          status: 'APPROVED',
+          expenseDate: { gte: start, lte: end },
+        },
+        _sum: { amountPaise: true },
+      }),
+      this.prisma.employeeExpense.aggregate({
+        where: {
+          employeeId,
+          status: 'PENDING',
+          expenseDate: { gte: start, lte: end },
+        },
+        _sum: { amountPaise: true },
+      }),
+    ]);
+    if (!record) {
+      throw new NotFoundException({
+        code: 'HR_RECORD_NOT_FOUND',
+        message: 'HR allowance settings are not configured for this employee.',
+      });
+    }
+
+    const dailyAllowancePaise = toNumber(record.dailyAllowancePaise);
+    const petrolAllowancePaise = toNumber(record.petrolAllowancePaise);
+    const mobileAllowancePaise = toNumber(record.mobileAllowancePaise);
+    const monthlyAllowanceCapPaise = toNumber(record.allowanceMonthlyPaise);
+    const fixedAllowancePaise = petrolAllowancePaise + mobileAllowancePaise;
+    const calculatedDailyAllowancePaise = Math.max(
+      0,
+      Math.min(dailyAllowancePaise * workingDays, monthlyAllowanceCapPaise - fixedAllowancePaise),
+    );
+    const calculatedAllowancePaise =
+      calculatedDailyAllowancePaise + petrolAllowancePaise + mobileAllowancePaise;
+    const approvedExtraExpensePaise = toNumber(approvedExtras._sum.amountPaise ?? 0);
+    const pendingExtraExpensePaise = toNumber(pendingExtras._sum.amountPaise ?? 0);
+
+    return {
+      periodMonth,
+      employeeId,
+      employeeName: record.employee.fullName,
+      workingDays,
+      dailyAllowancePaise,
+      petrolAllowancePaise,
+      mobileAllowancePaise,
+      monthlyAllowanceCapPaise,
+      calculatedDailyAllowancePaise,
+      calculatedAllowancePaise,
+      approvedExtraExpensePaise,
+      pendingExtraExpensePaise,
+      totalApprovedPayablePaise: calculatedAllowancePaise + approvedExtraExpensePaise,
+    };
+  }
+
+  private async assertCanSubmitWorkLog(employeeId: string, workDate: Date): Promise<void> {
+    const [leaveCount, holidayCount] = await Promise.all([
+      this.prisma.employeeLeaveRequest.count({
+        where: {
+          employeeId,
+          status: 'APPROVED',
+          startDate: { lte: workDate },
+          endDate: { gte: workDate },
+        },
+      }),
+      this.prisma.companyHoliday.count({
+        where: {
+          isActive: true,
+          holidayDate: workDate,
+        },
+      }),
+    ]);
+    if (leaveCount > 0 || holidayCount > 0) {
+      throw new BadRequestException({
+        code: 'WORK_LOG_BLOCKED_ON_HOLIDAY',
+        message: 'Work reports cannot be submitted for approved leave or company holidays.',
+      });
+    }
   }
 
   private toExpenseView(expense: {
@@ -437,6 +571,99 @@ export class UserService {
     draw('Division : PARSHLO', 500, y);
     y -= 22;
     draw(`Region : ${region}`, 500, y);
+
+    return pdf.save();
+  }
+
+  private async renderExpenseSlipPdf(
+    employeeName: string,
+    employeeCode: string,
+    periodMonth: string,
+    summary: HrExpenseAllowanceSummaryView,
+    expenses: {
+      expenseDate: Date;
+      type: string;
+      amountPaise: bigint;
+      description: string | null;
+      billKey: string | null;
+    }[],
+  ): Promise<Uint8Array> {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([842, 595]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const draw = (text: string, x: number, y: number, size = 9, useBold = false): void => {
+      page.drawText(text, {
+        x,
+        y,
+        size,
+        font: useBold ? bold : font,
+        color: rgb(0.06, 0.07, 0.08),
+      });
+    };
+    const line = (y: number): void => {
+      page.drawLine({ start: { x: 36, y }, end: { x: 806, y }, thickness: 0.6 });
+    };
+    const monthYear = formatMonthYear(parseDateOnly(`${periodMonth}-01`)).toUpperCase();
+
+    page.drawRectangle({
+      x: 36,
+      y: 520,
+      width: 770,
+      height: 48,
+      borderWidth: 1,
+      color: rgb(0.96, 0.98, 0.97),
+      borderColor: rgb(0.1, 0.18, 0.15),
+    });
+    draw('PARSHLO', 56, 548, 14, true);
+    draw(`EXPENSE SLIP FOR ${monthYear}`, 310, 548, 11, true);
+    draw(`EMPLOYEE: ${employeeName}`, 56, 520, 9, true);
+    draw(`EMPLOYEE NO.: ${employeeCode}`, 520, 520, 9, true);
+
+    let y = 480;
+    draw(`WORKED DAYS: ${summary.workingDays}`, 44, y, 9, true);
+    draw(`DAILY ALLOWANCE: ${formatInr(summary.dailyAllowancePaise)} / DAY`, 200, y, 9, true);
+    draw(`MONTHLY CAP: ${formatInr(summary.monthlyAllowanceCapPaise)}`, 520, y, 9, true);
+    y -= 28;
+    draw('AUTOMATIC ALLOWANCE', 44, y, 9, true);
+    line(y - 8);
+    y -= 24;
+    draw('Daily allowance', 44, y);
+    draw(`${summary.workingDays} worked day(s)`, 280, y);
+    draw(formatInr(summary.calculatedDailyAllowancePaise), 700, y);
+    y -= 22;
+    draw('Petrol allowance', 44, y);
+    draw('Monthly fixed', 280, y);
+    draw(formatInr(summary.petrolAllowancePaise), 700, y);
+    y -= 22;
+    draw('Mobile allowance', 44, y);
+    draw('Monthly fixed', 280, y);
+    draw(formatInr(summary.mobileAllowancePaise), 700, y);
+    y -= 30;
+
+    draw('APPROVED EXTRA CLAIMS', 44, y, 9, true);
+    y -= 24;
+    draw('DATE', 44, y, 9, true);
+    draw('TYPE', 150, y, 9, true);
+    draw('DESCRIPTION', 280, y, 9, true);
+    draw('BILL', 560, y, 9, true);
+    draw('AMOUNT', 700, y, 9, true);
+    line(y - 8);
+    y -= 28;
+
+    for (const expense of expenses) {
+      if (y < 86) break;
+      draw(formatDisplayDate(expense.expenseDate), 44, y);
+      draw(expense.type.replace(/_/g, ' '), 150, y);
+      draw((expense.description ?? '-').slice(0, 42), 280, y);
+      draw((expense.billKey ?? '-').slice(0, 18), 560, y);
+      draw(formatInr(expense.amountPaise), 700, y);
+      y -= 22;
+    }
+
+    line(78);
+    draw(`TOTAL PAYABLE: ${formatInr(summary.totalApprovedPayablePaise)}`, 560, 56, 10, true);
+    draw('This is a computer generated expense slip.', 44, 56, 8);
 
     return pdf.save();
   }

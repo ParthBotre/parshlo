@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   type AuthPrincipal,
@@ -7,6 +7,8 @@ import {
   type CreateMyHrExpenseInput,
   type CreateMyHrWorkLogInput,
   type EmployeeSalarySlipDownloadResponse,
+  type EmployeeExpenseSlipDownloadResponse,
+  type HrExpenseAllowanceSummaryView,
   type HrExpenseView,
   type HrSalarySlipView,
   type HrWorkLogView,
@@ -45,6 +47,22 @@ export class UserController {
   @Get('me/expenses')
   expenses(@CurrentUser() user: AuthPrincipal): Promise<HrExpenseView[]> {
     return this.userService.listExpenses(user.userId);
+  }
+
+  @Get('me/expenses/summary')
+  expenseSummary(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('periodMonth') periodMonth: string,
+  ): Promise<HrExpenseAllowanceSummaryView> {
+    return this.userService.expenseAllowanceSummary(user.userId, periodMonth);
+  }
+
+  @Get('me/expenses/slip')
+  downloadExpenseSlip(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('periodMonth') periodMonth: string,
+  ): Promise<EmployeeExpenseSlipDownloadResponse> {
+    return this.userService.downloadExpenseSlip(user.userId, periodMonth);
   }
 
   @Post('me/expenses')

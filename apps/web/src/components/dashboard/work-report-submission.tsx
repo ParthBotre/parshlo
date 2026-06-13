@@ -29,6 +29,15 @@ function stringValue(form: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+function weekKey(date: string): string {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  const day = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((value.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${value.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
 export function WorkReportSubmission({
   initialReports,
 }: {
@@ -42,6 +51,30 @@ export function WorkReportSubmission({
   const [gp, setGp] = useState(0);
   const [others, setOthers] = useState(0);
   const totalDoctors = useMemo(() => orth + md + gp + others, [gp, md, orth, others]);
+  const summaries = useMemo(() => {
+    const build = (keyFor: (report: MyWorkLog) => string) => {
+      const rows = new Map<
+        string,
+        { label: string; days: number; doctors: number; chemists: number }
+      >();
+      for (const report of reports) {
+        const key = keyFor(report);
+        const current = rows.get(key) ?? { label: key, days: 0, doctors: 0, chemists: 0 };
+        current.days += report.worked ? 1 : 0;
+        current.doctors += report.totalDoctors;
+        current.chemists += report.totalChemist;
+        rows.set(key, current);
+      }
+      return Array.from(rows.values())
+        .sort((a, b) => b.label.localeCompare(a.label))
+        .slice(0, 6);
+    };
+    return {
+      weekly: build((report) => weekKey(report.workDate)),
+      monthly: build((report) => report.workDate.slice(0, 7)),
+      yearly: build((report) => report.workDate.slice(0, 4)),
+    };
+  }, [reports]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -180,6 +213,30 @@ export function WorkReportSubmission({
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {[
+          ['Weekly', summaries.weekly],
+          ['Monthly', summaries.monthly],
+          ['Yearly', summaries.yearly],
+        ].map(([label, rows]) => (
+          <Card key={label as string}>
+            <CardContent className="p-4">
+              <h2 className="text-sm font-semibold">{label as string} summary</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                {(rows as typeof summaries.weekly).map((row) => (
+                  <div key={row.label} className="rounded-md border p-3">
+                    <div className="font-medium">{row.label}</div>
+                    <div className="text-muted-foreground mt-1">
+                      {row.days} days · {row.doctors} DR · {row.chemists} chemists
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

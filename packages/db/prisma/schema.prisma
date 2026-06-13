@@ -494,6 +494,7 @@ model CompanyHoliday {
 enum HrDocumentType {
   OFFER_LETTER
   APPOINTMENT_LETTER
+  INCREMENT_LETTER
   SALARY_SLIP
   EXPENSE_BILL
 }
@@ -518,6 +519,7 @@ model EmployeeHrRecord {
 
   employeeCode                 String    @unique
   serialNumber                 Int?
+  namePrefix                   String?
   roleTitle                    String
   address                      String    @db.Text
   headQuarter                  String

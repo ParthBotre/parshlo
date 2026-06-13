@@ -1,7 +1,9 @@
 import {
   CreateMyHrExpenseInputSchema,
   CreateMyHrWorkLogInputSchema,
+  EmployeeExpenseSlipDownloadResponse,
   EmployeeSalarySlipDownloadResponse,
+  HrExpenseAllowanceSummaryView,
   HrExpenseView,
   HrSalarySlipView,
   HrWorkLogView,
@@ -17,6 +19,8 @@ export const MyExpenseList = z.array(HrExpenseView);
 export const MyWorkLogList = z.array(HrWorkLogView);
 export type MySalarySlip = z.infer<typeof HrSalarySlipView>;
 export type MySalarySlipDownload = z.infer<typeof EmployeeSalarySlipDownloadResponse>;
+export type MyExpenseSlipDownload = z.infer<typeof EmployeeExpenseSlipDownloadResponse>;
+export type MyExpenseAllowanceSummary = z.infer<typeof HrExpenseAllowanceSummaryView>;
 export type MyExpense = z.infer<typeof HrExpenseView>;
 export type MyWorkLog = z.infer<typeof HrWorkLogView>;
 
@@ -69,6 +73,38 @@ export function createMyExpense(
     body: CreateMyHrExpenseInputSchema.parse(input),
     ...options,
   });
+}
+
+export function getMyExpenseAllowanceSummary(
+  accessToken: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<MyExpenseAllowanceSummary> {
+  return apiCall(
+    `/v1/users/me/expenses/summary?periodMonth=${encodeURIComponent(periodMonth)}`,
+    HrExpenseAllowanceSummaryView,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
+}
+
+export function downloadMyExpenseSlip(
+  accessToken: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<MyExpenseSlipDownload> {
+  return apiCall(
+    `/v1/users/me/expenses/slip?periodMonth=${encodeURIComponent(periodMonth)}`,
+    EmployeeExpenseSlipDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
 }
 
 export function listMyWorkLogs(

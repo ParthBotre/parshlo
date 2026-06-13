@@ -218,7 +218,7 @@ export function renderLeaveRequestReviewed(d: LeaveRequestData): Rendered {
 
 export interface HrDocumentReadyData {
   employeeName: string;
-  documentType: 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'SALARY_SLIP';
+  documentType: 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'INCREMENT_LETTER' | 'SALARY_SLIP';
   referenceNumber: string;
 }
 
@@ -228,7 +228,9 @@ export function renderHrDocumentReady(d: HrDocumentReadyData): Rendered {
       ? 'Offer letter'
       : d.documentType === 'APPOINTMENT_LETTER'
         ? 'Appointment letter'
-        : 'Salary slip';
+        : d.documentType === 'INCREMENT_LETTER'
+          ? 'Increment letter'
+          : 'Salary slip';
   const body = `
     <p>Hi ${d.employeeName},</p>
     <p>Your <strong>${label}</strong> is attached to this email.</p>
