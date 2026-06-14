@@ -126,6 +126,7 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
   const [expenses, setExpenses] = useState(initialExpenses);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [slipMonth, setSlipMonth] = useState(currentPeriodMonth);
   const [summary, setSummary] = useState<ExpenseAllowanceSummary | null>(null);
   const monthTotalPaise = useMemo(() => {
@@ -139,6 +140,7 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
   useEffect(() => {
     let cancelled = false;
     async function loadSummary(): Promise<void> {
+      setSummaryError(null);
       try {
         const res = await fetch(
           `/api/dashboard/expenses/summary?periodMonth=${encodeURIComponent(slipMonth)}`,
@@ -147,7 +149,14 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
         if (!res.ok) throw new Error(readProblem(json, 'Could not load expense allowance.'));
         if (!cancelled) setSummary(json as ExpenseAllowanceSummary);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load allowance.');
+        if (!cancelled) {
+          setSummary(null);
+          setSummaryError(
+            err instanceof Error && err.message
+              ? err.message
+              : 'Allowance settings are not available yet.',
+          );
+        }
       }
     }
     void loadSummary();
@@ -167,7 +176,6 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
       amountPaise: rupeesToPaise(form.get('amount')),
       description: formString(form, 'description') || null,
       billKey: formString(form, 'billKey') || null,
-      billContentType: null,
     };
     try {
       const res = await fetch('/api/dashboard/expenses', {
@@ -181,7 +189,11 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
       event.currentTarget.reset();
       setMessage('Expense submitted for Super Admin review.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit expense.');
+      setError(
+        err instanceof Error && err.message && !err.message.includes('[')
+          ? err.message
+          : 'Could not submit expense for review. Please check the date and amount, then try again.',
+      );
     }
   }
 
@@ -213,6 +225,11 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
             Normal expenses are calculated automatically from approved HR allowances and submitted
             work reports.
           </p>
+          {summaryError ? (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {summaryError}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

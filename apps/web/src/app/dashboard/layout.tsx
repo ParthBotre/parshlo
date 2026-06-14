@@ -61,7 +61,7 @@ export default async function DashboardLayout({
   return (
     <div className="container px-4 py-6 sm:px-6 md:py-12">
       <div className="grid gap-8 md:grid-cols-[220px_1fr]">
-        <aside className="md:sticky md:top-24 md:self-start">
+        <aside className="md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:self-start md:overflow-y-auto md:pr-1">
           <div
             className={
               isStaff
