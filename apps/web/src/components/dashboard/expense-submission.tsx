@@ -14,6 +14,21 @@ import { formatINR } from '@/lib/utils';
 const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+const MONTH_OPTIONS = [
+  ['01', 'January'],
+  ['02', 'February'],
+  ['03', 'March'],
+  ['04', 'April'],
+  ['05', 'May'],
+  ['06', 'June'],
+  ['07', 'July'],
+  ['08', 'August'],
+  ['09', 'September'],
+  ['10', 'October'],
+  ['11', 'November'],
+  ['12', 'December'],
+] as const;
+
 interface ExpenseAllowanceSummary {
   periodMonth: string;
   workingDays: number;
@@ -59,14 +74,59 @@ function downloadBase64Pdf(fileName: string, contentBase64: string): void {
   URL.revokeObjectURL(url);
 }
 
+function currentPeriodMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function yearOptions(): string[] {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, index) => String(currentYear - 1 + index));
+}
+
+function MonthYearSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const [year, month] = value.split('-');
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:w-[260px]">
+      <select
+        aria-label="Expense month"
+        className={SELECT_CLASS}
+        value={month}
+        onChange={(event) => onChange(`${year}-${event.target.value}`)}
+      >
+        {MONTH_OPTIONS.map(([monthValue, label]) => (
+          <option key={monthValue} value={monthValue}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Expense year"
+        className={SELECT_CLASS}
+        value={year}
+        onChange={(event) => onChange(`${event.target.value}-${month}`)}
+      >
+        {yearOptions().map((yearOption) => (
+          <option key={yearOption} value={yearOption}>
+            {yearOption}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpense[] }) {
   const [expenses, setExpenses] = useState(initialExpenses);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [slipMonth, setSlipMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [slipMonth, setSlipMonth] = useState(currentPeriodMonth);
   const [summary, setSummary] = useState<ExpenseAllowanceSummary | null>(null);
   const monthTotalPaise = useMemo(() => {
     return expenses
@@ -175,8 +235,9 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
             />
           </div>
           <p className="text-muted-foreground mt-3 text-xs">
-            Daily allowance is {summary ? formatINR(summary.dailyAllowancePaise) : '-'} per worked
-            day and is capped by the HR monthly allowance setting of{' '}
+            Mobile and petrol are included automatically every month. Daily allowance is{' '}
+            {summary ? formatINR(summary.dailyAllowancePaise) : '-'} per worked day and is capped by
+            the HR monthly allowance setting of{' '}
             {summary ? formatINR(summary.monthlyAllowanceCapPaise) : '-'}.
           </p>
         </CardContent>
@@ -231,18 +292,14 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
         <CardHeader>
           <CardTitle className="text-base">My Extra Claims</CardTitle>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              type="month"
-              className="sm:w-48"
-              value={slipMonth}
-              onChange={(event) => setSlipMonth(event.target.value)}
-            />
+            <MonthYearSelect value={slipMonth} onChange={setSlipMonth} />
             <Button type="button" variant="outline" onClick={() => void downloadExpenseSlip()}>
               Download Expense Slip
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Current month extra claims submitted: {formatINR(monthTotalPaise)}.
+            Expense slip includes automatic daily allowance, petrol, mobile, and approved extra
+            claims. Selected month extra claims submitted: {formatINR(monthTotalPaise)}.
           </p>
         </CardHeader>
         <CardContent className="p-0">

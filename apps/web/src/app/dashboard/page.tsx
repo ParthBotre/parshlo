@@ -1,6 +1,7 @@
 import { ArrowRight, BadgeCheck, PackageSearch, ScrollText, ShieldCheck } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,8 +17,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SALES_MANAGER']);
+
 export default async function DashboardOverview(): Promise<JSX.Element> {
   const session = await getSession();
+  if (session?.user.roles.some((role) => STAFF_ROLES.has(role))) {
+    redirect('/admin');
+  }
   let orders: Awaited<ReturnType<typeof listMyOrders>> = [];
   try {
     if (session) {

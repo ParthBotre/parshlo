@@ -259,6 +259,7 @@ export function HrManagement({
   const [salaryPeriod, setSalaryPeriod] = useState(currentPeriodMonth);
   const [holidayPeriod, setHolidayPeriod] = useState(currentPeriodMonth);
   const [workPeriod, setWorkPeriod] = useState(currentPeriodMonth);
+  const [workEmployeeId, setWorkEmployeeId] = useState('all');
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
@@ -289,6 +290,7 @@ export function HrManagement({
     >();
     for (const log of dashboard.workLogs) {
       if (log.workDate.slice(0, 7) !== workPeriod) continue;
+      if (workEmployeeId !== 'all' && log.employeeId !== workEmployeeId) continue;
       const key = log.employeeId;
       const current = rows.get(key) ?? {
         employeeName: log.employeeName,
@@ -311,7 +313,7 @@ export function HrManagement({
         avgChemists: row.reports > 0 ? row.chemists / row.reports : 0,
       }))
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [dashboard.workLogs, workPeriod]);
+  }, [dashboard.workLogs, workEmployeeId, workPeriod]);
   const maxWorkReports = Math.max(1, ...workSummaryRows.map((row) => row.reports));
   const maxWorkDoctors = Math.max(1, ...workSummaryRows.map((row) => row.doctors));
   const maxWorkChemists = Math.max(1, ...workSummaryRows.map((row) => row.chemists));
@@ -1057,7 +1059,22 @@ export function HrManagement({
                 Employee-wise roll-up from daily reports for the selected month.
               </p>
             </div>
-            <MonthYearSelect value={workPeriod} onChange={setWorkPeriod} />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select
+                aria-label="Work activity employee"
+                className={SELECT_CLASS}
+                value={workEmployeeId}
+                onChange={(event) => setWorkEmployeeId(event.target.value)}
+              >
+                <option value="all">All employees</option>
+                {activeRecords.map((record) => (
+                  <option key={record.employeeId} value={record.employeeId}>
+                    {record.employeeName}
+                  </option>
+                ))}
+              </select>
+              <MonthYearSelect value={workPeriod} onChange={setWorkPeriod} />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
