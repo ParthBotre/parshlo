@@ -277,6 +277,43 @@ export const GenerateHrSalarySlipResponse = z.object({
 });
 export type GenerateHrSalarySlipResponse = z.infer<typeof GenerateHrSalarySlipResponse>;
 
+export const HrExpenseSlipView = z.object({
+  id: EntityId,
+  employeeId: EntityId,
+  employeeName: z.string(),
+  periodMonth: LeaveDateString,
+  workingDays: z.number().int().min(0),
+  dailyAllowancePaise: HrMoneyPaise,
+  petrolAllowancePaise: HrMoneyPaise,
+  mobileAllowancePaise: HrMoneyPaise,
+  monthlyAllowanceCapPaise: HrMoneyPaise,
+  calculatedDailyAllowancePaise: HrMoneyPaise,
+  calculatedAllowancePaise: HrMoneyPaise,
+  approvedExtraExpensePaise: HrMoneyPaise,
+  pendingExtraExpensePaise: HrMoneyPaise,
+  totalPayablePaise: HrMoneyPaise,
+  transactionDate: LeaveDateString.nullable(),
+  transactionReference: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: IsoDateString,
+  updatedAt: IsoDateString,
+});
+export type HrExpenseSlipView = z.infer<typeof HrExpenseSlipView>;
+
+export const GenerateHrExpenseSlipInputSchema = z.object({
+  employeeId: EntityId,
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/, { message: 'Use YYYY-MM month format.' }),
+  transactionDate: LeaveDateString.optional().nullable(),
+  transactionReference: z.string().trim().max(120).optional().nullable(),
+  notes: z.string().trim().max(1000).optional().nullable(),
+});
+export type GenerateHrExpenseSlipInput = z.infer<typeof GenerateHrExpenseSlipInputSchema>;
+
+export const GenerateHrExpenseSlipResponse = z.object({
+  expenseSlip: HrExpenseSlipView,
+});
+export type GenerateHrExpenseSlipResponse = z.infer<typeof GenerateHrExpenseSlipResponse>;
+
 export const EmployeeSalarySlipDownloadResponse = z.object({
   salarySlip: HrSalarySlipView,
   fileName: z.string(),
@@ -286,8 +323,7 @@ export const EmployeeSalarySlipDownloadResponse = z.object({
 export type EmployeeSalarySlipDownloadResponse = z.infer<typeof EmployeeSalarySlipDownloadResponse>;
 
 export const EmployeeExpenseSlipDownloadResponse = z.object({
-  periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
-  summary: HrExpenseAllowanceSummaryView,
+  expenseSlip: HrExpenseSlipView,
   fileName: z.string(),
   contentType: z.literal('application/pdf'),
   contentBase64: z.string(),
@@ -300,6 +336,7 @@ export const HrDashboardView = z.object({
   records: z.array(HrEmployeeRecordView),
   documents: z.array(HrDocumentView),
   salarySlips: z.array(HrSalarySlipView),
+  expenseSlips: z.array(HrExpenseSlipView),
   expenses: z.array(HrExpenseView),
   workLogs: z.array(HrWorkLogView),
   leaveRequests: z.array(EmployeeLeaveRequestView),

@@ -21,6 +21,7 @@ import {
   CreateHrExpenseInputSchema,
   EmailHrDocumentInputSchema,
   CreateLeaveRequestInputSchema,
+  GenerateHrExpenseSlipInputSchema,
   GenerateHrDocumentInputSchema,
   GenerateHrSalarySlipInputSchema,
   AdminUpdateBuyerInputSchema,
@@ -42,6 +43,7 @@ import {
   type CreateHrExpenseInput,
   type EmailHrDocumentInput,
   type CreateLeaveRequestInput,
+  type GenerateHrExpenseSlipInput,
   type GenerateHrDocumentInput,
   type GenerateHrSalarySlipInput,
   type AdminUpdateBuyerInput,
@@ -447,6 +449,31 @@ export class AdminController {
   })
   deleteHrSalarySlip(@Param('id') id: string): ReturnType<AdminService['deleteHrSalarySlip']> {
     return this.admin.deleteHrSalarySlip(id);
+  }
+
+  @Post('hr/expense-slips')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'hr.expense_slip.generate',
+    resource: 'EmployeeExpenseSlip',
+    resolveResourceId: (_req, result) =>
+      (result as { expenseSlip?: { id?: string } }).expenseSlip?.id,
+  })
+  generateHrExpenseSlip(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(GenerateHrExpenseSlipInputSchema))
+    body: GenerateHrExpenseSlipInput,
+  ): ReturnType<AdminService['generateHrExpenseSlip']> {
+    return this.admin.generateHrExpenseSlip(user.userId, body);
+  }
+
+  @Get('hr/expense-slips/:id/download')
+  @RequireRoles('SUPER_ADMIN')
+  downloadHrExpenseSlip(
+    @Param('id') id: string,
+  ): ReturnType<AdminService['downloadHrExpenseSlip']> {
+    return this.admin.downloadHrExpenseSlip(id);
   }
 
   @Post('hr/expenses')

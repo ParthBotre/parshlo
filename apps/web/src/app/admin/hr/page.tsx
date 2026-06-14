@@ -18,6 +18,7 @@ export default async function HrPage(): Promise<JSX.Element> {
     records: [],
     documents: [],
     salarySlips: [],
+    expenseSlips: [],
     expenses: [],
     workLogs: [],
     leaveRequests: [],

@@ -24,6 +24,7 @@ export default async function AdminExpensesPage(): Promise<JSX.Element> {
     records: [],
     documents: [],
     salarySlips: [],
+    expenseSlips: [],
     expenses: [],
     workLogs: [],
     leaveRequests: [],

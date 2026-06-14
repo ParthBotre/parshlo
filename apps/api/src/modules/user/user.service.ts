@@ -5,6 +5,7 @@ import {
   type EmployeeExpenseSlipDownloadResponse,
   type EmployeeSalarySlipDownloadResponse,
   type HrExpenseAllowanceSummaryView,
+  type HrExpenseSlipView,
   type HrExpenseView,
   type HrSalarySlipView,
   type HrWorkLogView,
@@ -193,8 +194,11 @@ export class UserService {
     periodMonth: string,
   ): Promise<EmployeeExpenseSlipDownloadResponse> {
     const { start, end } = monthBounds(periodMonth);
-    const [summary, employee, expenses] = await Promise.all([
-      this.buildExpenseAllowanceSummary(employeeId, periodMonth),
+    const [slip, employee, expenses] = await Promise.all([
+      this.prisma.employeeExpenseSlip.findFirst({
+        where: { employeeId, periodMonth: start },
+        include: { employee: { select: { fullName: true } } },
+      }),
       this.prisma.user.findUnique({
         where: { id: employeeId },
         select: { fullName: true, email: true, hrRecord: { select: { employeeCode: true } } },
@@ -212,6 +216,14 @@ export class UserService {
     if (!employee) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND' });
     }
+    if (!slip) {
+      throw new NotFoundException({
+        code: 'EXPENSE_SLIP_NOT_READY',
+        message: 'Super Admin has not generated the paid expense slip for this month yet.',
+      });
+    }
+    const expenseSlip = this.toExpenseSlipView(slip);
+    const summary = this.summaryFromExpenseSlip(expenseSlip);
     const fileName = `expense_slip_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`;
     const bytes = await this.renderExpenseSlipPdf(
       employee.fullName,
@@ -219,10 +231,15 @@ export class UserService {
       periodMonth,
       summary,
       expenses,
+      {
+        transactionDate: slip.transactionDate,
+        transactionReference: slip.transactionReference,
+        notes: slip.notes,
+        totalPayablePaise: toNumber(slip.totalPayablePaise),
+      },
     );
     return {
-      periodMonth,
-      summary,
+      expenseSlip,
       fileName,
       contentType: 'application/pdf',
       contentBase64: Buffer.from(bytes).toString('base64'),
@@ -276,6 +293,68 @@ export class UserService {
       notes: slip.notes,
       createdAt: slip.createdAt.toISOString(),
       updatedAt: slip.updatedAt.toISOString(),
+    };
+  }
+
+  private toExpenseSlipView(slip: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    periodMonth: Date;
+    workingDays: number;
+    dailyAllowancePaise: bigint;
+    petrolAllowancePaise: bigint;
+    mobileAllowancePaise: bigint;
+    monthlyAllowanceCapPaise: bigint;
+    calculatedDailyAllowancePaise: bigint;
+    calculatedAllowancePaise: bigint;
+    approvedExtraExpensePaise: bigint;
+    pendingExtraExpensePaise: bigint;
+    totalPayablePaise: bigint;
+    transactionDate: Date | null;
+    transactionReference: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrExpenseSlipView {
+    return {
+      id: slip.id,
+      employeeId: slip.employeeId,
+      employeeName: slip.employee.fullName,
+      periodMonth: formatDateOnly(slip.periodMonth),
+      workingDays: slip.workingDays,
+      dailyAllowancePaise: toNumber(slip.dailyAllowancePaise),
+      petrolAllowancePaise: toNumber(slip.petrolAllowancePaise),
+      mobileAllowancePaise: toNumber(slip.mobileAllowancePaise),
+      monthlyAllowanceCapPaise: toNumber(slip.monthlyAllowanceCapPaise),
+      calculatedDailyAllowancePaise: toNumber(slip.calculatedDailyAllowancePaise),
+      calculatedAllowancePaise: toNumber(slip.calculatedAllowancePaise),
+      approvedExtraExpensePaise: toNumber(slip.approvedExtraExpensePaise),
+      pendingExtraExpensePaise: toNumber(slip.pendingExtraExpensePaise),
+      totalPayablePaise: toNumber(slip.totalPayablePaise),
+      transactionDate: slip.transactionDate ? formatDateOnly(slip.transactionDate) : null,
+      transactionReference: slip.transactionReference,
+      notes: slip.notes,
+      createdAt: slip.createdAt.toISOString(),
+      updatedAt: slip.updatedAt.toISOString(),
+    };
+  }
+
+  private summaryFromExpenseSlip(slip: HrExpenseSlipView): HrExpenseAllowanceSummaryView {
+    return {
+      periodMonth: slip.periodMonth.slice(0, 7),
+      employeeId: slip.employeeId,
+      employeeName: slip.employeeName,
+      workingDays: slip.workingDays,
+      dailyAllowancePaise: slip.dailyAllowancePaise,
+      petrolAllowancePaise: slip.petrolAllowancePaise,
+      mobileAllowancePaise: slip.mobileAllowancePaise,
+      monthlyAllowanceCapPaise: slip.monthlyAllowanceCapPaise,
+      calculatedDailyAllowancePaise: slip.calculatedDailyAllowancePaise,
+      calculatedAllowancePaise: slip.calculatedAllowancePaise,
+      approvedExtraExpensePaise: slip.approvedExtraExpensePaise,
+      pendingExtraExpensePaise: slip.pendingExtraExpensePaise,
+      totalApprovedPayablePaise: slip.totalPayablePaise,
     };
   }
 
@@ -587,6 +666,12 @@ export class UserService {
       description: string | null;
       billKey: string | null;
     }[],
+    payment: {
+      transactionDate: Date | null;
+      transactionReference: string | null;
+      notes: string | null;
+      totalPayablePaise: number;
+    },
   ): Promise<Uint8Array> {
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([842, 595]);
@@ -652,7 +737,7 @@ export class UserService {
     y -= 28;
 
     for (const expense of expenses) {
-      if (y < 86) break;
+      if (y < 130) break;
       draw(formatDisplayDate(expense.expenseDate), 44, y);
       draw(expense.type.replace(/_/g, ' '), 150, y);
       draw((expense.description ?? '-').slice(0, 42), 280, y);
@@ -661,9 +746,13 @@ export class UserService {
       y -= 22;
     }
 
-    line(78);
-    draw(`TOTAL PAYABLE: ${formatInr(summary.totalApprovedPayablePaise)}`, 560, 56, 10, true);
-    draw('This is a computer generated expense slip.', 44, 56, 8);
+    line(104);
+    draw(`NEFT/ DD/ CHQ DATE: ${formatDisplayDate(payment.transactionDate)}`, 44, 82, 8);
+    draw(`NEFT/ DD/ CHQ NO.: ${payment.transactionReference ?? '-'}`, 300, 82, 8);
+    draw(`AMOUNT: ${formatInr(payment.totalPayablePaise)}`, 585, 82, 8);
+    draw(`Remarks: ${payment.notes ?? '-'}`.slice(0, 115), 44, 64, 8);
+    draw(`TOTAL PAYABLE: ${formatInr(summary.totalApprovedPayablePaise)}`, 560, 44, 10, true);
+    draw('This is a computer generated expense slip.', 44, 44, 8);
 
     return pdf.save();
   }

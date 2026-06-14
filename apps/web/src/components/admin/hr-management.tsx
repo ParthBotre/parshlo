@@ -11,6 +11,7 @@ import {
   type AdminEmployee,
   type HrDashboard,
   type HrEmployeeRecord,
+  type HrExpenseSlip,
   type HrSalarySlip,
 } from '@/lib/api/admin';
 import { formatDateIst } from '@/lib/format-datetime';
@@ -253,10 +254,12 @@ export function HrManagement({
 }): JSX.Element {
   const [records, setRecords] = useState(dashboard.records);
   const [salarySlips, setSalarySlips] = useState(dashboard.salarySlips);
+  const [expenseSlips, setExpenseSlips] = useState(dashboard.expenseSlips);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
   const [salaryPeriod, setSalaryPeriod] = useState(currentPeriodMonth);
+  const [expenseSlipPeriod, setExpenseSlipPeriod] = useState(currentPeriodMonth);
   const [holidayPeriod, setHolidayPeriod] = useState(currentPeriodMonth);
   const [workPeriod, setWorkPeriod] = useState(currentPeriodMonth);
   const [workEmployeeId, setWorkEmployeeId] = useState('all');
@@ -276,6 +279,10 @@ export function HrManagement({
   const selectedSalarySlips = useMemo(
     () => salarySlips.filter((slip) => slip.periodMonth.slice(0, 7) === salaryPeriod),
     [salarySlips, salaryPeriod],
+  );
+  const selectedExpenseSlips = useMemo(
+    () => expenseSlips.filter((slip) => slip.periodMonth.slice(0, 7) === expenseSlipPeriod),
+    [expenseSlipPeriod, expenseSlips],
   );
   const workSummaryRows = useMemo(() => {
     const rows = new Map<
@@ -560,6 +567,47 @@ export function HrManagement({
       setMessage('Salary slip deleted.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete salary slip.');
+    }
+  }
+
+  async function saveExpenseSlip(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      const result = await submitJson<{ expenseSlip: HrExpenseSlip }>(
+        '/api/admin/hr/expense-slips',
+        'POST',
+        {
+          employeeId: formString(form, 'employeeId'),
+          periodMonth: `${formString(form, 'periodYear')}-${formString(form, 'periodMonth')}`,
+          transactionDate: formString(form, 'transactionDate'),
+          transactionReference: formString(form, 'transactionReference'),
+          notes: formString(form, 'notes'),
+        },
+        'Could not generate expense slip.',
+      );
+      setExpenseSlips((current) => [
+        result.expenseSlip,
+        ...current.filter((slip) => slip.id !== result.expenseSlip.id),
+      ]);
+      setExpenseSlipPeriod(result.expenseSlip.periodMonth.slice(0, 7));
+      setMessage('Expense slip saved. Employees can now download it from their Expenses page.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not generate expense slip.');
+    }
+  }
+
+  async function downloadExpenseSlip(slipId: string): Promise<void> {
+    try {
+      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+        `/api/admin/hr/expense-slips/${encodeURIComponent(slipId)}/download`,
+        'GET',
+        undefined,
+        'Could not download expense slip.',
+      );
+      downloadBase64Pdf(result.fileName, result.contentBase64);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download expense slip.');
     }
   }
 
@@ -1018,6 +1066,109 @@ export function HrManagement({
                   Delete
                 </Button>
               </div>,
+            ])}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Expense Slip</CardTitle>
+          <p className="text-muted-foreground text-sm">
+            Save month-end reimbursement after payment. This includes daily allowance, petrol,
+            mobile, and approved extra claims.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            onSubmit={(event) => void saveExpenseSlip(event)}
+          >
+            <RecordSelect records={activeRecords} />
+            <Field label="Month">
+              <select name="periodMonth" className={SELECT_CLASS} required defaultValue="">
+                <option value="" disabled>
+                  Choose month
+                </option>
+                {MONTH_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Year">
+              <select name="periodYear" className={SELECT_CLASS} required defaultValue="">
+                <option value="" disabled>
+                  Choose year
+                </option>
+                {salaryYearOptions().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Transaction date">
+              <Input name="transactionDate" type="date" />
+            </Field>
+            <Field label="Transaction ref">
+              <Input name="transactionReference" />
+            </Field>
+            <Field label="Notes">
+              <Input name="notes" />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Button type="submit">Save Expense Slip</Button>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Worked days come from employee work reports. Mobile and petrol are included
+                automatically from HR allowance settings.
+              </p>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Saved Expense Slips</CardTitle>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Select a month and year to review paid reimbursement slips.
+              </p>
+            </div>
+            <MonthYearSelect value={expenseSlipPeriod} onChange={setExpenseSlipPeriod} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table
+            headers={[
+              'Month',
+              'Employee',
+              'Worked Days',
+              'Auto Allowance',
+              'Extra Claims',
+              'Transaction',
+              'Amount',
+              'Action',
+            ]}
+            rows={selectedExpenseSlips.map((slip) => [
+              periodLabel(slip.periodMonth),
+              slip.employeeName,
+              slip.workingDays,
+              formatINR(slip.calculatedAllowancePaise),
+              formatINR(slip.approvedExtraExpensePaise),
+              slip.transactionReference ?? '-',
+              formatINR(slip.totalPayablePaise),
+              <Button
+                key={slip.id}
+                size="sm"
+                variant="outline"
+                onClick={() => void downloadExpenseSlip(slip.id)}
+              >
+                Download
+              </Button>,
             ])}
           />
         </CardContent>

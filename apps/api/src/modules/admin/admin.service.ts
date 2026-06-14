@@ -18,6 +18,8 @@ import {
   type EmailHrDocumentInput,
   type EmailHrDocumentResponse,
   type CreateLeaveRequestInput,
+  type GenerateHrExpenseSlipInput,
+  type GenerateHrExpenseSlipResponse,
   type GenerateHrDocumentInput,
   type GenerateHrDocumentResponse,
   type GenerateHrSalarySlipInput,
@@ -32,6 +34,8 @@ import {
   type HrDashboardView,
   type HrDocumentView,
   type HrEmployeeRecordView,
+  type HrExpenseAllowanceSummaryView,
+  type HrExpenseSlipView,
   type HrExpenseView,
   type HrSalarySlipView,
   type HrWorkLogView,
@@ -969,44 +973,51 @@ export class AdminService {
   }
 
   async hrDashboard(): Promise<HrDashboardView> {
-    const [records, documents, salarySlips, expenses, workLogs, leaveRequests] = await Promise.all([
-      this.prisma.employeeHrRecord.findMany({
-        include: { employee: { select: { id: true, fullName: true, email: true } } },
-        orderBy: [{ archivedAt: 'asc' }, { employeeCode: 'asc' }],
-      }),
-      this.prisma.employeeHrDocument.findMany({
-        take: 50,
-        orderBy: { generatedAt: 'desc' },
-      }),
-      this.prisma.employeeSalarySlip.findMany({
-        take: 50,
-        include: { employee: { select: { fullName: true } } },
-        orderBy: [{ periodMonth: 'desc' }, { createdAt: 'desc' }],
-      }),
-      this.prisma.employeeExpense.findMany({
-        take: 100,
-        include: { employee: { select: { fullName: true } } },
-        orderBy: [{ status: 'asc' }, { expenseDate: 'desc' }],
-      }),
-      this.prisma.employeeWorkLog.findMany({
-        take: 100,
-        include: { employee: { select: { fullName: true } } },
-        orderBy: { workDate: 'desc' },
-      }),
-      this.prisma.employeeLeaveRequest.findMany({
-        take: 200,
-        include: {
-          employee: { select: { id: true, fullName: true, email: true } },
-          reviewedBy: { select: { id: true, fullName: true } },
-        },
-        orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
-      }),
-    ]);
+    const [records, documents, salarySlips, expenseSlips, expenses, workLogs, leaveRequests] =
+      await Promise.all([
+        this.prisma.employeeHrRecord.findMany({
+          include: { employee: { select: { id: true, fullName: true, email: true } } },
+          orderBy: [{ archivedAt: 'asc' }, { employeeCode: 'asc' }],
+        }),
+        this.prisma.employeeHrDocument.findMany({
+          take: 50,
+          orderBy: { generatedAt: 'desc' },
+        }),
+        this.prisma.employeeSalarySlip.findMany({
+          take: 50,
+          include: { employee: { select: { fullName: true } } },
+          orderBy: [{ periodMonth: 'desc' }, { createdAt: 'desc' }],
+        }),
+        this.prisma.employeeExpenseSlip.findMany({
+          take: 50,
+          include: { employee: { select: { fullName: true } } },
+          orderBy: [{ periodMonth: 'desc' }, { createdAt: 'desc' }],
+        }),
+        this.prisma.employeeExpense.findMany({
+          take: 100,
+          include: { employee: { select: { fullName: true } } },
+          orderBy: [{ status: 'asc' }, { expenseDate: 'desc' }],
+        }),
+        this.prisma.employeeWorkLog.findMany({
+          take: 100,
+          include: { employee: { select: { fullName: true } } },
+          orderBy: { workDate: 'desc' },
+        }),
+        this.prisma.employeeLeaveRequest.findMany({
+          take: 200,
+          include: {
+            employee: { select: { id: true, fullName: true, email: true } },
+            reviewedBy: { select: { id: true, fullName: true } },
+          },
+          orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+        }),
+      ]);
 
     return {
       records: records.map((record) => this.toHrRecordView(record)),
       documents: documents.map((document) => this.toHrDocumentView(document)),
       salarySlips: salarySlips.map((salarySlip) => this.toHrSalarySlipView(salarySlip)),
+      expenseSlips: expenseSlips.map((expenseSlip) => this.toHrExpenseSlipView(expenseSlip)),
       expenses: expenses.map((expense) => this.toHrExpenseView(expense)),
       workLogs: workLogs.map((workLog) => this.toHrWorkLogView(workLog)),
       leaveRequests: leaveRequests.map((request) => this.toLeaveRequestView(request)),
@@ -1408,6 +1419,86 @@ export class AdminService {
     });
     if (!slip) throw new NotFoundException({ code: 'SALARY_SLIP_NOT_FOUND' });
     await this.prisma.employeeSalarySlip.delete({ where: { id: slipId } });
+  }
+
+  async generateHrExpenseSlip(
+    actorId: string,
+    input: GenerateHrExpenseSlipInput,
+  ): Promise<GenerateHrExpenseSlipResponse> {
+    await this.getHrRecordOrThrow(input.employeeId);
+    const { start } = monthBounds(input.periodMonth);
+    const summary = await this.buildExpenseAllowanceSummary(input.employeeId, input.periodMonth);
+
+    const expenseSlip = await this.prisma.employeeExpenseSlip.upsert({
+      where: { employeeId_periodMonth: { employeeId: input.employeeId, periodMonth: start } },
+      create: {
+        employeeId: input.employeeId,
+        generatedById: actorId,
+        periodMonth: start,
+        workingDays: summary.workingDays,
+        dailyAllowancePaise: summary.dailyAllowancePaise,
+        petrolAllowancePaise: summary.petrolAllowancePaise,
+        mobileAllowancePaise: summary.mobileAllowancePaise,
+        monthlyAllowanceCapPaise: summary.monthlyAllowanceCapPaise,
+        calculatedDailyAllowancePaise: summary.calculatedDailyAllowancePaise,
+        calculatedAllowancePaise: summary.calculatedAllowancePaise,
+        approvedExtraExpensePaise: summary.approvedExtraExpensePaise,
+        pendingExtraExpensePaise: summary.pendingExtraExpensePaise,
+        totalPayablePaise: summary.totalApprovedPayablePaise,
+        transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
+        transactionReference: input.transactionReference?.trim() ?? null,
+        notes: input.notes?.trim() ?? null,
+      },
+      update: {
+        generatedById: actorId,
+        workingDays: summary.workingDays,
+        dailyAllowancePaise: summary.dailyAllowancePaise,
+        petrolAllowancePaise: summary.petrolAllowancePaise,
+        mobileAllowancePaise: summary.mobileAllowancePaise,
+        monthlyAllowanceCapPaise: summary.monthlyAllowanceCapPaise,
+        calculatedDailyAllowancePaise: summary.calculatedDailyAllowancePaise,
+        calculatedAllowancePaise: summary.calculatedAllowancePaise,
+        approvedExtraExpensePaise: summary.approvedExtraExpensePaise,
+        pendingExtraExpensePaise: summary.pendingExtraExpensePaise,
+        totalPayablePaise: summary.totalApprovedPayablePaise,
+        transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
+        transactionReference: input.transactionReference?.trim() ?? null,
+        notes: input.notes?.trim() ?? null,
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+
+    return {
+      expenseSlip: this.toHrExpenseSlipView(expenseSlip),
+    };
+  }
+
+  async downloadHrExpenseSlip(slipId: string): Promise<{
+    expenseSlip: HrExpenseSlipView;
+    fileName: string;
+    contentType: 'application/pdf';
+    contentBase64: string;
+  }> {
+    const slip = await this.prisma.employeeExpenseSlip.findUnique({
+      where: { id: slipId },
+      include: { employee: { select: { fullName: true } } },
+    });
+    if (!slip) throw new NotFoundException({ code: 'EXPENSE_SLIP_NOT_FOUND' });
+
+    const record = await this.getHrRecordOrThrow(slip.employeeId);
+    const slipView = this.toHrExpenseSlipView(slip);
+    const periodMonth = formatDateOnly(slip.periodMonth).slice(0, 7);
+    const fileName = `expense_slip_${record.employeeCode}_${periodMonth}.pdf`;
+    const bytes = await this.renderHrPdf(
+      'EXPENSE SLIP',
+      this.expenseSlipLines(record, slipView, periodMonth),
+    );
+    return {
+      expenseSlip: slipView,
+      fileName,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
   }
 
   private async createHrDocumentPdf(
@@ -1947,6 +2038,74 @@ export class AdminService {
     return record;
   }
 
+  private async buildExpenseAllowanceSummary(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<HrExpenseAllowanceSummaryView> {
+    const { start, end } = monthBounds(periodMonth);
+    const [record, workingDays, approvedExtras, pendingExtras] = await Promise.all([
+      this.prisma.employeeHrRecord.findUnique({
+        where: { employeeId },
+        include: { employee: { select: { fullName: true } } },
+      }),
+      this.prisma.employeeWorkLog.count({
+        where: { employeeId, worked: true, workDate: { gte: start, lte: end } },
+      }),
+      this.prisma.employeeExpense.aggregate({
+        where: {
+          employeeId,
+          status: 'APPROVED',
+          expenseDate: { gte: start, lte: end },
+        },
+        _sum: { amountPaise: true },
+      }),
+      this.prisma.employeeExpense.aggregate({
+        where: {
+          employeeId,
+          status: 'PENDING',
+          expenseDate: { gte: start, lte: end },
+        },
+        _sum: { amountPaise: true },
+      }),
+    ]);
+    if (!record) {
+      throw new NotFoundException({
+        code: 'HR_RECORD_NOT_FOUND',
+        message: 'HR allowance settings are not configured for this employee.',
+      });
+    }
+
+    const dailyAllowancePaise = toNumber(record.dailyAllowancePaise);
+    const petrolAllowancePaise = toNumber(record.petrolAllowancePaise);
+    const mobileAllowancePaise = toNumber(record.mobileAllowancePaise);
+    const monthlyAllowanceCapPaise = toNumber(record.allowanceMonthlyPaise);
+    const fixedAllowancePaise = petrolAllowancePaise + mobileAllowancePaise;
+    const calculatedDailyAllowancePaise = Math.max(
+      0,
+      Math.min(dailyAllowancePaise * workingDays, monthlyAllowanceCapPaise - fixedAllowancePaise),
+    );
+    const calculatedAllowancePaise =
+      calculatedDailyAllowancePaise + petrolAllowancePaise + mobileAllowancePaise;
+    const approvedExtraExpensePaise = toNumber(approvedExtras._sum.amountPaise ?? 0);
+    const pendingExtraExpensePaise = toNumber(pendingExtras._sum.amountPaise ?? 0);
+
+    return {
+      periodMonth,
+      employeeId,
+      employeeName: record.employee.fullName,
+      workingDays,
+      dailyAllowancePaise,
+      petrolAllowancePaise,
+      mobileAllowancePaise,
+      monthlyAllowanceCapPaise,
+      calculatedDailyAllowancePaise,
+      calculatedAllowancePaise,
+      approvedExtraExpensePaise,
+      pendingExtraExpensePaise,
+      totalApprovedPayablePaise: calculatedAllowancePaise + approvedExtraExpensePaise,
+    };
+  }
+
   private hrDisplayName(record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>): string {
     const prefix = record.namePrefix?.trim();
     return prefix ? `${prefix} ${record.employee.fullName}` : record.employee.fullName;
@@ -2127,6 +2286,50 @@ export class AdminService {
       reviewerNote: expense.reviewerNote,
       createdAt: expense.createdAt.toISOString(),
       updatedAt: expense.updatedAt.toISOString(),
+    };
+  }
+
+  private toHrExpenseSlipView(slip: {
+    id: string;
+    employeeId: string;
+    employee: { fullName: string };
+    periodMonth: Date;
+    workingDays: number;
+    dailyAllowancePaise: bigint;
+    petrolAllowancePaise: bigint;
+    mobileAllowancePaise: bigint;
+    monthlyAllowanceCapPaise: bigint;
+    calculatedDailyAllowancePaise: bigint;
+    calculatedAllowancePaise: bigint;
+    approvedExtraExpensePaise: bigint;
+    pendingExtraExpensePaise: bigint;
+    totalPayablePaise: bigint;
+    transactionDate: Date | null;
+    transactionReference: string | null;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): HrExpenseSlipView {
+    return {
+      id: slip.id,
+      employeeId: slip.employeeId,
+      employeeName: slip.employee.fullName,
+      periodMonth: formatDateOnly(slip.periodMonth),
+      workingDays: slip.workingDays,
+      dailyAllowancePaise: toNumber(slip.dailyAllowancePaise),
+      petrolAllowancePaise: toNumber(slip.petrolAllowancePaise),
+      mobileAllowancePaise: toNumber(slip.mobileAllowancePaise),
+      monthlyAllowanceCapPaise: toNumber(slip.monthlyAllowanceCapPaise),
+      calculatedDailyAllowancePaise: toNumber(slip.calculatedDailyAllowancePaise),
+      calculatedAllowancePaise: toNumber(slip.calculatedAllowancePaise),
+      approvedExtraExpensePaise: toNumber(slip.approvedExtraExpensePaise),
+      pendingExtraExpensePaise: toNumber(slip.pendingExtraExpensePaise),
+      totalPayablePaise: toNumber(slip.totalPayablePaise),
+      transactionDate: slip.transactionDate ? formatDateOnly(slip.transactionDate) : null,
+      transactionReference: slip.transactionReference,
+      notes: slip.notes,
+      createdAt: slip.createdAt.toISOString(),
+      updatedAt: slip.updatedAt.toISOString(),
     };
   }
 
@@ -2398,6 +2601,63 @@ export class AdminService {
       `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ? formatDateDisplay(parseDateOnly(slip.transactionDate)) : '-'}`,
       `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
       `AMOUNT : ${formatInr(slip.netPayPaise)}`,
+      '',
+      `Name : ${record.employee.fullName}`,
+      'Division : PARSHLO',
+      `Region : ${record.region ?? record.headQuarter}`,
+    ];
+  }
+
+  private expenseSlipLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    slip: HrExpenseSlipView,
+    periodMonth: string,
+  ): string[] {
+    const monthYear = new Intl.DateTimeFormat('en-IN', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(`${periodMonth}-01T00:00:00.000Z`));
+    return [
+      'PARSHLO',
+      `EXPENSE SLIP FOR THE MONTH OF ${monthYear}`,
+      '',
+      `EMPLOYEE NAME : ${record.employee.fullName}`,
+      `EMPLOYEE NO. : ${record.employeeCode}`,
+      `DESIGNATION : ${record.roleTitle}`,
+      `DEPARTMENT : ${record.department ?? '-'}`,
+      `REGION : ${record.region ?? record.headQuarter}`,
+      `PAN NO. : ${record.panNumber ?? '-'}`,
+      `WORKED DAYS : ${slip.workingDays}`,
+      '',
+      'AUTOMATIC ALLOWANCE',
+      `DAILY ALLOWANCE : ${formatInr(slip.dailyAllowancePaise)} per worked day`,
+      `DAILY ALLOWANCE PAYABLE : ${formatInr(slip.calculatedDailyAllowancePaise)}`,
+      `PETROL : ${formatInr(slip.petrolAllowancePaise)}`,
+      `MOBILE : ${formatInr(slip.mobileAllowancePaise)}`,
+      `MONTHLY ALLOWANCE CAP : ${formatInr(slip.monthlyAllowanceCapPaise)}`,
+      `AUTOMATIC ALLOWANCE TOTAL : ${formatInr(slip.calculatedAllowancePaise)}`,
+      '',
+      'EXTRA CLAIMS',
+      `APPROVED EXTRA CLAIMS : ${formatInr(slip.approvedExtraExpensePaise)}`,
+      `PENDING EXTRA CLAIMS : ${formatInr(slip.pendingExtraExpensePaise)}`,
+      '',
+      `TOTAL PAYABLE : ${formatInr(slip.totalPayablePaise)}`,
+      '',
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ? formatDateDisplay(parseDateOnly(slip.transactionDate)) : '-'}`,
+      `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
+      `AMOUNT : ${formatInr(slip.totalPayablePaise)}`,
+      '',
+      `Remarks : ${slip.notes ?? '-'}`,
+      '',
+      'Since this is computer generated slip no need of signature.',
+      '',
+      '- - - - - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - - - - -',
+      '',
+      `I have received expenses for the month of ${monthYear}`,
+      `NEFT/ DD/ CHQ DATE : ${slip.transactionDate ? formatDateDisplay(parseDateOnly(slip.transactionDate)) : '-'}`,
+      `NEFT/ DD/ CHQ NO. : ${slip.transactionReference ?? '-'}`,
+      `AMOUNT : ${formatInr(slip.totalPayablePaise)}`,
       '',
       `Name : ${record.employee.fullName}`,
       'Division : PARSHLO',

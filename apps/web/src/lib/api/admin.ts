@@ -9,8 +9,11 @@ import {
   EmployeeLeaveDashboardView,
   EmployeeLeaveRequestView,
   CompanyHolidayView,
+  EmployeeExpenseSlipDownloadResponse,
   GenerateHrDocumentInputSchema,
   GenerateHrDocumentResponse,
+  GenerateHrExpenseSlipInputSchema,
+  GenerateHrExpenseSlipResponse,
   GenerateHrSalarySlipInputSchema,
   GenerateHrSalarySlipResponse,
   EmployeeSalarySlipDownloadResponse,
@@ -32,6 +35,7 @@ import {
   type AdminUpdateBuyerInputSchema,
   type AdminUpdateEmployeeInputSchema,
   type HrSalarySlipView,
+  type HrExpenseSlipView,
   type PlaceOrderOnBehalfInput,
   type UpdateOrderBeforeApprovalInput,
 } from '@parshlo/types';
@@ -46,6 +50,7 @@ type CreateHrExpenseInput = z.infer<typeof CreateHrExpenseInputSchema>;
 type EmailHrDocumentInput = z.infer<typeof EmailHrDocumentInputSchema>;
 type CreateLeaveRequestInput = z.infer<typeof CreateLeaveRequestInputSchema>;
 type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
+type GenerateHrExpenseSlipInput = z.infer<typeof GenerateHrExpenseSlipInputSchema>;
 type GenerateHrSalarySlipInput = z.infer<typeof GenerateHrSalarySlipInputSchema>;
 type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
 type AdminUpdateEmployeeInput = z.infer<typeof AdminUpdateEmployeeInputSchema>;
@@ -394,6 +399,7 @@ export type EmployeeLeaveRequest = z.infer<typeof EmployeeLeaveRequestView>;
 export type HrDashboard = z.infer<typeof HrDashboardView>;
 export type HrEmployeeRecord = z.infer<typeof HrEmployeeRecordView>;
 export type HrExpense = z.infer<typeof HrExpenseView>;
+export type HrExpenseSlip = z.infer<typeof HrExpenseSlipView>;
 export type HrSalarySlip = z.infer<typeof HrSalarySlipView>;
 export type HrWorkLog = z.infer<typeof HrWorkLogView>;
 
@@ -621,6 +627,35 @@ export async function deleteHrSalarySlip(
     accessToken,
     ...options,
   });
+}
+
+export function generateHrExpenseSlip(
+  accessToken: string,
+  input: GenerateHrExpenseSlipInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof GenerateHrExpenseSlipResponse>> {
+  return apiCall('/v1/admin/hr/expense-slips', GenerateHrExpenseSlipResponse, {
+    method: 'POST',
+    accessToken,
+    body: GenerateHrExpenseSlipInputSchema.parse(input),
+    ...options,
+  });
+}
+
+export function downloadHrExpenseSlip(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof EmployeeExpenseSlipDownloadResponse>> {
+  return apiCall(
+    `/v1/admin/hr/expense-slips/${encodeURIComponent(id)}/download`,
+    EmployeeExpenseSlipDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
 }
 
 export function createHrExpense(

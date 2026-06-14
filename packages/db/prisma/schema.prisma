@@ -72,22 +72,24 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  businessProfile      BusinessProfile?
-  kycApplications      KycApplication[]
-  orders               Order[]
-  auditEvents          AuditLog[]             @relation("AuditActor")
-  kycReviewed          KycApplication[]       @relation("KycReviewer")
-  inquiries            ContactInquiry[]
-  leaveRequests        EmployeeLeaveRequest[] @relation("LeaveEmployee")
-  leaveReviewed        EmployeeLeaveRequest[] @relation("LeaveReviewer")
-  hrRecord             EmployeeHrRecord?
-  hrSalarySlips        EmployeeSalarySlip[]   @relation("HrSalaryEmployee")
-  hrSalaryGenerated    EmployeeSalarySlip[]   @relation("HrSalaryGenerator")
-  hrExpenses           EmployeeExpense[]      @relation("HrExpenseEmployee")
-  hrExpenseReviewed    EmployeeExpense[]      @relation("HrExpenseReviewer")
-  hrWorkLogs           EmployeeWorkLog[]      @relation("HrWorkEmployee")
-  hrDocuments          EmployeeHrDocument[]   @relation("HrDocumentEmployee")
-  hrDocumentsGenerated EmployeeHrDocument[]   @relation("HrDocumentGenerator")
+  businessProfile        BusinessProfile?
+  kycApplications        KycApplication[]
+  orders                 Order[]
+  auditEvents            AuditLog[]             @relation("AuditActor")
+  kycReviewed            KycApplication[]       @relation("KycReviewer")
+  inquiries              ContactInquiry[]
+  leaveRequests          EmployeeLeaveRequest[] @relation("LeaveEmployee")
+  leaveReviewed          EmployeeLeaveRequest[] @relation("LeaveReviewer")
+  hrRecord               EmployeeHrRecord?
+  hrSalarySlips          EmployeeSalarySlip[]   @relation("HrSalaryEmployee")
+  hrSalaryGenerated      EmployeeSalarySlip[]   @relation("HrSalaryGenerator")
+  hrExpenseSlips         EmployeeExpenseSlip[]  @relation("HrExpenseSlipEmployee")
+  hrExpenseSlipGenerated EmployeeExpenseSlip[]  @relation("HrExpenseSlipGenerator")
+  hrExpenses             EmployeeExpense[]      @relation("HrExpenseEmployee")
+  hrExpenseReviewed      EmployeeExpense[]      @relation("HrExpenseReviewer")
+  hrWorkLogs             EmployeeWorkLog[]      @relation("HrWorkEmployee")
+  hrDocuments            EmployeeHrDocument[]   @relation("HrDocumentEmployee")
+  hrDocumentsGenerated   EmployeeHrDocument[]   @relation("HrDocumentGenerator")
 
   @@index([accountStatus])
   @@index([createdAt])
@@ -601,6 +603,37 @@ model EmployeeSalarySlip {
   bonusPaise            BigInt @default(0)
   deductionPaise        BigInt @default(20000)
   netPayPaise           BigInt
+
+  transactionDate      DateTime?
+  transactionReference String?
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodMonth])
+  @@index([periodMonth])
+}
+
+model EmployeeExpenseSlip {
+  id            String  @id @default(cuid())
+  employeeId    String
+  employee      User    @relation("HrExpenseSlipEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?   @relation("HrExpenseSlipGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  periodMonth DateTime
+
+  workingDays                   Int
+  dailyAllowancePaise           BigInt
+  petrolAllowancePaise          BigInt
+  mobileAllowancePaise          BigInt
+  monthlyAllowanceCapPaise      BigInt
+  calculatedDailyAllowancePaise BigInt
+  calculatedAllowancePaise      BigInt
+  approvedExtraExpensePaise     BigInt @default(0)
+  pendingExtraExpensePaise      BigInt @default(0)
+  totalPayablePaise             BigInt
 
   transactionDate      DateTime?
   transactionReference String?

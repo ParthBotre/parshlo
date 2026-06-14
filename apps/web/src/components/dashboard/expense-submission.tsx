@@ -316,7 +316,8 @@ export function ExpenseSubmission({ initialExpenses }: { initialExpenses: MyExpe
           </div>
           <p className="text-muted-foreground text-xs">
             Expense slip includes automatic daily allowance, petrol, mobile, and approved extra
-            claims. Selected month extra claims submitted: {formatINR(monthTotalPaise)}.
+            claims after Super Admin saves the paid slip. Selected month extra claims submitted:{' '}
+            {formatINR(monthTotalPaise)}.
           </p>
         </CardHeader>
         <CardContent className="p-0">
