@@ -350,7 +350,7 @@ export function ProductManagement({
         </CardContent>
       </Card>
 
-      <div className="overflow-hidden rounded-lg border">
+      <div className="w-full max-w-full overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-muted/60 text-muted-foreground">
             <tr>
