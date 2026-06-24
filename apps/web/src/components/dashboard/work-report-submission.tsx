@@ -49,8 +49,9 @@ export function WorkReportSubmission({
   const [orth, setOrth] = useState(0);
   const [md, setMd] = useState(0);
   const [gp, setGp] = useState(0);
+  const [gyn, setGyn] = useState(0);
   const [others, setOthers] = useState(0);
-  const totalDoctors = useMemo(() => orth + md + gp + others, [gp, md, orth, others]);
+  const totalDoctors = useMemo(() => orth + md + gp + gyn + others, [gp, gyn, md, orth, others]);
   const summaries = useMemo(() => {
     const build = (keyFor: (report: MyWorkLog) => string) => {
       const rows = new Map<
@@ -88,6 +89,7 @@ export function WorkReportSubmission({
       orthCalls: numberValue(form, 'orthCalls'),
       mdCalls: numberValue(form, 'mdCalls'),
       gpCalls: numberValue(form, 'gpCalls'),
+      gynCalls: numberValue(form, 'gynCalls'),
       otherCalls: numberValue(form, 'otherCalls'),
       totalChemist: numberValue(form, 'totalChemist'),
       note: stringValue(form, 'note'),
@@ -152,6 +154,15 @@ export function WorkReportSubmission({
                 onChange={(event) => setGp(Number.parseInt(event.target.value || '0', 10))}
               />
             </Field>
+            <Field label="GYN">
+              <Input
+                name="gynCalls"
+                type="number"
+                min="0"
+                defaultValue="0"
+                onChange={(event) => setGyn(Number.parseInt(event.target.value || '0', 10))}
+              />
+            </Field>
             <Field label="Others">
               <Input
                 name="otherCalls"
@@ -180,7 +191,7 @@ export function WorkReportSubmission({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Date</th>
@@ -188,6 +199,7 @@ export function WorkReportSubmission({
                   <th className="px-4 py-3 text-right">ORTH</th>
                   <th className="px-4 py-3 text-right">MD</th>
                   <th className="px-4 py-3 text-right">GP</th>
+                  <th className="px-4 py-3 text-right">GYN</th>
                   <th className="px-4 py-3 text-right">Others</th>
                   <th className="px-4 py-3 text-right">Total DR</th>
                   <th className="px-4 py-3 text-right">Total Chemist</th>
@@ -203,6 +215,7 @@ export function WorkReportSubmission({
                     <td className="px-4 py-3 text-right font-mono">{report.orthCalls}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.mdCalls}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.gpCalls}</td>
+                    <td className="px-4 py-3 text-right font-mono">{report.gynCalls}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.otherCalls}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.totalDoctors}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.totalChemist}</td>

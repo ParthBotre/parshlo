@@ -113,13 +113,15 @@ export class UserService {
   async upsertWorkLog(employeeId: string, input: CreateMyHrWorkLogInput): Promise<HrWorkLogView> {
     const workDate = parseDateOnly(input.workDate);
     await this.assertCanSubmitWorkLog(employeeId, workDate);
-    const totalDoctors = input.orthCalls + input.mdCalls + input.gpCalls + input.otherCalls;
+    const totalDoctors =
+      input.orthCalls + input.mdCalls + input.gpCalls + input.gynCalls + input.otherCalls;
     const data = {
       worked: input.worked,
       location: input.location?.trim().toUpperCase() ?? null,
       orthCalls: input.orthCalls,
       mdCalls: input.mdCalls,
       gpCalls: input.gpCalls,
+      gynCalls: input.gynCalls,
       otherCalls: input.otherCalls,
       totalDoctors,
       totalChemist: input.totalChemist,
@@ -493,6 +495,7 @@ export class UserService {
     orthCalls: number;
     mdCalls: number;
     gpCalls: number;
+    gynCalls: number;
     otherCalls: number;
     totalDoctors: number;
     totalChemist: number;
@@ -510,6 +513,7 @@ export class UserService {
       orthCalls: workLog.orthCalls,
       mdCalls: workLog.mdCalls,
       gpCalls: workLog.gpCalls,
+      gynCalls: workLog.gynCalls,
       otherCalls: workLog.otherCalls,
       totalDoctors: workLog.totalDoctors,
       totalChemist: workLog.totalChemist,

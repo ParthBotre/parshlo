@@ -683,6 +683,7 @@ model EmployeeWorkLog {
   orthCalls    Int      @default(0)
   mdCalls      Int      @default(0)
   gpCalls      Int      @default(0)
+  gynCalls     Int      @default(0)
   otherCalls   Int      @default(0)
   totalDoctors Int      @default(0)
   totalChemist Int      @default(0)
