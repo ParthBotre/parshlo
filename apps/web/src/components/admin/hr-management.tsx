@@ -876,7 +876,13 @@ export function HrManagement({
                     ? 'bg-background rounded-md px-3 py-2 text-sm font-semibold shadow-sm'
                     : 'text-muted-foreground hover:bg-background/70 hover:text-foreground rounded-md px-3 py-2 text-sm font-medium'
                 }
-                onClick={() => setActiveSection(section.key)}
+                onClick={() =>
+                  setActiveSection((current) =>
+                    current === section.key && section.key !== 'overview'
+                      ? 'overview'
+                      : section.key,
+                  )
+                }
               >
                 {section.label}
               </button>
