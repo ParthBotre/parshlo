@@ -275,6 +275,7 @@ export const GenerateHrSalarySlipInputSchema = z.object({
   employeeId: EntityId,
   periodMonth: z.string().regex(/^\d{4}-\d{2}$/, { message: 'Use YYYY-MM month format.' }),
   bonusPaise: HrMoneyPaise.default(0),
+  netPayPaise: HrMoneyPaise.optional().nullable(),
   transactionDate: LeaveDateString.optional().nullable(),
   transactionReference: z.string().trim().max(120).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
@@ -312,6 +313,7 @@ export type HrExpenseSlipView = z.infer<typeof HrExpenseSlipView>;
 export const GenerateHrExpenseSlipInputSchema = z.object({
   employeeId: EntityId,
   periodMonth: z.string().regex(/^\d{4}-\d{2}$/, { message: 'Use YYYY-MM month format.' }),
+  totalPayablePaise: HrMoneyPaise.optional().nullable(),
   transactionDate: LeaveDateString.optional().nullable(),
   transactionReference: z.string().trim().max(120).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),

@@ -21,6 +21,7 @@ const SELECT_CLASS =
   'border-input bg-background h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 const REQUIRED_HR_DOCUMENT_CC = 'hemantbotre@gmail.com';
+const ANNUAL_PTO_DAYS = 30;
 const MONTH_OPTIONS = [
   ['01', 'January'],
   ['02', 'February'],
@@ -108,6 +109,12 @@ function formString(form: FormData, name: string, fallback = ''): string {
 function rupeesToPaise(value: FormDataEntryValue | null): number {
   const parsed = Number.parseFloat(typeof value === 'string' ? value : '0');
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+
+function optionalRupeesToPaise(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : null;
 }
 
 function rupeesInputFromPaise(paise: number): string {
@@ -241,6 +248,16 @@ function periodLabel(periodMonth: string): string {
   return `${monthName(month)} ${year}`.trim();
 }
 
+function compareHrRecords(a: HrEmployeeRecord, b: HrEmployeeRecord): number {
+  const employeeCodeCompare = a.employeeCode.localeCompare(b.employeeCode, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  return employeeCodeCompare === 0
+    ? a.employeeName.localeCompare(b.employeeName)
+    : employeeCodeCompare;
+}
+
 function parseDateOnlyUtc(value: string): Date {
   return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
 }
@@ -316,12 +333,26 @@ export function HrManagement({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<HrSection>('overview');
-  const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
+  const activeRecords = useMemo(
+    () => records.filter((record) => !record.archivedAt).sort(compareHrRecords),
+    [records],
+  );
+  const orderedRecords = useMemo(
+    () =>
+      [...records].sort((a, b) => {
+        if (a.archivedAt && !b.archivedAt) return 1;
+        if (!a.archivedAt && b.archivedAt) return -1;
+        return compareHrRecords(a, b);
+      }),
+    [records],
+  );
   const [salaryPeriod, setSalaryPeriod] = useState(currentPeriodMonth);
   const [expenseSlipPeriod, setExpenseSlipPeriod] = useState(currentPeriodMonth);
   const [holidayPeriod, setHolidayPeriod] = useState(currentPeriodMonth);
   const [workPeriod, setWorkPeriod] = useState(currentPeriodMonth);
   const [workEmployeeId, setWorkEmployeeId] = useState('all');
+  const [workDetailEmployeeId, setWorkDetailEmployeeId] = useState('');
+  const [workDetailSort, setWorkDetailSort] = useState<'newest' | 'oldest'>('newest');
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
@@ -349,6 +380,39 @@ export function HrManagement({
   const pendingLeaveCount = dashboard.leaveRequests.filter(
     (request) => request.status === 'PENDING',
   ).length;
+  const salaryPaymentRows = useMemo(
+    () =>
+      activeRecords
+        .map((record) => {
+          const slip = selectedSalarySlips.find((item) => item.employeeId === record.employeeId);
+          const hasPaymentDetails =
+            Boolean(slip?.transactionDate) || Boolean(slip?.transactionReference);
+          const status = slip
+            ? hasPaymentDetails
+              ? 'Paid'
+              : 'Payment details missing'
+            : 'Needs slip';
+          return {
+            employeeId: record.employeeId,
+            employeeName: record.employeeName,
+            employeeCode: record.employeeCode,
+            status,
+            workingDays: slip?.workingDays ?? null,
+            leaveDays: slip?.leaveDays ?? null,
+            amountPaise:
+              slip?.netPayPaise ?? Math.max(0, record.grossMonthlyPaise - record.deductionPaise),
+          };
+        })
+        .sort((a, b) => {
+          const priority = (status: string): number =>
+            status === 'Needs slip' ? 0 : status === 'Payment details missing' ? 1 : 2;
+          const priorityCompare = priority(a.status) - priority(b.status);
+          return priorityCompare === 0
+            ? a.employeeCode.localeCompare(b.employeeCode, undefined, { numeric: true })
+            : priorityCompare;
+        }),
+    [activeRecords, selectedSalarySlips],
+  );
   const expensePayableRows = useMemo(() => {
     const range = monthRange(expenseSlipPeriod);
     return activeRecords
@@ -385,6 +449,7 @@ export function HrManagement({
         return {
           employeeId: record.employeeId,
           employeeName: record.employeeName,
+          employeeCode: record.employeeCode,
           workedDays,
           calculatedAllowancePaise,
           approvedExtraExpensePaise,
@@ -394,7 +459,12 @@ export function HrManagement({
           slipStatus: savedSlip ? 'Saved' : 'Not saved',
         };
       })
-      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+      .sort((a, b) => {
+        const slipCompare = a.slipStatus.localeCompare(b.slipStatus);
+        return slipCompare === 0
+          ? a.employeeCode.localeCompare(b.employeeCode, undefined, { numeric: true })
+          : slipCompare;
+      });
   }, [
     activeRecords,
     dashboard.expenses,
@@ -417,6 +487,8 @@ export function HrManagement({
         return {
           employeeId: record.employeeId,
           employeeName: record.employeeName,
+          employeeCode: record.employeeCode,
+          annualPtoDays: ANNUAL_PTO_DAYS,
           monthApprovedDays: approvedRequests.reduce(
             (total, request) =>
               total + payableDaysOverlap(request.startDate, request.endDate, month),
@@ -432,9 +504,19 @@ export function HrManagement({
             0,
           ),
           pendingDays: pendingRequests.reduce((total, request) => total + request.dayCount, 0),
+          remainingDays: Math.max(
+            0,
+            ANNUAL_PTO_DAYS -
+              approvedRequests.reduce(
+                (total, request) =>
+                  total + payableDaysOverlap(request.startDate, request.endDate, year),
+                0,
+              ) -
+              pendingRequests.reduce((total, request) => total + request.dayCount, 0),
+          ),
         };
       })
-      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+      .sort((a, b) => a.employeeCode.localeCompare(b.employeeCode, undefined, { numeric: true }));
   }, [activeRecords, dashboard.leaveRequests, holidayPeriod]);
   const workSummaryRows = useMemo(() => {
     const rows = new Map<
@@ -473,17 +555,19 @@ export function HrManagement({
       }))
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
   }, [dashboard.workLogs, workEmployeeId, workPeriod]);
-  const workDetailRows = useMemo(
-    () =>
-      dashboard.workLogs
-        .filter((log) => log.workDate.slice(0, 7) === workPeriod)
-        .filter((log) => workEmployeeId === 'all' || log.employeeId === workEmployeeId)
-        .sort((a, b) => {
-          const dateCompare = b.workDate.localeCompare(a.workDate);
-          return dateCompare === 0 ? a.employeeName.localeCompare(b.employeeName) : dateCompare;
-        }),
-    [dashboard.workLogs, workEmployeeId, workPeriod],
-  );
+  const workDetailRows = useMemo(() => {
+    if (!workDetailEmployeeId) return [];
+    return dashboard.workLogs
+      .filter((log) => log.workDate.slice(0, 7) === workPeriod)
+      .filter((log) => log.employeeId === workDetailEmployeeId)
+      .sort((a, b) => {
+        const dateCompare =
+          workDetailSort === 'newest'
+            ? b.workDate.localeCompare(a.workDate)
+            : a.workDate.localeCompare(b.workDate);
+        return dateCompare === 0 ? a.employeeName.localeCompare(b.employeeName) : dateCompare;
+      });
+  }, [dashboard.workLogs, workDetailEmployeeId, workDetailSort, workPeriod]);
   const maxWorkReports = Math.max(1, ...workSummaryRows.map((row) => row.reports));
   const maxWorkDoctors = Math.max(1, ...workSummaryRows.map((row) => row.doctors));
   const maxWorkChemists = Math.max(1, ...workSummaryRows.map((row) => row.chemists));
@@ -686,6 +770,7 @@ export function HrManagement({
           employeeId: formString(form, 'employeeId'),
           periodMonth: `${formString(form, 'periodYear')}-${formString(form, 'periodMonth')}`,
           bonusPaise: rupeesToPaise(form.get('bonus')),
+          netPayPaise: optionalRupeesToPaise(form.get('netPay')),
           transactionDate: formString(form, 'transactionDate'),
           transactionReference: formString(form, 'transactionReference'),
           notes: formString(form, 'notes'),
@@ -747,6 +832,7 @@ export function HrManagement({
         {
           employeeId: formString(form, 'employeeId'),
           periodMonth: `${formString(form, 'periodYear')}-${formString(form, 'periodMonth')}`,
+          totalPayablePaise: optionalRupeesToPaise(form.get('totalPayable')),
           transactionDate: formString(form, 'transactionDate'),
           transactionReference: formString(form, 'transactionReference'),
           notes: formString(form, 'notes'),
@@ -894,58 +980,82 @@ export function HrManagement({
       {activeSection === 'overview' ? (
         <section className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="HR Records" value={String(records.length)} />
-            <MetricCard label="Salary Slips" value={String(selectedSalarySlips.length)} />
-            <MetricCard label="Expense Slips" value={String(selectedExpenseSlips.length)} />
-            <MetricCard label="Pending Leaves" value={String(pendingLeaveCount)} />
+            <MetricCard label="Active Employees" value={String(activeRecords.length)} />
+            <MetricCard
+              label="Salary Pending"
+              value={String(salaryPaymentRows.filter((row) => row.status !== 'Paid').length)}
+            />
+            <MetricCard
+              label="Expense Slips Pending"
+              value={String(expensePayableRows.filter((row) => row.slipStatus !== 'Saved').length)}
+            />
+            <MetricCard label="Pending Holidays" value={String(pendingLeaveCount)} />
             <MetricCard label="Pending Expenses" value={String(pendingExpenseCount)} />
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Monthly Payroll Snapshot</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  {periodLabel(salaryPeriod)} · saved salary slips and employee records.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                <MetricCard label="Saved Slips" value={String(selectedSalarySlips.length)} />
-                <MetricCard label="Employees" value={String(activeRecords.length)} />
-                <MetricCard
-                  label="Net Pay Saved"
-                  value={formatINR(
-                    selectedSalarySlips.reduce((total, slip) => total + slip.netPayPaise, 0),
-                  )}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Expense Payables Snapshot</CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  {periodLabel(expenseSlipPeriod)} · allowance plus approved extra claims.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                <MetricCard
-                  label="Payable"
-                  value={formatINR(
-                    expensePayableRows.reduce((total, row) => total + row.totalPayablePaise, 0),
-                  )}
-                />
-                <MetricCard
-                  label="Pending Extra"
-                  value={formatINR(
-                    expensePayableRows.reduce(
-                      (total, row) => total + row.pendingExtraExpensePaise,
-                      0,
-                    ),
-                  )}
-                />
-                <MetricCard label="Saved Slips" value={String(selectedExpenseSlips.length)} />
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base">Monthly Salary Payment Board</CardTitle>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    {periodLabel(salaryPeriod)} · employee-wise payment status and amount.
+                  </p>
+                </div>
+                <MonthYearSelect value={salaryPeriod} onChange={setSalaryPeriod} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table
+                headers={['Employee ID', 'Employee', 'Status', 'Paid Days', 'Leave', 'Amount']}
+                rows={salaryPaymentRows.map((row) => [
+                  row.employeeCode,
+                  row.employeeName,
+                  <StatusPill key={`${row.employeeId}-salary-status`} status={row.status} />,
+                  row.workingDays ?? '-',
+                  row.leaveDays ?? '-',
+                  formatINR(row.amountPaise),
+                ])}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base">Monthly Expense Reimbursement Board</CardTitle>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    {periodLabel(expenseSlipPeriod)} · allowance, approved extra claims, and slip
+                    status.
+                  </p>
+                </div>
+                <MonthYearSelect value={expenseSlipPeriod} onChange={setExpenseSlipPeriod} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table
+                headers={[
+                  'Employee ID',
+                  'Employee',
+                  'Worked Days',
+                  'Auto Allowance',
+                  'Approved Extra',
+                  'Pending Extra',
+                  'Total Payable',
+                  'Slip',
+                ]}
+                rows={expensePayableRows.map((row) => [
+                  row.employeeCode,
+                  row.employeeName,
+                  row.workedDays,
+                  formatINR(row.calculatedAllowancePaise),
+                  formatINR(row.approvedExtraExpensePaise),
+                  formatINR(row.pendingExtraExpensePaise),
+                  formatINR(row.totalPayablePaise),
+                  <StatusPill key={`${row.employeeId}-expense-status`} status={row.slipStatus} />,
+                ])}
+              />
+            </CardContent>
+          </Card>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickAction
               label="Create / edit HR record"
@@ -1297,6 +1407,9 @@ export function HrManagement({
             <Field label="Bonus">
               <Input name="bonus" type="number" min="0" step="0.01" defaultValue="0" />
             </Field>
+            <Field label="Final salary amount">
+              <Input name="netPay" type="number" min="0" step="0.01" placeholder="Amount to pay" />
+            </Field>
             <Field label="Transaction date">
               <Input name="transactionDate" type="date" />
             </Field>
@@ -1309,8 +1422,8 @@ export function HrManagement({
             <div className="sm:col-span-2 lg:col-span-3">
               <Button type="submit">Save Salary Slip</Button>
               <p className="text-muted-foreground mt-2 text-xs">
-                Paid days are calculated from submitted Work Reports. Approved holidays reduce daily
-                allowance automatically.
+                Paid days are calculated from Work Reports. Enter Final salary amount to override
+                the calculated payable amount saved on the slip.
               </p>
             </div>
           </form>
@@ -1332,6 +1445,7 @@ export function HrManagement({
         <CardContent>
           <Table
             headers={[
+              'Employee ID',
               'Employee',
               'Worked Days',
               'Auto Allowance',
@@ -1342,6 +1456,7 @@ export function HrManagement({
               'Slip',
             ]}
             rows={expensePayableRows.map((row) => [
+              row.employeeCode,
               row.employeeName,
               row.workedDays,
               formatINR(row.calculatedAllowancePaise),
@@ -1440,6 +1555,15 @@ export function HrManagement({
                 ))}
               </select>
             </Field>
+            <Field label="Final expense amount">
+              <Input
+                name="totalPayable"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Amount to pay"
+              />
+            </Field>
             <Field label="Transaction date">
               <Input name="transactionDate" type="date" />
             </Field>
@@ -1452,8 +1576,8 @@ export function HrManagement({
             <div className="sm:col-span-2 lg:col-span-3">
               <Button type="submit">Save Expense Slip</Button>
               <p className="text-muted-foreground mt-2 text-xs">
-                Worked days come from employee work reports. Mobile and petrol are included
-                automatically from HR allowance settings.
+                Worked days come from Work Reports. Enter Final expense amount to override the
+                calculated reimbursement saved on the slip.
               </p>
             </div>
           </form>
@@ -1520,18 +1644,22 @@ export function HrManagement({
         <CardContent className="space-y-5">
           <Table
             headers={[
+              'Employee ID',
               'Employee',
+              'Annual PTO',
               'Approved This Month',
               'Approved This Year',
-              'Cumulative Approved',
               'Pending',
+              'Remaining',
             ]}
             rows={holidaySummaryRows.map((row) => [
+              row.employeeCode,
               row.employeeName,
+              row.annualPtoDays,
               row.monthApprovedDays,
               row.yearApprovedDays,
-              row.cumulativeApprovedDays,
               row.pendingDays,
+              row.remainingDays,
             ])}
           />
           <Table
@@ -1648,13 +1776,41 @@ export function HrManagement({
               row.avgChemists.toFixed(1),
             ])}
           />
-          <div>
-            <h3 className="text-sm font-semibold">Daily report details</h3>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Date-wise view of employee activity for {periodLabel(workPeriod)}.
-            </p>
+          <div className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Daily Report Details</h3>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {periodLabel(workPeriod)} · choose one employee to avoid clutter.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_140px] lg:min-w-[420px]">
+              <select
+                aria-label="Daily report employee"
+                className={SELECT_CLASS}
+                value={workDetailEmployeeId}
+                onChange={(event) => setWorkDetailEmployeeId(event.target.value)}
+              >
+                <option value="">Choose employee</option>
+                {activeRecords.map((record) => (
+                  <option key={record.employeeId} value={record.employeeId}>
+                    {record.employeeCode} · {record.employeeName}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Daily report sort"
+                className={SELECT_CLASS}
+                value={workDetailSort}
+                onChange={(event) =>
+                  setWorkDetailSort(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                }
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
           </div>
-          <Table
+          <DataTable
             headers={[
               'Date',
               'Employee',
@@ -1683,6 +1839,11 @@ export function HrManagement({
               log.totalChemist,
               log.note?.trim() ? log.note : '-',
             ])}
+            emptyMessage={
+              workDetailEmployeeId
+                ? `No daily reports for the selected employee in ${periodLabel(workPeriod)}.`
+                : 'Choose an employee to view daily report details.'
+            }
           />
         </CardContent>
       </Card>
@@ -1694,9 +1855,8 @@ export function HrManagement({
         <CardContent>
           <Table
             headers={[
-              'SR No',
+              'Employee ID',
               'Employee',
-              'Code',
               'HQ',
               'Designation',
               'DOJ',
@@ -1704,10 +1864,9 @@ export function HrManagement({
               'Status',
               'Actions',
             ]}
-            rows={records.map((record) => [
-              record.serialNumber ?? '-',
-              record.employeeName,
+            rows={orderedRecords.map((record) => [
               record.employeeCode,
+              record.employeeName,
               record.headQuarter,
               record.roleTitle,
               formatDateIst(record.joiningDate),
@@ -1840,8 +1999,22 @@ function MetricCard({ label, value }: { label: string; value: string }): JSX.Ele
   return (
     <div className="rounded-lg border p-4">
       <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-2 break-words text-xl font-semibold tabular-nums sm:text-2xl">{value}</p>
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }): JSX.Element {
+  const tone =
+    status === 'Paid' || status === 'Saved'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300'
+      : status === 'Needs slip' || status === 'Not saved'
+        ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300'
+        : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300';
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>
+      {status}
+    </span>
   );
 }
 
@@ -1902,6 +2075,18 @@ function RecordSelect({ records }: { records: HrEmployeeRecord[] }): JSX.Element
 }
 
 function Table({ headers, rows }: { headers: string[]; rows: ReactNode[][] }): JSX.Element {
+  return <DataTable headers={headers} rows={rows} emptyMessage="No records yet." />;
+}
+
+function DataTable({
+  headers,
+  rows,
+  emptyMessage,
+}: {
+  headers: string[];
+  rows: ReactNode[][];
+  emptyMessage: string;
+}): JSX.Element {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full min-w-[1100px] text-sm">
@@ -1918,7 +2103,7 @@ function Table({ headers, rows }: { headers: string[]; rows: ReactNode[][] }): J
           {rows.length === 0 ? (
             <tr>
               <td className="text-muted-foreground px-4 py-6 text-center" colSpan={headers.length}>
-                No records yet.
+                {emptyMessage}
               </td>
             </tr>
           ) : (

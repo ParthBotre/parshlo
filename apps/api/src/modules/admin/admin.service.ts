@@ -1025,6 +1025,7 @@ export class AdminService {
   }
 
   async upsertHrRecord(input: UpsertHrEmployeeRecordInput): Promise<HrEmployeeRecordView> {
+    const employeeCode = input.employeeCode.trim().toUpperCase();
     const employee = await this.prisma.user.findFirst({
       where: {
         id: input.employeeId,
@@ -1035,6 +1036,20 @@ export class AdminService {
     });
     if (!employee) {
       throw new NotFoundException({ code: 'EMPLOYEE_NOT_FOUND' });
+    }
+
+    const duplicateCode = await this.prisma.employeeHrRecord.findFirst({
+      where: {
+        employeeCode,
+        NOT: { employeeId: input.employeeId },
+      },
+      include: { employee: { select: { fullName: true } } },
+    });
+    if (duplicateCode) {
+      throw new ConflictException({
+        code: 'EMPLOYEE_CODE_ALREADY_EXISTS',
+        message: `Employee code ${employeeCode} is already assigned to ${duplicateCode.employee.fullName}.`,
+      });
     }
 
     const salary = splitSalary(input.grossMonthlyPaise);
@@ -1048,7 +1063,7 @@ export class AdminService {
       where: { employeeId: input.employeeId },
       create: {
         employeeId: input.employeeId,
-        employeeCode: input.employeeCode.trim().toUpperCase(),
+        employeeCode,
         serialNumber: nextSerialNumber,
         namePrefix: this.normalizeOptionalText(input.namePrefix),
         roleTitle: input.roleTitle.trim().toUpperCase(),
@@ -1087,7 +1102,7 @@ export class AdminService {
         deductionPaise: input.deductionPaise,
       },
       update: {
-        employeeCode: input.employeeCode.trim().toUpperCase(),
+        employeeCode,
         serialNumber: nextSerialNumber,
         namePrefix: this.normalizeOptionalText(input.namePrefix),
         roleTitle: input.roleTitle.trim().toUpperCase(),
@@ -1335,13 +1350,14 @@ export class AdminService {
       ),
     );
     const grossPaise = toNumber(record.grossMonthlyPaise);
-    const netPayPaise =
+    const calculatedNetPayPaise =
       grossPaise +
       dailyAllowancePaise +
       petrolAllowancePaise +
       mobileAllowancePaise +
       input.bonusPaise -
       toNumber(record.deductionPaise);
+    const netPayPaise = input.netPayPaise ?? calculatedNetPayPaise;
 
     const salarySlip = await this.prisma.employeeSalarySlip.upsert({
       where: { employeeId_periodMonth: { employeeId: input.employeeId, periodMonth: start } },
@@ -1433,6 +1449,7 @@ export class AdminService {
     const { start } = monthBounds(input.periodMonth);
     const summary = await this.buildExpenseAllowanceSummary(input.employeeId, input.periodMonth);
 
+    const totalPayablePaise = input.totalPayablePaise ?? summary.totalApprovedPayablePaise;
     const expenseSlip = await this.prisma.employeeExpenseSlip.upsert({
       where: { employeeId_periodMonth: { employeeId: input.employeeId, periodMonth: start } },
       create: {
@@ -1448,7 +1465,7 @@ export class AdminService {
         calculatedAllowancePaise: summary.calculatedAllowancePaise,
         approvedExtraExpensePaise: summary.approvedExtraExpensePaise,
         pendingExtraExpensePaise: summary.pendingExtraExpensePaise,
-        totalPayablePaise: summary.totalApprovedPayablePaise,
+        totalPayablePaise,
         transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
         transactionReference: input.transactionReference?.trim() ?? null,
         notes: input.notes?.trim() ?? null,
@@ -1464,7 +1481,7 @@ export class AdminService {
         calculatedAllowancePaise: summary.calculatedAllowancePaise,
         approvedExtraExpensePaise: summary.approvedExtraExpensePaise,
         pendingExtraExpensePaise: summary.pendingExtraExpensePaise,
-        totalPayablePaise: summary.totalApprovedPayablePaise,
+        totalPayablePaise,
         transactionDate: input.transactionDate ? parseDateOnly(input.transactionDate) : null,
         transactionReference: input.transactionReference?.trim() ?? null,
         notes: input.notes?.trim() ?? null,

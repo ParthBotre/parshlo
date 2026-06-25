@@ -85,7 +85,7 @@ export function WorkReportSubmission({
     const form = new FormData(event.currentTarget);
     const payload = {
       workDate: stringValue(form, 'workDate'),
-      worked: form.get('worked') === 'on',
+      worked: true,
       location: stringValue(form, 'location'),
       orthCalls: numberValue(form, 'orthCalls'),
       mdCalls: numberValue(form, 'mdCalls'),
@@ -147,10 +147,6 @@ export function WorkReportSubmission({
             <Field label="Location">
               <Input name="location" placeholder="CITY / HQ" required />
             </Field>
-            <label className="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm">
-              <input name="worked" type="checkbox" defaultChecked />
-              Worked today
-            </label>
             <Field label="ORTH">
               <Input
                 name="orthCalls"
