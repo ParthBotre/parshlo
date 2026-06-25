@@ -542,6 +542,7 @@ model EmployeeHrRecord {
   emergencyContactRelationship String?
   emergencyContactNumber       String?
   panNumber                    String?
+  aadhaarNumber                String?
 
   grossMonthlyPaise            BigInt
   basicMonthlyPaise            BigInt

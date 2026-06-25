@@ -46,6 +46,7 @@ export function WorkReportSubmission({
   const [reports, setReports] = useState(initialReports);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [orth, setOrth] = useState(0);
   const [md, setMd] = useState(0);
   const [gp, setGp] = useState(0);
@@ -108,6 +109,29 @@ export function WorkReportSubmission({
     const saved = json as MyWorkLog;
     setReports((current) => [saved, ...current.filter((report) => report.id !== saved.id)]);
     setMessage('Work report saved.');
+  }
+
+  async function deleteReport(report: MyWorkLog): Promise<void> {
+    const confirmed = window.confirm(`Delete work report for ${formatDateIst(report.workDate)}?`);
+    if (!confirmed) return;
+    setMessage(null);
+    setError(null);
+    setDeletingId(report.id);
+    try {
+      const res = await fetch(`/api/dashboard/work-logs/${encodeURIComponent(report.id)}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        const json: unknown = await res.json().catch(() => null);
+        setError(readProblem(json, 'Could not delete work report.'));
+        return;
+      }
+      setReports((current) => current.filter((item) => item.id !== report.id));
+      setMessage('Work report deleted.');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -191,7 +215,7 @@ export function WorkReportSubmission({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1220px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Date</th>
@@ -203,6 +227,8 @@ export function WorkReportSubmission({
                   <th className="px-4 py-3 text-right">Others</th>
                   <th className="px-4 py-3 text-right">Total DR</th>
                   <th className="px-4 py-3 text-right">Total Chemist</th>
+                  <th className="px-4 py-3">Remarks</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -219,6 +245,20 @@ export function WorkReportSubmission({
                     <td className="px-4 py-3 text-right font-mono">{report.otherCalls}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.totalDoctors}</td>
                     <td className="px-4 py-3 text-right font-mono">{report.totalChemist}</td>
+                    <td className="text-muted-foreground max-w-[260px] px-4 py-3">
+                      {report.note?.trim() ? report.note : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={deletingId === report.id}
+                        onClick={() => void deleteReport(report)}
+                      >
+                        {deletingId === report.id ? 'Deleting...' : 'Delete'}
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

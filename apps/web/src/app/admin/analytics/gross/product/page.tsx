@@ -1,17 +1,18 @@
 import { ArrowLeft } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { type ReactNode } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { getSalesAnalytics } from '@/lib/api/admin';
+import { getProductSalesByCity } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 import { dateInputKeyIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Admin · Sales analytics',
+  title: 'Admin · Product sales by city',
   robots: { index: false, follow: false },
 };
 
@@ -26,6 +27,7 @@ type Period = (typeof PERIODS)[number]['key'];
 
 interface PageProps {
   searchParams: Promise<{
+    productId?: string;
     period?: string;
     anchor?: string;
   }>;
@@ -81,15 +83,8 @@ function yearOptions(): string[] {
 function periodFieldLabel(period: Period): string {
   if (period === 'day') return 'Day';
   if (period === 'week') return 'Week starting';
-  if (period === 'month') {
-    return 'Month';
-  }
+  if (period === 'month') return 'Month';
   return 'Year';
-}
-
-function cityDetailHref(city: string, period: Period, anchor: string): string {
-  const params = new URLSearchParams({ city, period, anchor });
-  return `/admin/analytics/gross/location?${params.toString()}`;
 }
 
 function productDetailHref(productId: string, period: Period, anchor: string): string {
@@ -97,7 +92,7 @@ function productDetailHref(productId: string, period: Period, anchor: string): s
   return `/admin/analytics/gross/product?${params.toString()}`;
 }
 
-export default async function GrossSalesByCityPage({
+export default async function ProductSalesByCityPage({
   searchParams,
 }: PageProps): Promise<JSX.Element> {
   const session = await getSession();
@@ -105,18 +100,23 @@ export default async function GrossSalesByCityPage({
     return <></>;
   }
 
-  const { period: rawPeriod, anchor: rawAnchor } = await searchParams;
+  const { productId: rawProductId, period: rawPeriod, anchor: rawAnchor } = await searchParams;
+  const productId = rawProductId?.trim();
+  if (!productId) {
+    notFound();
+  }
+
   const period = isPeriod(rawPeriod) ? rawPeriod : 'month';
   const anchor = normalizeAnchor(period, rawAnchor);
   const months = monthOptions();
   const years = yearOptions();
 
-  let analytics: Awaited<ReturnType<typeof getSalesAnalytics>> | null = null;
+  let report: Awaited<ReturnType<typeof getProductSalesByCity>> | null = null;
   let loadError: string | null = null;
   try {
-    analytics = await getSalesAnalytics(
+    report = await getProductSalesByCity(
       session.accessToken,
-      { period, anchor },
+      { productId, period, anchor },
       { next: { revalidate: 0 } },
     );
   } catch (err) {
@@ -130,18 +130,18 @@ export default async function GrossSalesByCityPage({
   return (
     <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
       <Link
-        href="/admin"
+        href={`/admin/analytics/gross?period=${period}&anchor=${anchor}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
       >
-        <ArrowLeft className="h-4 w-4" /> Analytics
+        <ArrowLeft className="h-4 w-4" /> Sales analytics
       </Link>
 
       <div>
         <h1 className="font-display break-words text-2xl font-semibold tracking-tight sm:text-3xl">
-          Sales analytics
+          {report?.productName ?? 'Product sales by city'}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Gross sales, product-wise sales, and city-wise sales for the selected period.
+          City-wise sales for this product in the selected period.
         </p>
       </div>
 
@@ -150,9 +150,9 @@ export default async function GrossSalesByCityPage({
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <div className="bg-secondary/50 flex w-full max-w-full overflow-x-auto rounded-md p-1 sm:w-auto">
               {PERIODS.map((p) => (
-                <a
+                <Link
                   key={p.key}
-                  href={`/admin/analytics/gross?period=${p.key}&anchor=${defaultAnchor(p.key)}`}
+                  href={productDetailHref(productId, p.key, defaultAnchor(p.key))}
                   className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                     period === p.key
                       ? 'bg-background text-foreground shadow-sm'
@@ -160,13 +160,14 @@ export default async function GrossSalesByCityPage({
                   }`}
                 >
                   {p.label}
-                </a>
+                </Link>
               ))}
             </div>
             <form
               method="get"
               className="grid w-full max-w-full gap-2 sm:flex sm:flex-wrap sm:items-end"
             >
+              <input type="hidden" name="productId" value={productId} />
               <input type="hidden" name="period" value={period} />
               {period === 'month' ? (
                 <label className="text-muted-foreground grid gap-1 text-xs font-medium">
@@ -226,65 +227,38 @@ export default async function GrossSalesByCityPage({
         </p>
       ) : null}
 
-      <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2">
-        <Card className="min-w-0 overflow-hidden">
-          <CardContent className="p-5">
-            <p className="text-muted-foreground text-xs uppercase tracking-wider">
-              Gross sale {analytics ? `· ${analytics.label}` : ''}
-            </p>
-            <p className="font-display mt-1 text-2xl font-semibold">
-              {formatINR(analytics?.totalGrossPaise ?? 0)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 overflow-hidden">
-          <CardContent className="p-5">
-            <p className="text-muted-foreground text-xs uppercase tracking-wider">Orders</p>
-            <p className="font-display mt-1 text-2xl font-semibold">
-              {analytics?.totalOrders ?? 0}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Product gross" value={formatINR(report?.totalGrossPaise ?? 0)} />
+        <Metric label="Orders" value={String(report?.totalOrders ?? 0)} />
+        <Metric label="Paid qty" value={String(report?.chargedQuantity ?? 0)} />
+        <Metric label="Free qty" value={String(report?.freeQuantity ?? 0)} />
       </div>
 
-      <div className="grid w-full min-w-0 gap-6 xl:grid-cols-2">
-        <SalesTable
-          title="Product-wise sales"
-          empty="No product sales in this period."
-          headers={['Product', 'Qty', 'Free', 'Gross', 'Share']}
-          rows={(analytics?.productRows ?? []).map((row) => [
-            <Link
-              key={row.productId}
-              href={productDetailHref(row.productId, period, anchor)}
-              className="text-primary break-words font-medium hover:underline"
-            >
-              {row.productName}
-            </Link>,
-            row.chargedQuantity,
-            row.freeQuantity,
-            formatINR(row.grossPaise),
-            `${row.sharePercent}%`,
-          ])}
-        />
-        <SalesTable
-          title="City-wise sales"
-          empty="No city sales in this period."
-          headers={['City', 'Orders', 'Gross', 'Share']}
-          rows={(analytics?.regionRows ?? []).map((row) => [
-            <Link
-              key={row.region}
-              href={cityDetailHref(row.region, period, anchor)}
-              className="text-primary break-words font-medium hover:underline"
-            >
-              {row.region}
-            </Link>,
-            row.orderCount,
-            formatINR(row.grossPaise),
-            `${row.sharePercent}%`,
-          ])}
-        />
-      </div>
+      <SalesTable
+        title={`City-wise product sales${report ? ` · ${report.label}` : ''}`}
+        empty="No city sales for this product in this period."
+        headers={['City', 'Orders', 'Paid Qty', 'Free Qty', 'Gross', 'Share']}
+        rows={(report?.cityRows ?? []).map((row) => [
+          row.city,
+          row.orderCount,
+          row.chargedQuantity,
+          row.freeQuantity,
+          formatINR(row.grossPaise),
+          `${row.sharePercent}%`,
+        ])}
+      />
     </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <Card className="min-w-0 overflow-hidden">
+      <CardContent className="p-5">
+        <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
+        <p className="font-display mt-1 break-words text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -309,7 +283,7 @@ function SalesTable({
           <p className="text-muted-foreground p-8 text-center text-sm">{empty}</p>
         ) : (
           <div className="w-full max-w-full overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
                 <tr>
                   {headers.map((header, index) => (

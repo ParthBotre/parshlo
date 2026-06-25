@@ -999,7 +999,7 @@ export class AdminService {
           orderBy: [{ status: 'asc' }, { expenseDate: 'desc' }],
         }),
         this.prisma.employeeWorkLog.findMany({
-          take: 100,
+          take: 1000,
           include: { employee: { select: { fullName: true } } },
           orderBy: { workDate: 'desc' },
         }),
@@ -1075,6 +1075,7 @@ export class AdminService {
         ),
         emergencyContactNumber: this.normalizeOptionalText(input.emergencyContactNumber),
         panNumber: this.normalizeOptionalUpper(input.panNumber),
+        aadhaarNumber: this.normalizeOptionalText(input.aadhaarNumber),
         grossMonthlyPaise: input.grossMonthlyPaise,
         basicMonthlyPaise: salary.basicMonthlyPaise,
         hraMonthlyPaise: salary.hraMonthlyPaise,
@@ -1113,6 +1114,7 @@ export class AdminService {
         ),
         emergencyContactNumber: this.normalizeOptionalText(input.emergencyContactNumber),
         panNumber: this.normalizeOptionalUpper(input.panNumber),
+        aadhaarNumber: this.normalizeOptionalText(input.aadhaarNumber),
         grossMonthlyPaise: input.grossMonthlyPaise,
         basicMonthlyPaise: salary.basicMonthlyPaise,
         hraMonthlyPaise: salary.hraMonthlyPaise,
@@ -2181,6 +2183,7 @@ export class AdminService {
     emergencyContactRelationship: string | null;
     emergencyContactNumber: string | null;
     panNumber: string | null;
+    aadhaarNumber: string | null;
     grossMonthlyPaise: bigint;
     basicMonthlyPaise: bigint;
     hraMonthlyPaise: bigint;
@@ -2225,6 +2228,7 @@ export class AdminService {
       emergencyContactRelationship: record.emergencyContactRelationship,
       emergencyContactNumber: record.emergencyContactNumber,
       panNumber: record.panNumber,
+      aadhaarNumber: record.aadhaarNumber,
       grossMonthlyPaise: toNumber(record.grossMonthlyPaise),
       basicMonthlyPaise: toNumber(record.basicMonthlyPaise),
       hraMonthlyPaise: toNumber(record.hraMonthlyPaise),
@@ -2989,6 +2993,112 @@ export class AdminService {
         .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
         .sort((a, b) => b.grossPaise - a.grossPaise),
       regionRows: [...regionBuckets.values()]
+        .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
+        .sort((a, b) => b.grossPaise - a.grossPaise),
+    };
+  }
+
+  async productSalesByCity(filters: {
+    productId?: string;
+    period?: string;
+    anchor?: string;
+  }): Promise<{
+    period: BuyerAnalyticsPeriod;
+    anchor: string;
+    label: string;
+    productId: string;
+    productName: string;
+    totalGrossPaise: number;
+    totalOrders: number;
+    chargedQuantity: number;
+    freeQuantity: number;
+    cityRows: {
+      city: string;
+      orderCount: number;
+      chargedQuantity: number;
+      freeQuantity: number;
+      grossPaise: number;
+      sharePercent: number;
+    }[];
+  }> {
+    const productId = filters.productId?.trim();
+    if (!productId) {
+      throw new BadRequestException({
+        code: 'PRODUCT_ID_REQUIRED',
+        message: 'Product is required.',
+      });
+    }
+
+    const period = AdminService.isBuyerAnalyticsPeriod(filters.period) ? filters.period : 'month';
+    const anchor = AdminService.normalizeAnalyticsAnchor(period, filters.anchor);
+    const range = AdminService.businessPeriodRange(period, anchor);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        placedAt: { gte: range.start, lt: range.end },
+        items: { some: { productId } },
+      },
+      include: {
+        items: { where: { productId } },
+        buyer: { select: { businessProfile: { select: { city: true } } } },
+      },
+    });
+
+    const cityBuckets = new Map<
+      string,
+      {
+        city: string;
+        orderCount: number;
+        chargedQuantity: number;
+        freeQuantity: number;
+        grossPaise: number;
+      }
+    >();
+    let productName = '';
+    let totalGrossPaise = 0;
+    let chargedQuantity = 0;
+    let freeQuantity = 0;
+
+    for (const order of orders) {
+      const city = order.buyer.businessProfile?.city.trim();
+      const cityName = city && city.length > 0 ? city : 'Unknown';
+      const bucket = cityBuckets.get(cityName) ?? {
+        city: cityName,
+        orderCount: 0,
+        chargedQuantity: 0,
+        freeQuantity: 0,
+        grossPaise: 0,
+      };
+      bucket.orderCount += 1;
+
+      for (const item of order.items) {
+        productName ||= item.productNameSnapshot;
+        bucket.chargedQuantity += item.quantity;
+        bucket.freeQuantity += item.schemeFreeQuantity;
+        bucket.grossPaise += Number(item.lineTotalPaise);
+        chargedQuantity += item.quantity;
+        freeQuantity += item.schemeFreeQuantity;
+        totalGrossPaise += Number(item.lineTotalPaise);
+      }
+      cityBuckets.set(cityName, bucket);
+    }
+
+    const product = productName
+      ? null
+      : await this.prisma.product.findUnique({ where: { id: productId }, select: { name: true } });
+    const share = (value: number): number =>
+      totalGrossPaise > 0 ? Math.round((value * 1000) / totalGrossPaise) / 10 : 0;
+
+    return {
+      period,
+      anchor,
+      label: AdminService.analyticsPeriodLabel(period, anchor),
+      productId,
+      productName: productName.length > 0 ? productName : (product?.name ?? 'Unknown product'),
+      totalGrossPaise,
+      totalOrders: orders.length,
+      chargedQuantity,
+      freeQuantity,
+      cityRows: [...cityBuckets.values()]
         .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
         .sort((a, b) => b.grossPaise - a.grossPaise),
     };

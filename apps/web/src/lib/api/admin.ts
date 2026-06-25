@@ -277,6 +277,28 @@ const SalesAnalytics = z.object({
   ),
 });
 
+const ProductSalesByCity = z.object({
+  period: SalesAnalyticsPeriod,
+  anchor: z.string(),
+  label: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+  totalGrossPaise: z.number(),
+  totalOrders: z.number(),
+  chargedQuantity: z.number(),
+  freeQuantity: z.number(),
+  cityRows: z.array(
+    z.object({
+      city: z.string(),
+      orderCount: z.number(),
+      chargedQuantity: z.number(),
+      freeQuantity: z.number(),
+      grossPaise: z.number(),
+      sharePercent: z.number(),
+    }),
+  ),
+});
+
 export function approveKyc(accessToken: string, id: string, note?: string): Promise<void> {
   return apiCall(`/v1/kyc/${encodeURIComponent(id)}/approve`, z.void(), {
     method: 'POST',
@@ -354,6 +376,21 @@ export function getSalesAnalytics(
   if (filters.anchor) params.set('anchor', filters.anchor);
   const search = params.toString() ? `?${params.toString()}` : '';
   return apiCall(`/v1/admin/analytics/sales${search}`, SalesAnalytics, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function getProductSalesByCity(
+  accessToken: string,
+  filters: { productId: string; period?: string; anchor?: string },
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<z.infer<typeof ProductSalesByCity>> {
+  const params = new URLSearchParams({ productId: filters.productId });
+  if (filters.period) params.set('period', filters.period);
+  if (filters.anchor) params.set('anchor', filters.anchor);
+  return apiCall(`/v1/admin/analytics/sales/product?${params.toString()}`, ProductSalesByCity, {
     method: 'GET',
     accessToken,
     ...options,

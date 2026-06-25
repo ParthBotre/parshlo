@@ -36,6 +36,17 @@ const MONTH_OPTIONS = [
   ['12', 'December'],
 ] as const;
 
+const HR_SECTIONS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'records', label: 'Records & Letters' },
+  { key: 'salary', label: 'Salary Slips' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'holidays', label: 'Holidays' },
+  { key: 'work', label: 'Work Reports' },
+] as const;
+
+type HrSection = (typeof HR_SECTIONS)[number]['key'];
+
 type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'INCREMENT_LETTER';
 
 interface EmailDocumentDraft {
@@ -72,6 +83,7 @@ interface HrRecordFormState {
   emergencyContactRelationship: string;
   emergencyContactNumber: string;
   panNumber: string;
+  aadhaarNumber: string;
   grossMonthly: string;
   allowanceMonthly: string;
   dailyAllowance: string;
@@ -131,6 +143,7 @@ function blankRecordForm(employeeId: string): HrRecordFormState {
     emergencyContactRelationship: '',
     emergencyContactNumber: '',
     panNumber: '',
+    aadhaarNumber: '',
     grossMonthly: '',
     allowanceMonthly: '15000.00',
     dailyAllowance: '500.00',
@@ -165,6 +178,7 @@ function formFromRecord(record: HrEmployeeRecord): HrRecordFormState {
     emergencyContactRelationship: record.emergencyContactRelationship ?? '',
     emergencyContactNumber: record.emergencyContactNumber ?? '',
     panNumber: record.panNumber ?? '',
+    aadhaarNumber: record.aadhaarNumber ?? '',
     grossMonthly: rupeesInputFromPaise(record.grossMonthlyPaise),
     allowanceMonthly: rupeesInputFromPaise(record.allowanceMonthlyPaise),
     dailyAllowance: rupeesInputFromPaise(record.dailyAllowancePaise),
@@ -227,6 +241,50 @@ function periodLabel(periodMonth: string): string {
   return `${monthName(month)} ${year}`.trim();
 }
 
+function parseDateOnlyUtc(value: string): Date {
+  return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+}
+
+function monthRange(periodMonth: string): { start: Date; end: Date } {
+  const [year, month] = periodMonth.split('-').map((part) => Number.parseInt(part, 10));
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 0)),
+  };
+}
+
+function yearRange(year: string): { start: Date; end: Date } {
+  const parsed = Number.parseInt(year, 10);
+  return {
+    start: new Date(Date.UTC(parsed, 0, 1)),
+    end: new Date(Date.UTC(parsed, 11, 31)),
+  };
+}
+
+function dateInRange(value: string, range: { start: Date; end: Date }): boolean {
+  const date = parseDateOnlyUtc(value);
+  return date >= range.start && date <= range.end;
+}
+
+function payableDaysOverlap(
+  startDate: string,
+  endDate: string,
+  range: { start: Date; end: Date },
+): number {
+  const start =
+    parseDateOnlyUtc(startDate) > range.start ? parseDateOnlyUtc(startDate) : range.start;
+  const end = parseDateOnlyUtc(endDate) < range.end ? parseDateOnlyUtc(endDate) : range.end;
+  if (start > end) return 0;
+
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (cursor.getUTCDay() !== 0) count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
+}
+
 function promptIncrementDetails(): { incrementAmountPaise: number; effectiveDate: string } | null {
   const amount = window.prompt('Increment amount in rupees');
   if (amount === null) return null;
@@ -257,6 +315,7 @@ export function HrManagement({
   const [expenseSlips, setExpenseSlips] = useState(dashboard.expenseSlips);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<HrSection>('overview');
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
   const [salaryPeriod, setSalaryPeriod] = useState(currentPeriodMonth);
   const [expenseSlipPeriod, setExpenseSlipPeriod] = useState(currentPeriodMonth);
@@ -284,6 +343,99 @@ export function HrManagement({
     () => expenseSlips.filter((slip) => slip.periodMonth.slice(0, 7) === expenseSlipPeriod),
     [expenseSlipPeriod, expenseSlips],
   );
+  const pendingExpenseCount = dashboard.expenses.filter(
+    (expense) => expense.status === 'PENDING',
+  ).length;
+  const pendingLeaveCount = dashboard.leaveRequests.filter(
+    (request) => request.status === 'PENDING',
+  ).length;
+  const expensePayableRows = useMemo(() => {
+    const range = monthRange(expenseSlipPeriod);
+    return activeRecords
+      .map((record) => {
+        const workedDays = dashboard.workLogs.filter(
+          (log) =>
+            log.employeeId === record.employeeId && log.worked && dateInRange(log.workDate, range),
+        ).length;
+        const fixedAllowancePaise = record.petrolAllowancePaise + record.mobileAllowancePaise;
+        const dailyAllowanceTotalPaise = Math.max(
+          0,
+          Math.min(
+            record.dailyAllowancePaise * workedDays,
+            record.allowanceMonthlyPaise - fixedAllowancePaise,
+          ),
+        );
+        const calculatedAllowancePaise = dailyAllowanceTotalPaise + fixedAllowancePaise;
+        const employeeExpenses = dashboard.expenses.filter(
+          (expense) =>
+            expense.employeeId === record.employeeId && dateInRange(expense.expenseDate, range),
+        );
+        const approvedExtraExpensePaise = employeeExpenses
+          .filter((expense) => expense.status === 'APPROVED')
+          .reduce((total, expense) => total + expense.amountPaise, 0);
+        const pendingExtraExpensePaise = employeeExpenses
+          .filter((expense) => expense.status === 'PENDING')
+          .reduce((total, expense) => total + expense.amountPaise, 0);
+        const rejectedExtraExpensePaise = employeeExpenses
+          .filter((expense) => expense.status === 'REJECTED')
+          .reduce((total, expense) => total + expense.amountPaise, 0);
+        const savedSlip = selectedExpenseSlips.find(
+          (slip) => slip.employeeId === record.employeeId,
+        );
+        return {
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          workedDays,
+          calculatedAllowancePaise,
+          approvedExtraExpensePaise,
+          pendingExtraExpensePaise,
+          rejectedExtraExpensePaise,
+          totalPayablePaise: calculatedAllowancePaise + approvedExtraExpensePaise,
+          slipStatus: savedSlip ? 'Saved' : 'Not saved',
+        };
+      })
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }, [
+    activeRecords,
+    dashboard.expenses,
+    dashboard.workLogs,
+    expenseSlipPeriod,
+    selectedExpenseSlips,
+  ]);
+  const holidaySummaryRows = useMemo(() => {
+    const month = monthRange(holidayPeriod);
+    const year = yearRange(holidayPeriod.slice(0, 4));
+    return activeRecords
+      .map((record) => {
+        const employeeRequests = dashboard.leaveRequests.filter(
+          (request) => request.employeeId === record.employeeId,
+        );
+        const approvedRequests = employeeRequests.filter(
+          (request) => request.status === 'APPROVED',
+        );
+        const pendingRequests = employeeRequests.filter((request) => request.status === 'PENDING');
+        return {
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          monthApprovedDays: approvedRequests.reduce(
+            (total, request) =>
+              total + payableDaysOverlap(request.startDate, request.endDate, month),
+            0,
+          ),
+          yearApprovedDays: approvedRequests.reduce(
+            (total, request) =>
+              total + payableDaysOverlap(request.startDate, request.endDate, year),
+            0,
+          ),
+          cumulativeApprovedDays: approvedRequests.reduce(
+            (total, request) => total + request.dayCount,
+            0,
+          ),
+          pendingDays: pendingRequests.reduce((total, request) => total + request.dayCount, 0),
+        };
+      })
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }, [activeRecords, dashboard.leaveRequests, holidayPeriod]);
   const workSummaryRows = useMemo(() => {
     const rows = new Map<
       string,
@@ -321,9 +473,23 @@ export function HrManagement({
       }))
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
   }, [dashboard.workLogs, workEmployeeId, workPeriod]);
+  const workDetailRows = useMemo(
+    () =>
+      dashboard.workLogs
+        .filter((log) => log.workDate.slice(0, 7) === workPeriod)
+        .filter((log) => workEmployeeId === 'all' || log.employeeId === workEmployeeId)
+        .sort((a, b) => {
+          const dateCompare = b.workDate.localeCompare(a.workDate);
+          return dateCompare === 0 ? a.employeeName.localeCompare(b.employeeName) : dateCompare;
+        }),
+    [dashboard.workLogs, workEmployeeId, workPeriod],
+  );
   const maxWorkReports = Math.max(1, ...workSummaryRows.map((row) => row.reports));
   const maxWorkDoctors = Math.max(1, ...workSummaryRows.map((row) => row.doctors));
   const maxWorkChemists = Math.max(1, ...workSummaryRows.map((row) => row.chemists));
+  const activeSectionLabel =
+    HR_SECTIONS.find((section) => section.key === activeSection)?.label ?? 'Overview';
+  const sectionClass = (section: HrSection): string => (activeSection === section ? '' : 'hidden');
 
   function updateRecordForm<K extends keyof HrRecordFormState>(
     key: K,
@@ -387,6 +553,7 @@ export function HrManagement({
           emergencyContactRelationship: recordForm.emergencyContactRelationship || null,
           emergencyContactNumber: recordForm.emergencyContactNumber || null,
           panNumber: recordForm.panNumber || null,
+          aadhaarNumber: recordForm.aadhaarNumber || null,
           grossMonthlyPaise: rupeesToPaise(recordForm.grossMonthly),
           allowanceMonthlyPaise: rupeesToPaise(recordForm.allowanceMonthly),
           dailyAllowancePaise: rupeesToPaise(recordForm.dailyAllowance),
@@ -676,7 +843,116 @@ export function HrManagement({
         </div>
       ) : null}
 
-      <Card>
+      <section className="bg-card space-y-4 rounded-xl border p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+              Super Admin HR
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">HR Control Center</h2>
+            <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
+              {activeSectionLabel} · employee records, payroll, reimbursements, holidays, and field
+              activity are separated into focused work areas.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-[320px]">
+            <MetricCard label="Active Employees" value={String(activeRecords.length)} />
+            <MetricCard
+              label="Pending Actions"
+              value={String(pendingExpenseCount + pendingLeaveCount)}
+            />
+          </div>
+        </div>
+
+        <div className="bg-muted/30 overflow-x-auto rounded-lg border p-1">
+          <div className="flex min-w-max gap-1">
+            {HR_SECTIONS.map((section) => (
+              <button
+                key={section.key}
+                type="button"
+                aria-pressed={activeSection === section.key}
+                className={
+                  activeSection === section.key
+                    ? 'bg-background rounded-md px-3 py-2 text-sm font-semibold shadow-sm'
+                    : 'text-muted-foreground hover:bg-background/70 hover:text-foreground rounded-md px-3 py-2 text-sm font-medium'
+                }
+                onClick={() => setActiveSection(section.key)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {activeSection === 'overview' ? (
+        <section className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="HR Records" value={String(records.length)} />
+            <MetricCard label="Salary Slips" value={String(selectedSalarySlips.length)} />
+            <MetricCard label="Expense Slips" value={String(selectedExpenseSlips.length)} />
+            <MetricCard label="Pending Leaves" value={String(pendingLeaveCount)} />
+            <MetricCard label="Pending Expenses" value={String(pendingExpenseCount)} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Monthly Payroll Snapshot</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  {periodLabel(salaryPeriod)} · saved salary slips and employee records.
+                </p>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-3">
+                <MetricCard label="Saved Slips" value={String(selectedSalarySlips.length)} />
+                <MetricCard label="Employees" value={String(activeRecords.length)} />
+                <MetricCard
+                  label="Net Pay Saved"
+                  value={formatINR(
+                    selectedSalarySlips.reduce((total, slip) => total + slip.netPayPaise, 0),
+                  )}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Expense Payables Snapshot</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  {periodLabel(expenseSlipPeriod)} · allowance plus approved extra claims.
+                </p>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-3">
+                <MetricCard
+                  label="Payable"
+                  value={formatINR(
+                    expensePayableRows.reduce((total, row) => total + row.totalPayablePaise, 0),
+                  )}
+                />
+                <MetricCard
+                  label="Pending Extra"
+                  value={formatINR(
+                    expensePayableRows.reduce(
+                      (total, row) => total + row.pendingExtraExpensePaise,
+                      0,
+                    ),
+                  )}
+                />
+                <MetricCard label="Saved Slips" value={String(selectedExpenseSlips.length)} />
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <QuickAction
+              label="Create / edit HR record"
+              onClick={() => setActiveSection('records')}
+            />
+            <QuickAction label="Prepare salary slips" onClick={() => setActiveSection('salary')} />
+            <QuickAction label="Review expenses" onClick={() => setActiveSection('expenses')} />
+            <QuickAction label="Check work reports" onClick={() => setActiveSection('work')} />
+          </div>
+        </section>
+      ) : null}
+
+      <Card className={sectionClass('records')}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -879,6 +1155,17 @@ export function HrManagement({
                 onChange={(event) => updateRecordForm('panNumber', event.target.value)}
               />
             </Field>
+            <Field label="Aadhaar No">
+              <Input
+                name="aadhaarNumber"
+                inputMode="numeric"
+                maxLength={12}
+                pattern="\d{12}"
+                placeholder="12 digits"
+                value={recordForm.aadhaarNumber}
+                onChange={(event) => updateRecordForm('aadhaarNumber', event.target.value)}
+              />
+            </Field>
             <Field label="Gross salary/month">
               <Input
                 name="grossMonthly"
@@ -967,7 +1254,7 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('salary')}>
         <CardHeader>
           <CardTitle className="text-base">Salary Slip</CardTitle>
         </CardHeader>
@@ -1024,7 +1311,45 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('expenses')}>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Employee Expense Payables</CardTitle>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Employee-wise allowance and approved extra claims for the selected month.
+              </p>
+            </div>
+            <MonthYearSelect value={expenseSlipPeriod} onChange={setExpenseSlipPeriod} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table
+            headers={[
+              'Employee',
+              'Worked Days',
+              'Auto Allowance',
+              'Approved Extra',
+              'Pending Extra',
+              'Rejected Extra',
+              'Payable',
+              'Slip',
+            ]}
+            rows={expensePayableRows.map((row) => [
+              row.employeeName,
+              row.workedDays,
+              formatINR(row.calculatedAllowancePaise),
+              formatINR(row.approvedExtraExpensePaise),
+              formatINR(row.pendingExtraExpensePaise),
+              formatINR(row.rejectedExtraExpensePaise),
+              formatINR(row.totalPayablePaise),
+              row.slipStatus,
+            ])}
+          />
+        </CardContent>
+      </Card>
+
+      <Card className={sectionClass('salary')}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1071,7 +1396,7 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('expenses')}>
         <CardHeader>
           <CardTitle className="text-base">Expense Slip</CardTitle>
           <p className="text-muted-foreground text-sm">
@@ -1129,7 +1454,7 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('expenses')}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1174,7 +1499,7 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('holidays')}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1186,7 +1511,23 @@ export function HrManagement({
             <MonthYearSelect value={holidayPeriod} onChange={setHolidayPeriod} />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
+          <Table
+            headers={[
+              'Employee',
+              'Approved This Month',
+              'Approved This Year',
+              'Cumulative Approved',
+              'Pending',
+            ]}
+            rows={holidaySummaryRows.map((row) => [
+              row.employeeName,
+              row.monthApprovedDays,
+              row.yearApprovedDays,
+              row.cumulativeApprovedDays,
+              row.pendingDays,
+            ])}
+          />
           <Table
             headers={['Employee', 'From', 'To', 'Days', 'Status', 'Reason']}
             rows={selectedLeaveRequests.map((request) => [
@@ -1201,7 +1542,7 @@ export function HrManagement({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('work')}>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1301,10 +1642,46 @@ export function HrManagement({
               row.avgChemists.toFixed(1),
             ])}
           />
+          <div>
+            <h3 className="text-sm font-semibold">Daily report details</h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Date-wise view of employee activity for {periodLabel(workPeriod)}.
+            </p>
+          </div>
+          <Table
+            headers={[
+              'Date',
+              'Employee',
+              'Worked',
+              'Location',
+              'ORTH',
+              'MD',
+              'GP',
+              'GYN',
+              'Others',
+              'Total DR',
+              'Chemist',
+              'Remarks',
+            ]}
+            rows={workDetailRows.map((log) => [
+              formatDateIst(log.workDate),
+              log.employeeName,
+              log.worked ? 'Yes' : 'No',
+              log.location ?? '-',
+              log.orthCalls,
+              log.mdCalls,
+              log.gpCalls,
+              log.gynCalls,
+              log.otherCalls,
+              log.totalDoctors,
+              log.totalChemist,
+              log.note?.trim() ? log.note : '-',
+            ])}
+          />
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={sectionClass('records')}>
         <CardHeader>
           <CardTitle className="text-base">HR Records</CardTitle>
         </CardHeader>
@@ -1459,6 +1836,18 @@ function MetricCard({ label, value }: { label: string; value: string }): JSX.Ele
       <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
+  );
+}
+
+function QuickAction({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="bg-card rounded-lg border p-4 text-left text-sm font-semibold shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20"
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
 

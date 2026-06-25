@@ -21,6 +21,11 @@ export type HrExpenseStatus = z.infer<typeof HrExpenseStatus>;
 export const HrMoneyPaise = z.coerce.number().int().min(0).max(100_000_000_00);
 export type HrMoneyPaise = z.infer<typeof HrMoneyPaise>;
 
+const AadhaarNumber = z
+  .string()
+  .trim()
+  .regex(/^\d{12}$/, 'Aadhaar number must be 12 digits');
+
 export const HrEmployeeRecordView = z.object({
   id: EntityId,
   employeeId: EntityId,
@@ -49,6 +54,7 @@ export const HrEmployeeRecordView = z.object({
   emergencyContactRelationship: z.string().nullable(),
   emergencyContactNumber: z.string().nullable(),
   panNumber: z.string().nullable(),
+  aadhaarNumber: z.string().nullable(),
   grossMonthlyPaise: HrMoneyPaise,
   basicMonthlyPaise: HrMoneyPaise,
   hraMonthlyPaise: HrMoneyPaise,
@@ -90,6 +96,7 @@ export const UpsertHrEmployeeRecordInputSchema = z.object({
   emergencyContactRelationship: z.string().trim().max(80).optional().nullable(),
   emergencyContactNumber: z.string().trim().max(30).optional().nullable(),
   panNumber: z.string().trim().max(20).optional().nullable(),
+  aadhaarNumber: AadhaarNumber.optional().nullable(),
   grossMonthlyPaise: HrMoneyPaise,
   allowanceMonthlyPaise: HrMoneyPaise.default(1_500_000),
   dailyAllowancePaise: HrMoneyPaise.default(50_000),

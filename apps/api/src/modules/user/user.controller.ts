@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   type AuthPrincipal,
@@ -86,5 +86,11 @@ export class UserController {
     @Body(new ZodValidationPipe(CreateMyHrWorkLogInputSchema)) body: CreateMyHrWorkLogInput,
   ): Promise<HrWorkLogView> {
     return this.userService.upsertWorkLog(user.userId, body);
+  }
+
+  @Delete('me/work-logs/:id')
+  @HttpCode(204)
+  deleteWorkLog(@CurrentUser() user: AuthPrincipal, @Param('id') id: string): Promise<void> {
+    return this.userService.deleteWorkLog(user.userId, id);
   }
 }

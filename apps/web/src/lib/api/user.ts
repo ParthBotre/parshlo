@@ -130,3 +130,15 @@ export function createMyWorkLog(
     ...options,
   });
 }
+
+export async function deleteMyWorkLog(
+  accessToken: string,
+  id: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  await apiCall(`/v1/users/me/work-logs/${encodeURIComponent(id)}`, z.undefined().optional(), {
+    method: 'DELETE',
+    accessToken,
+    ...options,
+  });
+}

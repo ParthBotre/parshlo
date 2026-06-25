@@ -110,6 +110,15 @@ export class AdminController {
     return this.admin.salesAnalytics({ period, anchor });
   }
 
+  @Get('analytics/sales/product')
+  productSalesByCity(
+    @Query('productId') productId?: string,
+    @Query('period') period?: string,
+    @Query('anchor') anchor?: string,
+  ): ReturnType<AdminService['productSalesByCity']> {
+    return this.admin.productSalesByCity({ productId, period, anchor });
+  }
+
   @Post('orders')
   @HttpCode(201)
   @Throttle(THROTTLE_ORDER_PLACE)

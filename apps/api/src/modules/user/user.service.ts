@@ -136,6 +136,17 @@ export class UserService {
     return this.toWorkLogView(log);
   }
 
+  async deleteWorkLog(employeeId: string, id: string): Promise<void> {
+    const log = await this.prisma.employeeWorkLog.findFirst({
+      where: { id, employeeId },
+      select: { id: true },
+    });
+    if (!log) {
+      throw new NotFoundException({ code: 'WORK_LOG_NOT_FOUND' });
+    }
+    await this.prisma.employeeWorkLog.delete({ where: { id } });
+  }
+
   async createExpense(employeeId: string, input: CreateMyHrExpenseInput): Promise<HrExpenseView> {
     const expense = await this.prisma.employeeExpense.create({
       data: {
