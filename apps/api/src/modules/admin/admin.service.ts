@@ -2805,20 +2805,27 @@ export class AdminService {
       if (!separator) return false;
       const [key, ...rest] = line.split(separator);
       const value = rest.join(separator).trim();
-      if (!key || key.length > 36 || value.length > 90) return false;
-      page.drawText(key.trim(), {
+      if (!key || key.length > 36) return false;
+      const label = `${key.trim()}${separator === ' : ' ? ' :' : ':'}`;
+      const labelWidth = bold.widthOfTextAtSize(label, 9.5);
+      const valueX = 58 + labelWidth + 5;
+      const valueLines = wrapLine(value || '-', pageSize[0] - valueX - 58, 9.5);
+      page.drawText(label, {
         x: 58,
         y,
         size: 9.5,
         font: bold,
         color: rgb(0.08, 0.1, 0.12),
       });
-      page.drawText(value || '-', {
-        x: 260,
-        y,
-        size: 9.5,
-        font,
-        color: rgb(0.08, 0.1, 0.12),
+      valueLines.forEach((valueLine, index) => {
+        if (index > 0) y -= 14;
+        page.drawText(valueLine, {
+          x: valueX,
+          y,
+          size: 9.5,
+          font,
+          color: rgb(0.08, 0.1, 0.12),
+        });
       });
       y -= 16;
       return true;

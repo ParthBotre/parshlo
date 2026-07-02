@@ -294,15 +294,59 @@ function drawPaymentRows(
   notes: string | null,
 ): void {
   drawSectionTitle(ctx, 'Payment Details');
-  drawTwoColumnDetails(ctx, [
+  ensureSpace(ctx, 86);
+  drawBox(ctx.page, MARGIN_X, ctx.y - 74, CONTENT_WIDTH, 74, { border: BORDER });
+  drawBox(ctx.page, MARGIN_X, ctx.y - 22, CONTENT_WIDTH, 22, { fill: LIGHT_FILL, border: BORDER });
+  const columns: [string, string, number, number][] = [
+    ['NEFT/DD/CHQ DATE', formatDate(transactionDate), 12, 142],
+    ['NEFT/DD/CHQ NO.', transactionReference ?? '-', 184, 180],
+    ['AMOUNT', formatInr(amountPaise), 400, 112],
+  ];
+  for (const [label, value, x, width] of columns) {
+    drawText(ctx.page, label, MARGIN_X + x, ctx.y - 14, ctx.bold, 8, {
+      color: HEADER_GREEN,
+      maxWidth: width,
+    });
+    drawText(ctx.page, value, MARGIN_X + x, ctx.y - 42, ctx.font, 8.5, { maxWidth: width });
+  }
+  drawText(ctx.page, 'REMARKS', MARGIN_X + 12, ctx.y - 62, ctx.bold, 8, {
+    color: MUTED,
+  });
+  drawText(ctx.page, notes ?? '-', MARGIN_X + 82, ctx.y - 62, ctx.font, 8.5, {
+    maxWidth: CONTENT_WIDTH - 100,
+  });
+  ctx.y -= 88;
+}
+
+function drawReceiptPaymentRows(
+  ctx: PdfContext,
+  amountPaise: bigint | number,
+  transactionDate: Date | null,
+  transactionReference: string | null,
+  employeeName: string,
+  region: string,
+): void {
+  ensureSpace(ctx, 96);
+  drawBox(ctx.page, MARGIN_X, ctx.y - 84, CONTENT_WIDTH, 84, { border: BORDER });
+  const rows: [string, string, string, string][] = [
     [
       'NEFT/DD/CHQ DATE',
       formatDate(transactionDate),
       'NEFT/DD/CHQ NO.',
       transactionReference ?? '-',
     ],
-    ['AMOUNT', formatInr(amountPaise), 'REMARKS', notes ?? '-'],
-  ]);
+    ['AMOUNT', formatInr(amountPaise), 'NAME', employeeName],
+    ['DIVISION', 'PARSHLO', 'REGION', region],
+  ];
+  let rowY = ctx.y - 18;
+  for (const [leftLabel, leftValue, rightLabel, rightValue] of rows) {
+    drawText(ctx.page, leftLabel, MARGIN_X + 12, rowY, ctx.bold, 8, { color: MUTED });
+    drawText(ctx.page, leftValue, MARGIN_X + 126, rowY, ctx.font, 8.5, { maxWidth: 142 });
+    drawText(ctx.page, rightLabel, MARGIN_X + 296, rowY, ctx.bold, 8, { color: MUTED });
+    drawText(ctx.page, rightValue, MARGIN_X + 402, rowY, ctx.font, 8.5, { maxWidth: 110 });
+    rowY -= 24;
+  }
+  ctx.y -= 98;
 }
 
 function drawReceiptCutout(
@@ -334,16 +378,14 @@ function drawReceiptCutout(
     9.5,
   );
   ctx.y -= 28;
-  drawTwoColumnDetails(ctx, [
-    [
-      'NEFT/DD/CHQ DATE',
-      formatDate(transactionDate),
-      'NEFT/DD/CHQ NO.',
-      transactionReference ?? '-',
-    ],
-    ['AMOUNT', formatInr(amountPaise), 'NAME', employeeName],
-    ['DIVISION', 'PARSHLO', 'REGION', region],
-  ]);
+  drawReceiptPaymentRows(
+    ctx,
+    amountPaise,
+    transactionDate,
+    transactionReference,
+    employeeName,
+    region,
+  );
 }
 
 async function createContext(): Promise<PdfContext> {
