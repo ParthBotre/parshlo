@@ -13,6 +13,10 @@ import {
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
+import {
+  renderExpenseSlipPdf as renderHrExpenseSlipPdf,
+  renderSalarySlipPdf as renderHrSalarySlipPdf,
+} from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 function formatDateOnly(value: Date): string {
@@ -192,7 +196,32 @@ export class UserService {
 
     const salarySlip = this.toSalarySlipView(slip);
     const fileName = `salary_slip_${record.employeeCode}_${formatDateOnly(slip.periodMonth).slice(0, 7)}.pdf`;
-    const bytes = await this.renderSalarySlipPdf(record, slip);
+    const bytes = await renderHrSalarySlipPdf(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        department: record.department,
+        gender: record.gender,
+        region: record.region,
+        headQuarter: record.headQuarter,
+        panNumber: record.panNumber,
+        bankDetails: record.bankDetails,
+        bankAccountNumber: record.bankAccountNumber,
+      },
+      {
+        periodMonth: slip.periodMonth,
+        workingDays: slip.workingDays,
+        basicPaise: slip.basicPaise,
+        hraPaise: slip.hraPaise,
+        specialAllowancePaise: slip.specialAllowancePaise,
+        deductionPaise: slip.deductionPaise,
+        netPayPaise: slip.netPayPaise,
+        transactionDate: slip.transactionDate,
+        transactionReference: slip.transactionReference,
+        notes: slip.notes,
+      },
+    );
 
     return {
       salarySlip,
@@ -207,7 +236,7 @@ export class UserService {
     periodMonth: string,
   ): Promise<EmployeeExpenseSlipDownloadResponse> {
     const { start, end } = monthBounds(periodMonth);
-    const [slip, employee, expenses] = await Promise.all([
+    const [slip, employee, expenses, workLogs] = await Promise.all([
       this.prisma.employeeExpenseSlip.findFirst({
         where: { employeeId, periodMonth: start },
         include: { employee: { select: { fullName: true } } },
@@ -225,6 +254,11 @@ export class UserService {
         include: { employee: { select: { fullName: true } } },
         orderBy: [{ expenseDate: 'asc' }, { createdAt: 'asc' }],
       }),
+      this.prisma.employeeWorkLog.findMany({
+        where: { employeeId, worked: true, workDate: { gte: start, lte: end } },
+        orderBy: [{ workDate: 'asc' }, { createdAt: 'asc' }],
+        select: { workDate: true, location: true },
+      }),
     ]);
     if (!employee) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND' });
@@ -238,17 +272,28 @@ export class UserService {
     const expenseSlip = this.toExpenseSlipView(slip);
     const summary = this.summaryFromExpenseSlip(expenseSlip);
     const fileName = `expense_slip_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`;
-    const bytes = await this.renderExpenseSlipPdf(
-      employee.fullName,
-      employee.hrRecord?.employeeCode ?? '-',
-      periodMonth,
-      summary,
-      expenses,
+    const bytes = await renderHrExpenseSlipPdf(
       {
+        employeeName: employee.fullName,
+        employeeCode: employee.hrRecord?.employeeCode ?? '-',
+      },
+      {
+        periodMonth: start,
+        workingDays: summary.workingDays,
+        dailyAllowancePaise: summary.dailyAllowancePaise,
+        petrolAllowancePaise: summary.petrolAllowancePaise,
+        mobileAllowancePaise: summary.mobileAllowancePaise,
+        monthlyAllowanceCapPaise: summary.monthlyAllowanceCapPaise,
+        calculatedDailyAllowancePaise: summary.calculatedDailyAllowancePaise,
+        calculatedAllowancePaise: summary.calculatedAllowancePaise,
+        approvedExtraExpensePaise: summary.approvedExtraExpensePaise,
+        pendingExtraExpensePaise: summary.pendingExtraExpensePaise,
+        totalPayablePaise: slip.totalPayablePaise,
         transactionDate: slip.transactionDate,
         transactionReference: slip.transactionReference,
         notes: slip.notes,
-        totalPayablePaise: toNumber(slip.totalPayablePaise),
+        workedDays: workLogs,
+        extraClaims: expenses,
       },
     );
     return {

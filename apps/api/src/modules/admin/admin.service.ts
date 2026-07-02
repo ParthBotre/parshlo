@@ -49,6 +49,7 @@ import {
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
+import { renderExpenseSlipPdf, renderSalarySlipPdf } from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const ORDER_STATUSES: OrderStatus[] = [
@@ -1420,9 +1421,31 @@ export class AdminService {
     const slipView = this.toHrSalarySlipView(slip);
     const periodMonth = formatDateOnly(slip.periodMonth).slice(0, 7);
     const fileName = `salary_slip_${record.employeeCode}_${periodMonth}.pdf`;
-    const bytes = await this.renderHrPdf(
-      'SALARY SLIP',
-      this.salarySlipLines(record, slipView, periodMonth),
+    const bytes = await renderSalarySlipPdf(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        department: record.department,
+        gender: record.gender,
+        region: record.region,
+        headQuarter: record.headQuarter,
+        panNumber: record.panNumber,
+        bankDetails: record.bankDetails,
+        bankAccountNumber: record.bankAccountNumber,
+      },
+      {
+        periodMonth: slip.periodMonth,
+        workingDays: slip.workingDays,
+        basicPaise: slip.basicPaise,
+        hraPaise: slip.hraPaise,
+        specialAllowancePaise: slip.specialAllowancePaise,
+        deductionPaise: slip.deductionPaise,
+        netPayPaise: slip.netPayPaise,
+        transactionDate: slip.transactionDate,
+        transactionReference: slip.transactionReference,
+        notes: slip.notes,
+      },
     );
     return {
       salarySlip: slipView,
@@ -1510,9 +1533,61 @@ export class AdminService {
     const slipView = this.toHrExpenseSlipView(slip);
     const periodMonth = formatDateOnly(slip.periodMonth).slice(0, 7);
     const fileName = `expense_slip_${record.employeeCode}_${periodMonth}.pdf`;
-    const bytes = await this.renderHrPdf(
-      'EXPENSE SLIP',
-      this.expenseSlipLines(record, slipView, periodMonth),
+    const { start, end } = monthBounds(periodMonth);
+    const [workLogs, approvedExtraClaims] = await Promise.all([
+      this.prisma.employeeWorkLog.findMany({
+        where: {
+          employeeId: slip.employeeId,
+          worked: true,
+          workDate: { gte: start, lte: end },
+        },
+        orderBy: [{ workDate: 'asc' }, { createdAt: 'asc' }],
+        select: { workDate: true, location: true },
+      }),
+      this.prisma.employeeExpense.findMany({
+        where: {
+          employeeId: slip.employeeId,
+          status: 'APPROVED',
+          expenseDate: { gte: start, lte: end },
+        },
+        orderBy: [{ expenseDate: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          expenseDate: true,
+          type: true,
+          amountPaise: true,
+          description: true,
+          billKey: true,
+        },
+      }),
+    ]);
+    const bytes = await renderExpenseSlipPdf(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        department: record.department,
+        region: record.region,
+        headQuarter: record.headQuarter,
+        panNumber: record.panNumber,
+      },
+      {
+        periodMonth: slip.periodMonth,
+        workingDays: slip.workingDays,
+        dailyAllowancePaise: slip.dailyAllowancePaise,
+        petrolAllowancePaise: slip.petrolAllowancePaise,
+        mobileAllowancePaise: slip.mobileAllowancePaise,
+        monthlyAllowanceCapPaise: slip.monthlyAllowanceCapPaise,
+        calculatedDailyAllowancePaise: slip.calculatedDailyAllowancePaise,
+        calculatedAllowancePaise: slip.calculatedAllowancePaise,
+        approvedExtraExpensePaise: slip.approvedExtraExpensePaise,
+        pendingExtraExpensePaise: slip.pendingExtraExpensePaise,
+        totalPayablePaise: slip.totalPayablePaise,
+        transactionDate: slip.transactionDate,
+        transactionReference: slip.transactionReference,
+        notes: slip.notes,
+        workedDays: workLogs,
+        extraClaims: approvedExtraClaims,
+      },
     );
     return {
       expenseSlip: slipView,
@@ -2468,7 +2543,7 @@ export class AdminService {
       '',
       'Kindly confirm your acceptance by signing copy of this letter. We welcome you on board and wish you a long successful career with PARSHLO.',
       '',
-      'Best Wishes.',
+      'Best Wishes,',
       'PARSHLO',
       '',
       '',
@@ -2751,6 +2826,52 @@ export class AdminService {
 
     drawCentered(title, 14);
     y -= 28;
+    const wrapLine = (text: string, maxWidth: number, size: number): string[] => {
+      const words = text.split(/\s+/).filter(Boolean);
+      const lines: string[] = [];
+      let current = '';
+      for (const word of words) {
+        const candidate = current ? `${current} ${word}` : word;
+        if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+          current = candidate;
+        } else {
+          if (current) lines.push(current);
+          current = word;
+        }
+      }
+      if (current) lines.push(current);
+      return lines.length > 0 ? lines : [''];
+    };
+    const drawParagraph = (text: string, indent = 0, firstPrefix = ''): void => {
+      const size = 10;
+      const prefixWidth = firstPrefix ? bold.widthOfTextAtSize(firstPrefix, size) + 4 : 0;
+      const maxWidth = pageSize[0] - 116 - indent - prefixWidth;
+      const lines = wrapLine(text, maxWidth, size);
+      lines.forEach((wrapped, index) => {
+        if (y < 76) {
+          page = createPage();
+          y = letterheadPage ? pageSize[1] - 170 : pageSize[1] - 52;
+        }
+        const x = 58 + indent + (index === 0 ? prefixWidth : 0);
+        if (index === 0 && firstPrefix) {
+          page.drawText(firstPrefix, {
+            x: 58 + indent,
+            y,
+            size,
+            font: bold,
+            color: rgb(0.08, 0.1, 0.12),
+          });
+        }
+        page.drawText(wrapped, {
+          x,
+          y,
+          size,
+          font,
+          color: rgb(0.08, 0.1, 0.12),
+        });
+        y -= 15;
+      });
+    };
 
     for (const line of lines) {
       if (y < 76) {
@@ -2783,16 +2904,12 @@ export class AdminService {
         continue;
       }
       if (drawKeyValue(line)) continue;
-      const chunks = line.match(/.{1,88}(\s|$)/g) ?? [''];
-      for (const chunk of chunks) {
-        page.drawText(chunk.trimEnd(), {
-          x: 58,
-          y,
-          size: 10,
-          font,
-          color: rgb(0.08, 0.1, 0.12),
-        });
-        y -= 15;
+      const numbered = /^(\d+\.\s+)(.+)$/.exec(line);
+      if (numbered) {
+        drawParagraph(numbered[2], 0, numbered[1]);
+        y -= 3;
+      } else {
+        drawParagraph(line);
       }
     }
 

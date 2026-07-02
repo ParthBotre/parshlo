@@ -10,6 +10,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { type MyWorkLog } from '@/lib/api/user';
 import { dateInputKeyIst, formatDateIst } from '@/lib/format-datetime';
 
+const SELECT_CLASS =
+  'border-input bg-background ring-offset-background focus-visible:ring-ring h-10 rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+
+const SUMMARY_TYPES = [
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'yearly', label: 'Yearly' },
+] as const;
+
+type SummaryType = (typeof SUMMARY_TYPES)[number]['key'];
+
+interface SummaryRow {
+  label: string;
+  days: number;
+  doctors: number;
+  chemists: number;
+}
+
 function readProblem(json: unknown, fallback: string): string {
   if (json && typeof json === 'object' && 'detail' in json) {
     const detail = (json as { detail?: unknown }).detail;
@@ -38,6 +56,23 @@ function weekKey(date: string): string {
   return `${value.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+function summaryLabel(type: SummaryType, value: string): string {
+  if (type === 'weekly') {
+    const [year, week] = value.split('-W');
+    return `Week ${Number(week)}, ${year}`;
+  }
+  if (type === 'monthly') {
+    const [year, month] = value.split('-');
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+    return new Intl.DateTimeFormat('en-IN', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    }).format(date);
+  }
+  return value;
+}
+
 export function WorkReportSubmission({
   initialReports,
 }: {
@@ -52,13 +87,12 @@ export function WorkReportSubmission({
   const [gp, setGp] = useState(0);
   const [gyn, setGyn] = useState(0);
   const [others, setOthers] = useState(0);
+  const [summaryType, setSummaryType] = useState<SummaryType>('monthly');
+  const [summaryPeriod, setSummaryPeriod] = useState('');
   const totalDoctors = useMemo(() => orth + md + gp + gyn + others, [gp, gyn, md, orth, others]);
   const summaries = useMemo(() => {
     const build = (keyFor: (report: MyWorkLog) => string) => {
-      const rows = new Map<
-        string,
-        { label: string; days: number; doctors: number; chemists: number }
-      >();
+      const rows = new Map<string, SummaryRow>();
       for (const report of reports) {
         const key = keyFor(report);
         const current = rows.get(key) ?? { label: key, days: 0, doctors: 0, chemists: 0 };
@@ -67,9 +101,7 @@ export function WorkReportSubmission({
         current.chemists += report.totalChemist;
         rows.set(key, current);
       }
-      return Array.from(rows.values())
-        .sort((a, b) => b.label.localeCompare(a.label))
-        .slice(0, 6);
+      return Array.from(rows.values()).sort((a, b) => b.label.localeCompare(a.label));
     };
     return {
       weekly: build((report) => weekKey(report.workDate)),
@@ -77,6 +109,12 @@ export function WorkReportSubmission({
       yearly: build((report) => report.workDate.slice(0, 4)),
     };
   }, [reports]);
+  const summaryRows = summaries[summaryType];
+  const fallbackSummaryPeriod = summaryRows[0]?.label ?? '';
+  const selectedSummaryPeriod = summaryRows.some((row) => row.label === summaryPeriod)
+    ? summaryPeriod
+    : fallbackSummaryPeriod;
+  const selectedSummary = summaryRows.find((row) => row.label === selectedSummaryPeriod);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -263,29 +301,74 @@ export function WorkReportSubmission({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {[
-          ['Weekly', summaries.weekly],
-          ['Monthly', summaries.monthly],
-          ['Yearly', summaries.yearly],
-        ].map(([label, rows]) => (
-          <Card key={label as string}>
-            <CardContent className="p-4">
-              <h2 className="text-sm font-semibold">{label as string} summary</h2>
-              <div className="mt-3 space-y-2 text-sm">
-                {(rows as typeof summaries.weekly).map((row) => (
-                  <div key={row.label} className="rounded-md border p-3">
-                    <div className="font-medium">{row.label}</div>
-                    <div className="text-muted-foreground mt-1">
-                      {row.days} days · {row.doctors} DR · {row.chemists} chemists
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Report summary</h2>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Choose a period instead of scrolling through every week, month, and year.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Summary">
+                <select
+                  className={SELECT_CLASS}
+                  value={summaryType}
+                  onChange={(event) => {
+                    setSummaryType(event.target.value as SummaryType);
+                    setSummaryPeriod('');
+                  }}
+                >
+                  {SUMMARY_TYPES.map((type) => (
+                    <option key={type.key} value={type.key}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Period">
+                <select
+                  className={SELECT_CLASS}
+                  value={selectedSummaryPeriod}
+                  onChange={(event) => setSummaryPeriod(event.target.value)}
+                  disabled={summaryRows.length === 0}
+                >
+                  {summaryRows.length === 0 ? <option value="">No reports yet</option> : null}
+                  {summaryRows.map((row) => (
+                    <option key={row.label} value={row.label}>
+                      {summaryLabel(summaryType, row.label)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          {selectedSummary ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              <SummaryMetric label="Worked Days" value={String(selectedSummary.days)} />
+              <SummaryMetric label="Total DR" value={String(selectedSummary.doctors)} />
+              <SummaryMetric label="Total Chemist" value={String(selectedSummary.chemists)} />
+            </div>
+          ) : (
+            <div className="text-muted-foreground rounded-md border p-4 text-sm">
+              No work reports submitted yet.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="rounded-md border p-4">
+      <div className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+        {label}
       </div>
+      <div className="mt-2 font-mono text-2xl font-semibold">{value}</div>
     </div>
   );
 }
