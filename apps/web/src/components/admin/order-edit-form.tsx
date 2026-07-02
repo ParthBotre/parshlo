@@ -1,7 +1,7 @@
 'use client';
 
 import { type OrderView, type ProductPriceTier } from '@parshlo/types';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -21,11 +21,59 @@ interface EditableOrderItem {
   gstRate: string;
 }
 
+const QUANTITY_BUTTON_CLASS =
+  'border-input bg-background hover:bg-accent inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors';
 const QUANTITY_INPUT_CLASS =
-  'border-input bg-background ml-auto h-9 w-20 rounded-md border px-2 text-right font-mono text-sm';
+  'border-input bg-background h-8 w-12 rounded-md border px-1 text-center font-mono text-sm';
 
 function rateTierLabel(tier: ProductPriceTier): string {
   return tier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)';
+}
+
+function QuantityControl({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}): JSX.Element {
+  const numericValue = Number.parseInt(value || '0', 10);
+  const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+  const step = (delta: number): void => {
+    onChange(String(Math.max(0, safeValue + delta)));
+  };
+
+  return (
+    <div className="ml-auto flex h-9 w-[7.75rem] items-center justify-end gap-1">
+      <button
+        type="button"
+        className={QUANTITY_BUTTON_CLASS}
+        onClick={() => step(-1)}
+        aria-label={`Decrease ${label}`}
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value.replace(/\D/g, ''))}
+        className={QUANTITY_INPUT_CLASS}
+        aria-label={label}
+      />
+      <button
+        type="button"
+        className={QUANTITY_BUTTON_CLASS}
+        onClick={() => step(1)}
+        aria-label={`Increase ${label}`}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
 }
 
 export function OrderEditForm({
@@ -226,27 +274,19 @@ export function OrderEditForm({
                   {item.productName.toUpperCase()}
                 </td>
                 <td className="px-4 py-3">
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
+                  <QuantityControl
                     value={item.quantity}
-                    onChange={(event) =>
-                      updateItem(item.productId, { quantity: event.currentTarget.value })
-                    }
-                    className={QUANTITY_INPUT_CLASS}
+                    onChange={(quantity) => updateItem(item.productId, { quantity })}
+                    label={`${item.productName} paid quantity`}
                   />
                 </td>
                 <td className="px-4 py-3">
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
+                  <QuantityControl
                     value={item.schemeFreeQuantity}
-                    onChange={(event) =>
-                      updateItem(item.productId, { schemeFreeQuantity: event.currentTarget.value })
+                    onChange={(schemeFreeQuantity) =>
+                      updateItem(item.productId, { schemeFreeQuantity })
                     }
-                    className={QUANTITY_INPUT_CLASS}
+                    label={`${item.productName} free quantity`}
                   />
                 </td>
                 <td className="px-4 py-3">
