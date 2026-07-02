@@ -22,7 +22,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'
 
 type Statement = LogisticsStatement;
 type ConsignmentType = 'INCOMING' | 'OUTGOING';
-type ConsignmentPeriod = 'day' | 'week' | 'month' | 'year';
 
 const BUSINESS_TIME_ZONE = 'Asia/Kolkata';
 
@@ -35,13 +34,6 @@ const STATUS_COLORS: Record<string, string> = {
   FLAGGED: 'destructive',
   UNRECONCILED: 'secondary',
   PAID: 'outline',
-};
-
-const PERIOD_LABELS: Record<ConsignmentPeriod, string> = {
-  day: 'Daily',
-  week: 'Weekly',
-  month: 'Monthly',
-  year: 'Yearly',
 };
 
 function paise(v: string | number | bigint) {
@@ -71,11 +63,6 @@ function pad2(value: number): string {
 function calendarDateKey(date: Date): string {
   const parts = calendarParts(date);
   return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
-}
-
-function businessCalendarDate(date: Date): Date {
-  const parts = calendarParts(date);
-  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
 }
 
 function dateInputToBusinessIso(dateValue: string): string {
@@ -130,9 +117,23 @@ const BILLING_MONTH_OPTIONS = [
   { label: 'December', value: '12' },
 ] as const;
 
+const DASHBOARD_MONTH_OPTIONS = BILLING_MONTH_OPTIONS.map((month) => ({
+  ...month,
+  value: pad2(Number(month.value)),
+}));
+
 function billingYearOptions(): string[] {
-  const currentYear = new Date().getUTCFullYear();
+  const currentYear = calendarParts(new Date()).year;
   return Array.from({ length: 6 }, (_, index) => String(currentYear - index));
+}
+
+function currentBusinessMonth(): { month: string; year: string } {
+  const parts = calendarParts(new Date());
+  return { month: pad2(parts.month), year: String(parts.year) };
+}
+
+function monthLabel(month: string): string {
+  return DASHBOARD_MONTH_OPTIONS.find((option) => option.value === month)?.label ?? month;
 }
 
 function displayConsignmentStatus(consignment: Consignment) {
@@ -155,74 +156,6 @@ function toConsignmentType(value: string): ConsignmentType {
   return value === 'INCOMING' ? 'INCOMING' : 'OUTGOING';
 }
 
-function startOfWeek(date: Date) {
-  const start = businessCalendarDate(date);
-  const day = start.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  start.setUTCDate(start.getUTCDate() + diff);
-  return start;
-}
-
-function formatPeriodLabel(date: Date, period: ConsignmentPeriod) {
-  if (period === 'day') {
-    return formatDateKeyDisplay(calendarDateKey(date));
-  }
-
-  if (period === 'week') {
-    const start = startOfWeek(date);
-    const end = new Date(start);
-    end.setUTCDate(start.getUTCDate() + 6);
-    return `${formatDateKeyDisplay(start.toISOString().slice(0, 10))} - ${formatDateKeyDisplay(end.toISOString().slice(0, 10))}`;
-  }
-
-  if (period === 'month') {
-    const parts = calendarParts(date);
-    const lastDay = new Date(Date.UTC(parts.year, parts.month, 0)).getUTCDate();
-    return `${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-01`)} - ${formatDateKeyDisplay(`${parts.year}-${pad2(parts.month)}-${pad2(lastDay)}`)}`;
-  }
-
-  const year = calendarParts(date).year;
-  return `${formatDateKeyDisplay(`${year}-01-01`)} - ${formatDateKeyDisplay(`${year}-12-31`)}`;
-}
-
-function periodKey(date: Date, period: ConsignmentPeriod) {
-  if (period === 'day') {
-    return calendarDateKey(date);
-  }
-
-  if (period === 'week') {
-    return startOfWeek(date).toISOString().slice(0, 10);
-  }
-
-  if (period === 'month') {
-    const parts = calendarParts(date);
-    return `${parts.year}-${pad2(parts.month)}`;
-  }
-
-  return String(calendarParts(date).year);
-}
-
-function groupConsignments(consignments: Consignment[], period: ConsignmentPeriod) {
-  const groups = new Map<string, { label: string; rows: Consignment[]; totalPaise: bigint }>();
-
-  for (const consignment of consignments) {
-    const date = new Date(consignment.consignmentDate);
-    const key = periodKey(date, period);
-    const group = groups.get(key) ?? {
-      label: formatPeriodLabel(date, period),
-      rows: [],
-      totalPaise: 0n,
-    };
-    group.rows.push(consignment);
-    group.totalPaise += BigInt(consignment.amountPaise);
-    groups.set(key, group);
-  }
-
-  return [...groups.entries()]
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([key, group]) => ({ key, ...group }));
-}
-
 interface Props {
   accessToken: string;
   couriers: CourierPartner[];
@@ -242,7 +175,9 @@ export default function LogisticsPageClient({
   const [couriers, setCouriers] = useState(initCouriers);
   const [consignments, setConsignments] = useState(initConsignments);
   const [statements, setStatements] = useState(initStatements);
-  const [consignmentPeriod, setConsignmentPeriod] = useState<ConsignmentPeriod>('month');
+  const currentMonth = useMemo(() => currentBusinessMonth(), []);
+  const [selectedConsignmentMonth, setSelectedConsignmentMonth] = useState(currentMonth.month);
+  const [selectedConsignmentYear, setSelectedConsignmentYear] = useState(currentMonth.year);
   const [dashboardCourierId, setDashboardCourierId] = useState('all');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -718,7 +653,9 @@ export default function LogisticsPageClient({
     }
     setTab('consignments');
     setDashboardCourierId(statement.courierId);
-    setConsignmentPeriod('month');
+    const statementStart = calendarParts(new Date(statement.billingPeriodStart));
+    setSelectedConsignmentMonth(pad2(statementStart.month));
+    setSelectedConsignmentYear(String(statementStart.year));
     setForm((current) => ({
       ...current,
       courierId: statement.courierId,
@@ -750,7 +687,46 @@ export default function LogisticsPageClient({
         : statements.filter((s) => s.courierId === dashboardCourierId),
     [statements, dashboardCourierId],
   );
-  const consignmentGroups = groupConsignments(filteredConsignments, consignmentPeriod);
+  const selectedConsignments = useMemo(
+    () =>
+      filteredConsignments.filter((consignment) => {
+        const parts = calendarParts(new Date(consignment.consignmentDate));
+        return (
+          String(parts.year) === selectedConsignmentYear &&
+          pad2(parts.month) === selectedConsignmentMonth
+        );
+      }),
+    [filteredConsignments, selectedConsignmentMonth, selectedConsignmentYear],
+  );
+  const selectedConsignmentTotal = selectedConsignments.reduce(
+    (total, consignment) => total + BigInt(consignment.amountPaise),
+    0n,
+  );
+  const selectedConsignmentLabel = `${monthLabel(selectedConsignmentMonth)} ${selectedConsignmentYear}`;
+  const consignmentGroups =
+    selectedConsignments.length > 0
+      ? [
+          {
+            key: `${selectedConsignmentYear}-${selectedConsignmentMonth}`,
+            label: selectedConsignmentLabel,
+            rows: selectedConsignments,
+            totalPaise: selectedConsignmentTotal,
+          },
+        ]
+      : [];
+  const consignmentYearOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          currentMonth.year,
+          selectedConsignmentYear,
+          ...consignments.map((consignment) =>
+            String(calendarParts(new Date(consignment.consignmentDate)).year),
+          ),
+        ]),
+      ).sort((a, b) => b.localeCompare(a)),
+    [consignments, currentMonth.year, selectedConsignmentYear],
+  );
   const dashboardCourierName =
     dashboardCourierId === 'all'
       ? 'all courier partners'
@@ -1149,29 +1125,51 @@ export default function LogisticsPageClient({
                     Consignment Logs
                   </h2>
                   <p className="text-muted-foreground text-xs">
-                    {filteredConsignments.length} entries for {dashboardCourierName} grouped{' '}
-                    {PERIOD_LABELS[consignmentPeriod].toLowerCase()}
+                    {selectedConsignments.length} entries for {dashboardCourierName} in{' '}
+                    {selectedConsignmentLabel}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-end gap-3">
                   {courierFilter}
-                  <div className="bg-secondary/50 inline-flex rounded-md p-1">
-                    {(['day', 'week', 'month', 'year'] as const).map((period) => (
-                      <button
-                        key={period}
-                        type="button"
-                        onClick={() => setConsignmentPeriod(period)}
-                        className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${consignmentPeriod === period ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        {PERIOD_LABELS[period]}
-                      </button>
-                    ))}
+                  <div className="min-w-40">
+                    <label htmlFor="logistics-month-filter" className={labelCls}>
+                      Month
+                    </label>
+                    <select
+                      id="logistics-month-filter"
+                      className={inputCls}
+                      value={selectedConsignmentMonth}
+                      onChange={(e) => setSelectedConsignmentMonth(e.target.value)}
+                    >
+                      {DASHBOARD_MONTH_OPTIONS.map((month) => (
+                        <option key={month.value} value={month.value}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-28">
+                    <label htmlFor="logistics-year-filter" className={labelCls}>
+                      Year
+                    </label>
+                    <select
+                      id="logistics-year-filter"
+                      className={inputCls}
+                      value={selectedConsignmentYear}
+                      onChange={(e) => setSelectedConsignmentYear(e.target.value)}
+                    >
+                      {consignmentYearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
-              {filteredConsignments.length === 0 ? (
+              {selectedConsignments.length === 0 ? (
                 <div className="text-muted-foreground p-10 text-center text-sm">
-                  No consignments logged yet.
+                  No consignments found for {selectedConsignmentLabel}.
                 </div>
               ) : (
                 <div className="divide-y">
