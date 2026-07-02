@@ -21,6 +21,9 @@ interface EditableOrderItem {
   gstRate: string;
 }
 
+const QUANTITY_INPUT_CLASS =
+  'border-input bg-background ml-auto h-9 w-20 rounded-md border px-2 text-right font-mono text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
 function rateTierLabel(tier: ProductPriceTier): string {
   return tier === 'RATE_B' ? 'Rate B (Chemist)' : 'Rate A (Stockist)';
 }
@@ -231,7 +234,7 @@ export function OrderEditForm({
                     onChange={(event) =>
                       updateItem(item.productId, { quantity: event.currentTarget.value })
                     }
-                    className="border-input bg-background ml-auto h-9 w-24 rounded-md border px-2 text-right font-mono"
+                    className={QUANTITY_INPUT_CLASS}
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -243,7 +246,7 @@ export function OrderEditForm({
                     onChange={(event) =>
                       updateItem(item.productId, { schemeFreeQuantity: event.currentTarget.value })
                     }
-                    className="border-input bg-background ml-auto h-9 w-24 rounded-md border px-2 text-right font-mono"
+                    className={QUANTITY_INPUT_CLASS}
                   />
                 </td>
                 <td className="px-4 py-3">
