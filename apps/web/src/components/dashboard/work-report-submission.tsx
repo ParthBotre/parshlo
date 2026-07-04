@@ -19,6 +19,21 @@ const SUMMARY_TYPES = [
   { key: 'yearly', label: 'Yearly' },
 ] as const;
 
+const MONTH_OPTIONS = [
+  ['01', 'January'],
+  ['02', 'February'],
+  ['03', 'March'],
+  ['04', 'April'],
+  ['05', 'May'],
+  ['06', 'June'],
+  ['07', 'July'],
+  ['08', 'August'],
+  ['09', 'September'],
+  ['10', 'October'],
+  ['11', 'November'],
+  ['12', 'December'],
+] as const;
+
 type SummaryType = (typeof SUMMARY_TYPES)[number]['key'];
 
 interface SummaryRow {
@@ -73,6 +88,15 @@ function summaryLabel(type: SummaryType, value: string): string {
   return value;
 }
 
+function currentIstMonth(): { month: string; year: string } {
+  const today = dateInputKeyIst();
+  return { month: today.slice(5, 7), year: today.slice(0, 4) };
+}
+
+function monthLabel(month: string): string {
+  return MONTH_OPTIONS.find(([value]) => value === month)?.[1] ?? month;
+}
+
 export function WorkReportSubmission({
   initialReports,
 }: {
@@ -90,7 +114,31 @@ export function WorkReportSubmission({
   const [others, setOthers] = useState(0);
   const [summaryType, setSummaryType] = useState<SummaryType>('monthly');
   const [summaryPeriod, setSummaryPeriod] = useState('');
+  const currentMonth = useMemo(() => currentIstMonth(), []);
+  const [selectedReportMonth, setSelectedReportMonth] = useState(currentMonth.month);
+  const [selectedReportYear, setSelectedReportYear] = useState(currentMonth.year);
   const totalDoctors = useMemo(() => orth + md + gp + gyn + others, [gp, gyn, md, orth, others]);
+  const reportYearOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          currentMonth.year,
+          selectedReportYear,
+          ...reports.map((report) => report.workDate.slice(0, 4)),
+        ]),
+      ).sort((a, b) => b.localeCompare(a)),
+    [currentMonth.year, reports, selectedReportYear],
+  );
+  const selectedReports = useMemo(
+    () =>
+      reports.filter(
+        (report) =>
+          report.workDate.slice(0, 4) === selectedReportYear &&
+          report.workDate.slice(5, 7) === selectedReportMonth,
+      ),
+    [reports, selectedReportMonth, selectedReportYear],
+  );
+  const selectedReportPeriodLabel = `${monthLabel(selectedReportMonth)} ${selectedReportYear}`;
   const summaries = useMemo(() => {
     const build = (keyFor: (report: MyWorkLog) => string) => {
       const rows = new Map<string, SummaryRow>();
@@ -149,6 +197,8 @@ export function WorkReportSubmission({
       }
       const saved = json as MyWorkLog;
       setReports((current) => [saved, ...current.filter((report) => report.id !== saved.id)]);
+      setSelectedReportYear(saved.workDate.slice(0, 4));
+      setSelectedReportMonth(saved.workDate.slice(5, 7));
       setMessage('Work report saved.');
     } catch {
       setError('Network connection failed. Please check internet and try again.');
@@ -260,6 +310,42 @@ export function WorkReportSubmission({
 
       <Card>
         <CardContent className="p-0">
+          <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Submitted reports</h2>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {selectedReports.length} report(s) for {selectedReportPeriodLabel}.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Month">
+                <select
+                  className={SELECT_CLASS}
+                  value={selectedReportMonth}
+                  onChange={(event) => setSelectedReportMonth(event.target.value)}
+                >
+                  {MONTH_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Year">
+                <select
+                  className={SELECT_CLASS}
+                  value={selectedReportYear}
+                  onChange={(event) => setSelectedReportYear(event.target.value)}
+                >
+                  {reportYearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1220px] text-sm">
               <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
@@ -278,7 +364,7 @@ export function WorkReportSubmission({
                 </tr>
               </thead>
               <tbody>
-                {reports.map((report) => (
+                {selectedReports.map((report) => (
                   <tr key={report.id} className="border-t">
                     <td className="whitespace-nowrap px-4 py-3">
                       {formatDateIst(report.workDate)}
@@ -307,6 +393,13 @@ export function WorkReportSubmission({
                     </td>
                   </tr>
                 ))}
+                {selectedReports.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="text-muted-foreground px-4 py-8 text-center">
+                      No reports submitted for {selectedReportPeriodLabel}.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
