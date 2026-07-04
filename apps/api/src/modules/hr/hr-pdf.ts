@@ -294,28 +294,28 @@ function drawPaymentRows(
   notes: string | null,
 ): void {
   drawSectionTitle(ctx, 'Payment Details');
-  ensureSpace(ctx, 86);
-  drawBox(ctx.page, MARGIN_X, ctx.y - 74, CONTENT_WIDTH, 74, { border: BORDER });
-  drawBox(ctx.page, MARGIN_X, ctx.y - 22, CONTENT_WIDTH, 22, { fill: LIGHT_FILL, border: BORDER });
+  ensureSpace(ctx, 104);
+  drawBox(ctx.page, MARGIN_X, ctx.y - 88, CONTENT_WIDTH, 88, { border: BORDER });
+  drawBox(ctx.page, MARGIN_X, ctx.y - 24, CONTENT_WIDTH, 24, { fill: LIGHT_FILL, border: BORDER });
   const columns: [string, string, number, number][] = [
-    ['NEFT/DD/CHQ DATE', formatDate(transactionDate), 12, 146],
-    ['NEFT/DD/CHQ NO.', transactionReference ?? '-', 180, 168],
-    ['AMOUNT', formatInr(amountPaise), 372, 136],
+    ['NEFT/DD/CHQ DATE', formatDate(transactionDate), 12, 150],
+    ['NEFT/DD/CHQ NO.', transactionReference ?? '-', 196, 158],
+    ['AMOUNT', formatInr(amountPaise), 390, 118],
   ];
   for (const [label, value, x, width] of columns) {
-    drawText(ctx.page, label, MARGIN_X + x, ctx.y - 14, ctx.bold, 8, {
+    drawText(ctx.page, label, MARGIN_X + x, ctx.y - 16, ctx.bold, 8, {
       color: HEADER_GREEN,
       maxWidth: width,
     });
-    drawText(ctx.page, value, MARGIN_X + x, ctx.y - 42, ctx.font, 8.5, { maxWidth: width });
+    drawText(ctx.page, value, MARGIN_X + x, ctx.y - 48, ctx.font, 8.5, { maxWidth: width });
   }
-  drawText(ctx.page, 'REMARKS', MARGIN_X + 12, ctx.y - 62, ctx.bold, 8, {
+  drawText(ctx.page, 'REMARKS', MARGIN_X + 12, ctx.y - 74, ctx.bold, 8, {
     color: MUTED,
   });
-  drawText(ctx.page, notes ?? '-', MARGIN_X + 82, ctx.y - 62, ctx.font, 8.5, {
-    maxWidth: CONTENT_WIDTH - 100,
+  drawText(ctx.page, notes ?? '-', MARGIN_X + 104, ctx.y - 74, ctx.font, 8.5, {
+    maxWidth: CONTENT_WIDTH - 122,
   });
-  ctx.y -= 88;
+  ctx.y -= 104;
 }
 
 function drawReceiptPaymentRows(
@@ -599,6 +599,7 @@ export async function renderExpenseSlipPdf(
     }
   }
 
+  ctx.y -= 14;
   drawPaymentRows(
     ctx,
     slip.totalPayablePaise,
