@@ -81,6 +81,7 @@ export function WorkReportSubmission({
   const [reports, setReports] = useState(initialReports);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [orth, setOrth] = useState(0);
   const [md, setMd] = useState(0);
@@ -134,19 +135,26 @@ export function WorkReportSubmission({
       note: stringValue(form, 'note'),
     };
 
-    const res = await fetch('/api/dashboard/work-logs', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const json: unknown = await res.json().catch(() => null);
-    if (!res.ok) {
-      setError(readProblem(json, 'Could not save work report.'));
-      return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/dashboard/work-logs', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(readProblem(json, 'Could not save work report.'));
+        return;
+      }
+      const saved = json as MyWorkLog;
+      setReports((current) => [saved, ...current.filter((report) => report.id !== saved.id)]);
+      setMessage('Work report saved.');
+    } catch {
+      setError('Network connection failed. Please check internet and try again.');
+    } finally {
+      setSubmitting(false);
     }
-    const saved = json as MyWorkLog;
-    setReports((current) => [saved, ...current.filter((report) => report.id !== saved.id)]);
-    setMessage('Work report saved.');
   }
 
   async function deleteReport(report: MyWorkLog): Promise<void> {
@@ -167,6 +175,8 @@ export function WorkReportSubmission({
       }
       setReports((current) => current.filter((item) => item.id !== report.id));
       setMessage('Work report deleted.');
+    } catch {
+      setError('Network connection failed. Please check internet and try again.');
     } finally {
       setDeletingId(null);
     }
@@ -240,7 +250,9 @@ export function WorkReportSubmission({
               <Textarea name="note" rows={2} placeholder="Optional remarks" />
             </Field>
             <div className="md:col-span-4">
-              <Button type="submit">Save Report</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save Report'}
+              </Button>
             </div>
           </form>
         </CardContent>
