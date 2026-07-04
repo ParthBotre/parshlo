@@ -298,9 +298,9 @@ function drawPaymentRows(
   drawBox(ctx.page, MARGIN_X, ctx.y - 74, CONTENT_WIDTH, 74, { border: BORDER });
   drawBox(ctx.page, MARGIN_X, ctx.y - 22, CONTENT_WIDTH, 22, { fill: LIGHT_FILL, border: BORDER });
   const columns: [string, string, number, number][] = [
-    ['NEFT/DD/CHQ DATE', formatDate(transactionDate), 12, 142],
-    ['NEFT/DD/CHQ NO.', transactionReference ?? '-', 184, 180],
-    ['AMOUNT', formatInr(amountPaise), 400, 112],
+    ['NEFT/DD/CHQ DATE', formatDate(transactionDate), 12, 146],
+    ['NEFT/DD/CHQ NO.', transactionReference ?? '-', 180, 168],
+    ['AMOUNT', formatInr(amountPaise), 372, 136],
   ];
   for (const [label, value, x, width] of columns) {
     drawText(ctx.page, label, MARGIN_X + x, ctx.y - 14, ctx.bold, 8, {
@@ -492,6 +492,51 @@ function drawSimpleTableRow(ctx: PdfContext, columns: [string, number, number][]
   ctx.y -= 22;
 }
 
+function drawExpenseAllowanceSummary(ctx: PdfContext, slip: ExpenseSlipPdfData): void {
+  drawSectionTitle(ctx, 'Overall Summary');
+  ensureSpace(ctx, 108);
+  drawBox(ctx.page, MARGIN_X, ctx.y - 96, CONTENT_WIDTH, 96, { border: BORDER });
+  drawBox(ctx.page, MARGIN_X, ctx.y - 22, CONTENT_WIDTH, 22, { fill: LIGHT_FILL, border: BORDER });
+  drawText(ctx.page, 'ALLOWANCE BASIS', MARGIN_X + 12, ctx.y - 14, ctx.bold, 8, {
+    color: HEADER_GREEN,
+  });
+  drawText(ctx.page, 'AMOUNT', MARGIN_X + 410, ctx.y - 14, ctx.bold, 8, {
+    color: HEADER_GREEN,
+  });
+
+  const rows: [string, string][] = [
+    [
+      `Daily allowance - ${slip.workingDays} worked day(s) x ${formatInr(slip.dailyAllowancePaise)}`,
+      formatInr(slip.calculatedDailyAllowancePaise),
+    ],
+    ['Petrol allowance - monthly fixed', formatInr(slip.petrolAllowancePaise)],
+    ['Mobile allowance - monthly fixed', formatInr(slip.mobileAllowancePaise)],
+  ];
+
+  let rowY = ctx.y - 42;
+  for (const [label, amount] of rows) {
+    drawText(ctx.page, label, MARGIN_X + 12, rowY, ctx.font, 8.5, { maxWidth: 360 });
+    drawText(ctx.page, amount, MARGIN_X + 410, rowY, ctx.font, 8.5, { maxWidth: 98 });
+    rowY -= 20;
+  }
+
+  drawText(ctx.page, 'Monthly allowance cap', MARGIN_X + 12, rowY, ctx.bold, 8.5, {
+    maxWidth: 360,
+  });
+  drawText(
+    ctx.page,
+    formatInr(slip.monthlyAllowanceCapPaise),
+    MARGIN_X + 410,
+    rowY,
+    ctx.bold,
+    8.5,
+    {
+      maxWidth: 98,
+    },
+  );
+  ctx.y -= 112;
+}
+
 export async function renderExpenseSlipPdf(
   record: ExpenseSlipPdfRecord,
   slip: ExpenseSlipPdfData,
@@ -499,7 +544,6 @@ export async function renderExpenseSlipPdf(
   const ctx = await createContext();
   const monthYear = formatMonthYear(slip.periodMonth);
   const region = record.region ?? record.headQuarter ?? '-';
-  const perDayAmount = slip.dailyAllowancePaise;
 
   drawHeader(ctx, 'Expense Slip', monthYear);
   drawTwoColumnDetails(ctx, [
@@ -514,23 +558,7 @@ export async function renderExpenseSlipPdf(
     ],
   ]);
 
-  drawSectionTitle(ctx, 'Working Day Allowance');
-  drawSimpleTableHeader(ctx, [
-    ['DATE', 10, 90],
-    ['LOCATION', 140, 230],
-    ['DAILY ALLOWANCE', 410, 100],
-  ]);
-  if (slip.workedDays.length === 0) {
-    drawSimpleTableRow(ctx, [['No worked days recorded for this month.', 10, 420]]);
-  } else {
-    for (const day of slip.workedDays) {
-      drawSimpleTableRow(ctx, [
-        [formatDate(day.workDate), 10, 90],
-        [day.location ?? '-', 140, 230],
-        [formatInr(perDayAmount), 410, 100],
-      ]);
-    }
-  }
+  drawExpenseAllowanceSummary(ctx, slip);
 
   drawAmountTable(
     ctx,
