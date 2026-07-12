@@ -529,6 +529,15 @@ export class AdminController {
     return this.admin.upsertHrWorkLog(body);
   }
 
+  @Get('hr/work-logs/pdf')
+  @RequireRoles('SUPER_ADMIN')
+  downloadHrWorkReportPdf(
+    @Query('employeeId') employeeId: string,
+    @Query('periodMonth') periodMonth: string,
+  ): ReturnType<AdminService['downloadHrWorkReportPdf']> {
+    return this.admin.downloadHrWorkReportPdf(employeeId, periodMonth);
+  }
+
   @Get('leave-requests')
   leaveRequests(@CurrentUser() user: AuthPrincipal): ReturnType<AdminService['leaveDashboard']> {
     return this.admin.leaveDashboard(user.userId, user.roles);

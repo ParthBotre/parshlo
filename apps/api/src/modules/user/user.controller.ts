@@ -13,6 +13,7 @@ import {
   type HrSalarySlipView,
   type HrWorkLogView,
   type PublicUser,
+  type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
@@ -77,6 +78,14 @@ export class UserController {
   @Get('me/work-logs')
   workLogs(@CurrentUser() user: AuthPrincipal): Promise<HrWorkLogView[]> {
     return this.userService.listWorkLogs(user.userId);
+  }
+
+  @Get('me/work-logs/pdf')
+  downloadWorkReportPdf(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('periodMonth') periodMonth: string,
+  ): Promise<WorkReportPdfDownloadResponse> {
+    return this.userService.downloadWorkReportPdf(user.userId, periodMonth);
   }
 
   @Post('me/work-logs')

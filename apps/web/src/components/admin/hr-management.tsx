@@ -48,7 +48,11 @@ const HR_SECTIONS = [
 
 type HrSection = (typeof HR_SECTIONS)[number]['key'];
 
-type HrLetterType = 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'INCREMENT_LETTER';
+type HrLetterType =
+  | 'OFFER_LETTER'
+  | 'APPOINTMENT_LETTER'
+  | 'APPOINTMENT_ACKNOWLEDGEMENT'
+  | 'INCREMENT_LETTER';
 
 interface EmailDocumentDraft {
   employeeId: string;
@@ -225,6 +229,7 @@ function parseEmailList(value: string): string[] {
 
 function labelForLetterType(type: HrLetterType): string {
   if (type === 'OFFER_LETTER') return 'offer letter';
+  if (type === 'APPOINTMENT_ACKNOWLEDGEMENT') return 'appointment acknowledgement';
   if (type === 'INCREMENT_LETTER') return 'increment letter';
   return 'appointment letter';
 }
@@ -353,6 +358,7 @@ export function HrManagement({
   const [workEmployeeId, setWorkEmployeeId] = useState('all');
   const [workDetailEmployeeId, setWorkDetailEmployeeId] = useState('');
   const [workDetailSort, setWorkDetailSort] = useState<'newest' | 'oldest'>('newest');
+  const [workReportDownloading, setWorkReportDownloading] = useState(false);
   const [recordForm, setRecordForm] = useState<HrRecordFormState>(() => blankRecordForm(''));
   const [emailDraft, setEmailDraft] = useState<EmailDocumentDraft | null>(null);
   const editingRecord =
@@ -861,6 +867,28 @@ export function HrManagement({
       downloadBase64Pdf(result.fileName, result.contentBase64);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not download expense slip.');
+    }
+  }
+
+  async function downloadWorkReportPdf(): Promise<void> {
+    if (!workDetailEmployeeId) {
+      setError('Choose an employee before downloading the work report PDF.');
+      return;
+    }
+    setWorkReportDownloading(true);
+    try {
+      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+        `/api/admin/hr/work-logs/pdf?employeeId=${encodeURIComponent(workDetailEmployeeId)}&periodMonth=${encodeURIComponent(workPeriod)}`,
+        'GET',
+        undefined,
+        'Could not download work report PDF.',
+      );
+      downloadBase64Pdf(result.fileName, result.contentBase64);
+      setMessage(`Work report PDF downloaded for ${periodLabel(workPeriod)}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download work report PDF.');
+    } finally {
+      setWorkReportDownloading(false);
     }
   }
 
@@ -1783,7 +1811,7 @@ export function HrManagement({
                 {periodLabel(workPeriod)} · choose one employee to avoid clutter.
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_140px] lg:min-w-[420px]">
+            <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_140px_auto] lg:min-w-[560px]">
               <select
                 aria-label="Daily report employee"
                 className={SELECT_CLASS}
@@ -1808,6 +1836,14 @@ export function HrManagement({
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
               </select>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!workDetailEmployeeId || workReportDownloading}
+                onClick={() => void downloadWorkReportPdf()}
+              >
+                {workReportDownloading ? 'Downloading...' : 'Download PDF'}
+              </Button>
             </div>
           </div>
           <DataTable
@@ -1900,6 +1936,15 @@ export function HrManagement({
                   onClick={() => void generateDocument(record.employeeId, 'APPOINTMENT_LETTER')}
                 >
                   Appointment
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void generateDocument(record.employeeId, 'APPOINTMENT_ACKNOWLEDGEMENT')
+                  }
+                >
+                  Appointment Ack
                 </Button>
                 <Button
                   size="sm"

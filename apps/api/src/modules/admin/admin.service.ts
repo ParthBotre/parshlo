@@ -46,10 +46,11 @@ import {
   type UpsertHrEmployeeRecordInput,
   type UpsertHrWorkLogInput,
   type UpsertCompanyHolidayInput,
+  type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-import { renderExpenseSlipPdf, renderSalarySlipPdf } from '../hr/hr-pdf.js';
+import { renderExpenseSlipPdf, renderSalarySlipPdf, renderWorkReportPdf } from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const ORDER_STATUSES: OrderStatus[] = [
@@ -1597,6 +1598,46 @@ export class AdminService {
     };
   }
 
+  async downloadHrWorkReportPdf(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<WorkReportPdfDownloadResponse> {
+    const record = await this.getHrRecordOrThrow(employeeId);
+    const { start, end } = monthBounds(periodMonth);
+    const reports = await this.prisma.employeeWorkLog.findMany({
+      where: { employeeId, workDate: { gte: start, lte: end } },
+      orderBy: [{ workDate: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        workDate: true,
+        location: true,
+        orthCalls: true,
+        mdCalls: true,
+        gpCalls: true,
+        gynCalls: true,
+        otherCalls: true,
+        totalDoctors: true,
+        totalChemist: true,
+        note: true,
+      },
+    });
+    const bytes = await renderWorkReportPdf(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        region: record.region,
+        headQuarter: record.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${record.employeeCode}_${periodMonth}.pdf`,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
   private async createHrDocumentPdf(
     employeeId: string,
     actorId: string,
@@ -1649,7 +1690,9 @@ export class AdminService {
         ? 'OFFER LETTER'
         : input.type === 'INCREMENT_LETTER'
           ? 'INCREMENT LETTER'
-          : 'APPOINTMENT LETTER';
+          : input.type === 'APPOINTMENT_ACKNOWLEDGEMENT'
+            ? 'APPOINTMENT LETTER ACKNOWLEDGEMENT'
+            : 'APPOINTMENT LETTER';
     const fileName = existingDocument?.fileName ?? `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
     const lines = (() => {
       if (input.type === 'OFFER_LETTER') return this.offerLetterLines(record);
@@ -1660,6 +1703,9 @@ export class AdminService {
           input.incrementAmountPaise ?? 0,
           input.effectiveDate ? parseDateOnly(input.effectiveDate) : new Date(),
         );
+      }
+      if (input.type === 'APPOINTMENT_ACKNOWLEDGEMENT') {
+        return this.appointmentAcknowledgementLines(record, referenceNumber);
       }
       return this.appointmentLetterLines(record, referenceNumber);
     })();
@@ -2611,6 +2657,27 @@ export class AdminService {
       '',
       '',
       '(Authority Signatory)',
+    ];
+  }
+
+  private appointmentAcknowledgementLines(
+    record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    referenceNumber: string,
+  ): string[] {
+    const displayName = this.hrDisplayName(record);
+    return [
+      ...this.appointmentLetterLines(record, referenceNumber),
+      '',
+      '',
+      'ACKNOWLEDGEMENT',
+      '',
+      `I hereby acknowledge that I, ${displayName}, have received, read, understood, and accepted the terms and conditions stated in this appointment letter.`,
+      '',
+      `Employee Name: ${displayName}`,
+      '',
+      'Employee Signature: ______________________________',
+      '',
+      `Date: ${formatDateDisplay(new Date())}`,
     ];
   }
 

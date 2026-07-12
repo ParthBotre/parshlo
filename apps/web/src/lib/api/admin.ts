@@ -31,6 +31,7 @@ import {
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
   UpsertCompanyHolidayInputSchema,
+  WorkReportPdfDownloadResponse,
   type AdminCreateBuyerInputSchema,
   type AdminUpdateBuyerInputSchema,
   type AdminUpdateEmployeeInputSchema,
@@ -687,6 +688,23 @@ export function downloadHrExpenseSlip(
   return apiCall(
     `/v1/admin/hr/expense-slips/${encodeURIComponent(id)}/download`,
     EmployeeExpenseSlipDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
+}
+
+export function downloadHrWorkReportPdf(
+  accessToken: string,
+  employeeId: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof WorkReportPdfDownloadResponse>> {
+  return apiCall(
+    `/v1/admin/hr/work-logs/pdf?employeeId=${encodeURIComponent(employeeId)}&periodMonth=${encodeURIComponent(periodMonth)}`,
+    WorkReportPdfDownloadResponse,
     {
       method: 'GET',
       accessToken,

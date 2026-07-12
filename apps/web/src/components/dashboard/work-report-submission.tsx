@@ -51,6 +51,17 @@ function readProblem(json: unknown, fallback: string): string {
   return fallback;
 }
 
+function downloadBase64Pdf(fileName: string, contentBase64: string): void {
+  const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function numberValue(form: FormData, name: string): number {
   const value = form.get(name);
   const parsed = Number.parseInt(typeof value === 'string' ? value : '0', 10);
@@ -107,6 +118,7 @@ export function WorkReportSubmission({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const [orth, setOrth] = useState(0);
   const [md, setMd] = useState(0);
   const [gp, setGp] = useState(0);
@@ -232,6 +244,31 @@ export function WorkReportSubmission({
     }
   }
 
+  async function downloadWorkReportPdf(): Promise<void> {
+    setMessage(null);
+    setError(null);
+    setDownloadingReport(true);
+    try {
+      const periodMonth = `${selectedReportYear}-${selectedReportMonth}`;
+      const res = await fetch(
+        `/api/dashboard/work-logs/pdf?periodMonth=${encodeURIComponent(periodMonth)}`,
+        { headers: { Accept: 'application/json' } },
+      );
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(readProblem(json, 'Could not download work report PDF.'));
+        return;
+      }
+      const payload = json as { fileName: string; contentBase64: string };
+      downloadBase64Pdf(payload.fileName, payload.contentBase64);
+      setMessage(`Work report PDF downloaded for ${selectedReportPeriodLabel}.`);
+    } catch {
+      setError('Network connection failed. Please check internet and try again.');
+    } finally {
+      setDownloadingReport(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
@@ -317,7 +354,7 @@ export function WorkReportSubmission({
                 {selectedReports.length} report(s) for {selectedReportPeriodLabel}.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
               <Field label="Month">
                 <select
                   className={SELECT_CLASS}
@@ -344,6 +381,16 @@ export function WorkReportSubmission({
                   ))}
                 </select>
               </Field>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={downloadingReport}
+                  onClick={() => void downloadWorkReportPdf()}
+                >
+                  {downloadingReport ? 'Downloading...' : 'Download PDF'}
+                </Button>
+              </div>
             </div>
           </div>
           <div className="overflow-x-auto">

@@ -77,6 +77,32 @@ export interface ExpenseSlipPdfData {
   extraClaims: ExpenseSlipExtraClaim[];
 }
 
+export interface WorkReportPdfRecord {
+  employeeName: string;
+  employeeCode: string;
+  roleTitle?: string | null;
+  region?: string | null;
+  headQuarter?: string | null;
+}
+
+export interface WorkReportPdfRow {
+  workDate: Date;
+  location?: string | null;
+  orthCalls: number;
+  mdCalls: number;
+  gpCalls: number;
+  gynCalls: number;
+  otherCalls: number;
+  totalDoctors: number;
+  totalChemist: number;
+  note?: string | null;
+}
+
+export interface WorkReportPdfData {
+  periodMonth: Date;
+  reports: WorkReportPdfRow[];
+}
+
 interface PdfContext {
   pdf: PDFDocument;
   page: PDFPage;
@@ -188,13 +214,27 @@ function drawBox(
 }
 
 function drawHeader(ctx: PdfContext, title: string, subtitle: string): void {
-  drawBox(ctx.page, MARGIN_X, 758, CONTENT_WIDTH, 58, { fill: LIGHT_FILL, border: HEADER_GREEN });
-  drawCentered(ctx.page, 'PARSHLO', 795, ctx.bold, 17, HEADER_GREEN);
-  drawCentered(ctx.page, 'B2B Pharmaceutical Distribution', 778, ctx.font, 8.5, MUTED);
-  drawCentered(ctx.page, 'Pune, Maharashtra, India', 765, ctx.font, 8, MUTED);
-  drawBox(ctx.page, MARGIN_X, 728, CONTENT_WIDTH, 22, { fill: HEADER_GREEN, border: HEADER_GREEN });
-  drawCentered(ctx.page, `${title} - ${subtitle.toUpperCase()}`, 735, ctx.bold, 10.5, rgb(1, 1, 1));
-  ctx.y = 704;
+  drawBox(ctx.page, MARGIN_X, 752, CONTENT_WIDTH, 66, { fill: LIGHT_FILL, border: HEADER_GREEN });
+  drawCentered(ctx.page, 'PARSHLO', 799, ctx.bold, 17, HEADER_GREEN);
+  drawCentered(
+    ctx.page,
+    'Phase 2, Office No. 3, Laxminagar Commercial Complex,',
+    782,
+    ctx.font,
+    8,
+    MUTED,
+  );
+  drawCentered(
+    ctx.page,
+    'S. No. 93, Final Plot No. 512, Parvati, Pune - 411009, Maharashtra, INDIA.',
+    770,
+    ctx.font,
+    8,
+    MUTED,
+  );
+  drawBox(ctx.page, MARGIN_X, 722, CONTENT_WIDTH, 22, { fill: HEADER_GREEN, border: HEADER_GREEN });
+  drawCentered(ctx.page, `${title} - ${subtitle.toUpperCase()}`, 729, ctx.bold, 10.5, rgb(1, 1, 1));
+  ctx.y = 698;
 }
 
 function drawTwoColumnDetails(ctx: PdfContext, rows: [string, string, string, string][]): void {
@@ -625,6 +665,104 @@ export async function renderExpenseSlipPdf(
     slip.transactionReference,
     record.employeeName,
     region,
+  );
+
+  return ctx.pdf.save();
+}
+
+export async function renderWorkReportPdf(
+  record: WorkReportPdfRecord,
+  data: WorkReportPdfData,
+): Promise<Uint8Array> {
+  const ctx = await createContext();
+  const monthYear = formatMonthYear(data.periodMonth);
+  const region = record.region ?? record.headQuarter ?? '-';
+  const totals = data.reports.reduce(
+    (current, report) => ({
+      orth: current.orth + report.orthCalls,
+      md: current.md + report.mdCalls,
+      gp: current.gp + report.gpCalls,
+      gyn: current.gyn + report.gynCalls,
+      others: current.others + report.otherCalls,
+      doctors: current.doctors + report.totalDoctors,
+      chemists: current.chemists + report.totalChemist,
+    }),
+    { orth: 0, md: 0, gp: 0, gyn: 0, others: 0, doctors: 0, chemists: 0 },
+  );
+
+  drawHeader(ctx, 'Work Report', monthYear);
+  drawTwoColumnDetails(ctx, [
+    ['EMPLOYEE NAME', record.employeeName, 'EMPLOYEE NO.', record.employeeCode],
+    ['DESIGNATION', record.roleTitle ?? '-', 'REGION', region],
+    ['REPORTED DAYS', String(data.reports.length), 'TOTAL DR', String(totals.doctors)],
+    ['TOTAL CHEMIST', String(totals.chemists), 'MONTH', monthYear],
+  ]);
+
+  drawSectionTitle(ctx, 'Call Summary');
+  drawAmountTable(
+    ctx,
+    'DOCTOR CALLS',
+    [
+      ['ORTH', String(totals.orth)],
+      ['MD', String(totals.md)],
+      ['GP', String(totals.gp)],
+      ['GYN', String(totals.gyn)],
+      ['OTHERS', String(totals.others)],
+      ['TOTAL DR', String(totals.doctors)],
+    ],
+    'CHEMIST CALLS',
+    [
+      ['TOTAL CHEMIST', String(totals.chemists)],
+      [
+        'AVG DR / DAY',
+        data.reports.length > 0 ? (totals.doctors / data.reports.length).toFixed(1) : '0',
+      ],
+      [
+        'AVG CHEMIST / DAY',
+        data.reports.length > 0 ? (totals.chemists / data.reports.length).toFixed(1) : '0',
+      ],
+    ],
+  );
+
+  drawSectionTitle(ctx, 'Daily Details');
+  drawSimpleTableHeader(ctx, [
+    ['DATE', 6, 58],
+    ['LOCATION', 70, 72],
+    ['ORTH', 150, 34],
+    ['MD', 190, 28],
+    ['GP', 224, 28],
+    ['GYN', 258, 30],
+    ['OTH', 294, 30],
+    ['DR', 330, 34],
+    ['CHEM', 370, 42],
+    ['REMARKS', 420, 88],
+  ]);
+  if (data.reports.length === 0) {
+    drawSimpleTableRow(ctx, [['No work reports submitted for this month.', 10, 420]]);
+  } else {
+    for (const report of data.reports) {
+      drawSimpleTableRow(ctx, [
+        [formatDate(report.workDate), 6, 58],
+        [report.location ?? '-', 70, 72],
+        [String(report.orthCalls), 150, 34],
+        [String(report.mdCalls), 190, 28],
+        [String(report.gpCalls), 224, 28],
+        [String(report.gynCalls), 258, 30],
+        [String(report.otherCalls), 294, 30],
+        [String(report.totalDoctors), 330, 34],
+        [String(report.totalChemist), 370, 42],
+        [report.note?.trim() ? report.note : '-', 420, 88],
+      ]);
+    }
+  }
+
+  drawCentered(
+    ctx.page,
+    'Since this is a computer generated report no signature is required.',
+    Math.max(ctx.y - 8, 38),
+    ctx.font,
+    8.5,
+    MUTED,
   );
 
   return ctx.pdf.save();

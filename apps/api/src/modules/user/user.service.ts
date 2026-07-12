@@ -10,12 +10,14 @@ import {
   type HrSalarySlipView,
   type HrWorkLogView,
   type PublicUser,
+  type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 import {
   renderExpenseSlipPdf as renderHrExpenseSlipPdf,
   renderSalarySlipPdf as renderHrSalarySlipPdf,
+  renderWorkReportPdf,
 } from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -299,6 +301,63 @@ export class UserService {
     return {
       expenseSlip,
       fileName,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async downloadWorkReportPdf(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<WorkReportPdfDownloadResponse> {
+    const { start, end } = monthBounds(periodMonth);
+    const [employee, reports] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: employeeId },
+        select: {
+          fullName: true,
+          hrRecord: {
+            select: {
+              employeeCode: true,
+              roleTitle: true,
+              region: true,
+              headQuarter: true,
+            },
+          },
+        },
+      }),
+      this.prisma.employeeWorkLog.findMany({
+        where: { employeeId, workDate: { gte: start, lte: end } },
+        orderBy: [{ workDate: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          workDate: true,
+          location: true,
+          orthCalls: true,
+          mdCalls: true,
+          gpCalls: true,
+          gynCalls: true,
+          otherCalls: true,
+          totalDoctors: true,
+          totalChemist: true,
+          note: true,
+        },
+      }),
+    ]);
+    if (!employee) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
+
+    const bytes = await renderWorkReportPdf(
+      {
+        employeeName: employee.fullName,
+        employeeCode: employee.hrRecord?.employeeCode ?? '-',
+        roleTitle: employee.hrRecord?.roleTitle ?? '-',
+        region: employee.hrRecord?.region,
+        headQuarter: employee.hrRecord?.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`,
       contentType: 'application/pdf',
       contentBase64: Buffer.from(bytes).toString('base64'),
     };

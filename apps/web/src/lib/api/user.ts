@@ -7,6 +7,7 @@ import {
   HrExpenseView,
   HrSalarySlipView,
   HrWorkLogView,
+  WorkReportPdfDownloadResponse,
   type CreateMyHrExpenseInput,
   type CreateMyHrWorkLogInput,
 } from '@parshlo/types';
@@ -20,6 +21,7 @@ export const MyWorkLogList = z.array(HrWorkLogView);
 export type MySalarySlip = z.infer<typeof HrSalarySlipView>;
 export type MySalarySlipDownload = z.infer<typeof EmployeeSalarySlipDownloadResponse>;
 export type MyExpenseSlipDownload = z.infer<typeof EmployeeExpenseSlipDownloadResponse>;
+export type MyWorkReportPdfDownload = z.infer<typeof WorkReportPdfDownloadResponse>;
 export type MyExpenseAllowanceSummary = z.infer<typeof HrExpenseAllowanceSummaryView>;
 export type MyExpense = z.infer<typeof HrExpenseView>;
 export type MyWorkLog = z.infer<typeof HrWorkLogView>;
@@ -116,6 +118,22 @@ export function listMyWorkLogs(
     accessToken,
     ...options,
   });
+}
+
+export function downloadMyWorkReportPdf(
+  accessToken: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<MyWorkReportPdfDownload> {
+  return apiCall(
+    `/v1/users/me/work-logs/pdf?periodMonth=${encodeURIComponent(periodMonth)}`,
+    WorkReportPdfDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
 }
 
 export function createMyWorkLog(

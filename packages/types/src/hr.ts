@@ -6,6 +6,7 @@ import { EmployeeLeaveRequestView, LeaveDateString } from './leave.js';
 export const HrDocumentType = z.enum([
   'OFFER_LETTER',
   'APPOINTMENT_LETTER',
+  'APPOINTMENT_ACKNOWLEDGEMENT',
   'INCREMENT_LETTER',
   'SALARY_SLIP',
   'EXPENSE_BILL',
@@ -122,7 +123,12 @@ export const HrDocumentView = z.object({
 export type HrDocumentView = z.infer<typeof HrDocumentView>;
 
 export const GenerateHrDocumentInputSchema = z.object({
-  type: HrDocumentType.extract(['OFFER_LETTER', 'APPOINTMENT_LETTER', 'INCREMENT_LETTER']),
+  type: HrDocumentType.extract([
+    'OFFER_LETTER',
+    'APPOINTMENT_LETTER',
+    'APPOINTMENT_ACKNOWLEDGEMENT',
+    'INCREMENT_LETTER',
+  ]),
   incrementAmountPaise: HrMoneyPaise.optional().nullable(),
   effectiveDate: LeaveDateString.optional().nullable(),
 });
@@ -342,6 +348,13 @@ export const EmployeeExpenseSlipDownloadResponse = z.object({
 export type EmployeeExpenseSlipDownloadResponse = z.infer<
   typeof EmployeeExpenseSlipDownloadResponse
 >;
+
+export const WorkReportPdfDownloadResponse = z.object({
+  fileName: z.string(),
+  contentType: z.literal('application/pdf'),
+  contentBase64: z.string(),
+});
+export type WorkReportPdfDownloadResponse = z.infer<typeof WorkReportPdfDownloadResponse>;
 
 export const HrDashboardView = z.object({
   records: z.array(HrEmployeeRecordView),
