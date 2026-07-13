@@ -720,11 +720,17 @@ export class OrderService {
   /** Generates PSH-YYYY-NNNNNN where NNNNNN is a zero-padded yearly counter. */
   private async nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await tx.order.count({
+    const prefix = `PSH-${String(year)}-`;
+    const latest = await tx.order.findFirst({
       where: { orderNumber: { startsWith: `PSH-${String(year)}-` } },
+      orderBy: { orderNumber: 'desc' },
+      select: { orderNumber: true },
     });
-    const seq = String(count + 1).padStart(6, '0');
-    return `PSH-${String(year)}-${seq}`;
+    const latestSequence = latest?.orderNumber.slice(prefix.length);
+    const latestNumber =
+      latestSequence && /^\d+$/.test(latestSequence) ? Number.parseInt(latestSequence, 10) : 0;
+    const seq = String(latestNumber + 1).padStart(6, '0');
+    return `${prefix}${seq}`;
   }
 
   private toView(
