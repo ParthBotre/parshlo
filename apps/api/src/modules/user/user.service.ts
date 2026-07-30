@@ -10,6 +10,7 @@ import {
   type HrSalarySlipView,
   type HrWorkLogView,
   type PublicUser,
+  type WorkReportCsvDownloadResponse,
   type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -17,6 +18,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   renderExpenseSlipPdf as renderHrExpenseSlipPdf,
   renderSalarySlipPdf as renderHrSalarySlipPdf,
+  renderWorkReportCsv,
   renderWorkReportPdf,
 } from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -310,6 +312,56 @@ export class UserService {
     employeeId: string,
     periodMonth: string,
   ): Promise<WorkReportPdfDownloadResponse> {
+    const { employee, reports, start } = await this.getWorkReportDownloadData(
+      employeeId,
+      periodMonth,
+    );
+
+    const bytes = await renderWorkReportPdf(
+      {
+        employeeName: employee.fullName,
+        employeeCode: employee.hrRecord?.employeeCode ?? '-',
+        roleTitle: employee.hrRecord?.roleTitle ?? '-',
+        region: employee.hrRecord?.region,
+        headQuarter: employee.hrRecord?.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async downloadWorkReportCsv(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<WorkReportCsvDownloadResponse> {
+    const { employee, reports, start } = await this.getWorkReportDownloadData(
+      employeeId,
+      periodMonth,
+    );
+    const bytes = renderWorkReportCsv(
+      {
+        employeeName: employee.fullName,
+        employeeCode: employee.hrRecord?.employeeCode ?? '-',
+        roleTitle: employee.hrRecord?.roleTitle ?? '-',
+        region: employee.hrRecord?.region,
+        headQuarter: employee.hrRecord?.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.csv`,
+      contentType: 'text/csv',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  private async getWorkReportDownloadData(employeeId: string, periodMonth: string) {
     const { start, end } = monthBounds(periodMonth);
     const [employee, reports] = await Promise.all([
       this.prisma.user.findUnique({
@@ -345,22 +397,7 @@ export class UserService {
     ]);
     if (!employee) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
 
-    const bytes = await renderWorkReportPdf(
-      {
-        employeeName: employee.fullName,
-        employeeCode: employee.hrRecord?.employeeCode ?? '-',
-        roleTitle: employee.hrRecord?.roleTitle ?? '-',
-        region: employee.hrRecord?.region,
-        headQuarter: employee.hrRecord?.headQuarter,
-      },
-      { periodMonth: start, reports },
-    );
-
-    return {
-      fileName: `work_report_${employee.hrRecord?.employeeCode ?? employeeId}_${periodMonth}.pdf`,
-      contentType: 'application/pdf',
-      contentBase64: Buffer.from(bytes).toString('base64'),
-    };
+    return { employee, reports, start };
   }
 
   private toSalarySlipView(slip: {

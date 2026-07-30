@@ -138,6 +138,55 @@ function formatMonthYear(value: Date): string {
   }).format(value);
 }
 
+function escapeCsvCell(value: string | number | null | undefined): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+export function renderWorkReportCsv(
+  record: WorkReportPdfRecord,
+  data: WorkReportPdfData,
+): Uint8Array {
+  const rows: (string | number | null | undefined)[][] = [
+    ['PARSHLO WORK REPORT'],
+    ['Employee Name', record.employeeName],
+    ['Employee No.', record.employeeCode],
+    ['Designation', record.roleTitle ?? '-'],
+    ['Region', record.region ?? record.headQuarter ?? '-'],
+    ['Month', formatMonthYear(data.periodMonth)],
+    [],
+    [
+      'Date',
+      'Location',
+      'ORTH',
+      'MD',
+      'GP',
+      'GYN',
+      'Others',
+      'Total Dr',
+      'Total Chemist',
+      'Remarks',
+    ],
+    ...data.reports.map((report) => [
+      formatDate(report.workDate),
+      report.location ?? '',
+      report.orthCalls,
+      report.mdCalls,
+      report.gpCalls,
+      report.gynCalls,
+      report.otherCalls,
+      report.totalDoctors,
+      report.totalChemist,
+      report.note ?? '',
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
+  return Buffer.from(`\uFEFF${csv}`, 'utf8');
+}
+
 function sanitize(text: string): string {
   return text.replace(/[₹–—]/g, (char) => {
     if (char === '₹') return 'Rs.';

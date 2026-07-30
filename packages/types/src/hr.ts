@@ -356,6 +356,13 @@ export const WorkReportPdfDownloadResponse = z.object({
 });
 export type WorkReportPdfDownloadResponse = z.infer<typeof WorkReportPdfDownloadResponse>;
 
+export const WorkReportCsvDownloadResponse = z.object({
+  fileName: z.string(),
+  contentType: z.literal('text/csv'),
+  contentBase64: z.string(),
+});
+export type WorkReportCsvDownloadResponse = z.infer<typeof WorkReportCsvDownloadResponse>;
+
 export const HrDashboardView = z.object({
   records: z.array(HrEmployeeRecordView),
   documents: z.array(HrDocumentView),

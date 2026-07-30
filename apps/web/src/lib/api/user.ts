@@ -7,6 +7,7 @@ import {
   HrExpenseView,
   HrSalarySlipView,
   HrWorkLogView,
+  WorkReportCsvDownloadResponse,
   WorkReportPdfDownloadResponse,
   type CreateMyHrExpenseInput,
   type CreateMyHrWorkLogInput,
@@ -22,6 +23,7 @@ export type MySalarySlip = z.infer<typeof HrSalarySlipView>;
 export type MySalarySlipDownload = z.infer<typeof EmployeeSalarySlipDownloadResponse>;
 export type MyExpenseSlipDownload = z.infer<typeof EmployeeExpenseSlipDownloadResponse>;
 export type MyWorkReportPdfDownload = z.infer<typeof WorkReportPdfDownloadResponse>;
+export type MyWorkReportCsvDownload = z.infer<typeof WorkReportCsvDownloadResponse>;
 export type MyExpenseAllowanceSummary = z.infer<typeof HrExpenseAllowanceSummaryView>;
 export type MyExpense = z.infer<typeof HrExpenseView>;
 export type MyWorkLog = z.infer<typeof HrWorkLogView>;
@@ -128,6 +130,22 @@ export function downloadMyWorkReportPdf(
   return apiCall(
     `/v1/users/me/work-logs/pdf?periodMonth=${encodeURIComponent(periodMonth)}`,
     WorkReportPdfDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
+}
+
+export function downloadMyWorkReportCsv(
+  accessToken: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<MyWorkReportCsvDownload> {
+  return apiCall(
+    `/v1/users/me/work-logs/csv?periodMonth=${encodeURIComponent(periodMonth)}`,
+    WorkReportCsvDownloadResponse,
     {
       method: 'GET',
       accessToken,

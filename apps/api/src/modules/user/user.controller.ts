@@ -13,6 +13,7 @@ import {
   type HrSalarySlipView,
   type HrWorkLogView,
   type PublicUser,
+  type WorkReportCsvDownloadResponse,
   type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 
@@ -86,6 +87,14 @@ export class UserController {
     @Query('periodMonth') periodMonth: string,
   ): Promise<WorkReportPdfDownloadResponse> {
     return this.userService.downloadWorkReportPdf(user.userId, periodMonth);
+  }
+
+  @Get('me/work-logs/csv')
+  downloadWorkReportCsv(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('periodMonth') periodMonth: string,
+  ): Promise<WorkReportCsvDownloadResponse> {
+    return this.userService.downloadWorkReportCsv(user.userId, periodMonth);
   }
 
   @Post('me/work-logs')

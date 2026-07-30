@@ -51,15 +51,19 @@ function readProblem(json: unknown, fallback: string): string {
   return fallback;
 }
 
-function downloadBase64Pdf(fileName: string, contentBase64: string): void {
+function downloadBase64File(fileName: string, contentBase64: string, contentType: string): void {
   const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const blob = new Blob([bytes], { type: contentType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadBase64Pdf(fileName: string, contentBase64: string): void {
+  downloadBase64File(fileName, contentBase64, 'application/pdf');
 }
 
 function numberValue(form: FormData, name: string): number {
@@ -269,6 +273,31 @@ export function WorkReportSubmission({
     }
   }
 
+  async function downloadWorkReportCsv(): Promise<void> {
+    setMessage(null);
+    setError(null);
+    setDownloadingReport(true);
+    try {
+      const periodMonth = `${selectedReportYear}-${selectedReportMonth}`;
+      const res = await fetch(
+        `/api/dashboard/work-logs/csv?periodMonth=${encodeURIComponent(periodMonth)}`,
+        { headers: { Accept: 'application/json' } },
+      );
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(readProblem(json, 'Could not download work report CSV.'));
+        return;
+      }
+      const payload = json as { fileName: string; contentBase64: string };
+      downloadBase64File(payload.fileName, payload.contentBase64, 'text/csv');
+      setMessage(`Work report CSV downloaded for ${selectedReportPeriodLabel}.`);
+    } catch {
+      setError('Network connection failed. Please check internet and try again.');
+    } finally {
+      setDownloadingReport(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
@@ -381,7 +410,7 @@ export function WorkReportSubmission({
                   ))}
                 </select>
               </Field>
-              <div className="flex items-end">
+              <div className="flex flex-wrap items-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -389,6 +418,14 @@ export function WorkReportSubmission({
                   onClick={() => void downloadWorkReportPdf()}
                 >
                   {downloadingReport ? 'Downloading...' : 'Download PDF'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={downloadingReport}
+                  onClick={() => void downloadWorkReportCsv()}
+                >
+                  Download Excel CSV
                 </Button>
               </div>
             </div>

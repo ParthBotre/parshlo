@@ -312,7 +312,7 @@ export function ProductManagement({
                 required
               />
             </Field>
-            <Field id="product-manufacturer" label="Manufacturer">
+            <Field id="product-manufacturer" label="Products Marketed By">
               <Input
                 id="product-manufacturer"
                 value={draft.manufacturer}

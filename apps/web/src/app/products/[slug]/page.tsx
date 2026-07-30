@@ -82,7 +82,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
           <div className="grid grid-cols-2 gap-3 text-sm">
             <Field label="Form" value={product.form} />
             <Field label="Packaging" value={product.packaging} value2 />
-            <Field label="Manufacturer" value={product.manufacturer} value2 />
+            <Field label="Products Marketed By" value={product.manufacturer} value2 />
           </div>
 
           <div className="flex flex-wrap gap-2">

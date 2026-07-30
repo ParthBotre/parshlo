@@ -27,18 +27,22 @@ import {
   ReviewHrExpenseInputSchema,
   ProductWriteInput,
   ReviewLeaveRequestInputSchema,
+  SecondarySalesDashboardView,
   UpdateCompanyHolidayInputSchema,
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
   UpsertCompanyHolidayInputSchema,
+  WorkReportCsvDownloadResponse,
   WorkReportPdfDownloadResponse,
   type AdminCreateBuyerInputSchema,
   type AdminUpdateBuyerInputSchema,
   type AdminUpdateEmployeeInputSchema,
+  type GrantSecondarySalesEditorInputSchema,
   type HrSalarySlipView,
   type HrExpenseSlipView,
   type PlaceOrderOnBehalfInput,
   type UpdateOrderBeforeApprovalInput,
+  type UpsertSecondarySalesEntryInputSchema,
 } from '@parshlo/types';
 import { z } from 'zod';
 
@@ -53,6 +57,7 @@ type CreateLeaveRequestInput = z.infer<typeof CreateLeaveRequestInputSchema>;
 type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
 type GenerateHrExpenseSlipInput = z.infer<typeof GenerateHrExpenseSlipInputSchema>;
 type GenerateHrSalarySlipInput = z.infer<typeof GenerateHrSalarySlipInputSchema>;
+type GrantSecondarySalesEditorInput = z.infer<typeof GrantSecondarySalesEditorInputSchema>;
 type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
 type AdminUpdateEmployeeInput = z.infer<typeof AdminUpdateEmployeeInputSchema>;
 type PlaceOrderOnBehalfInputType = z.infer<typeof PlaceOrderOnBehalfInput>;
@@ -61,6 +66,7 @@ type ReviewHrExpenseInput = z.infer<typeof ReviewHrExpenseInputSchema>;
 type ReviewLeaveRequestInput = z.infer<typeof ReviewLeaveRequestInputSchema>;
 type UpdateCompanyHolidayInput = z.infer<typeof UpdateCompanyHolidayInputSchema>;
 type UpdateOrderBeforeApprovalInputType = z.infer<typeof UpdateOrderBeforeApprovalInput>;
+type UpsertSecondarySalesEntryInput = z.infer<typeof UpsertSecondarySalesEntryInputSchema>;
 type UpsertHrEmployeeRecordInput = z.infer<typeof UpsertHrEmployeeRecordInputSchema>;
 type UpsertHrWorkLogInput = z.infer<typeof UpsertHrWorkLogInputSchema>;
 type UpsertCompanyHolidayInput = z.infer<typeof UpsertCompanyHolidayInputSchema>;
@@ -398,6 +404,64 @@ export function getProductSalesByCity(
   });
 }
 
+export function getSecondarySalesDashboard(
+  accessToken: string,
+  filters: { periodMonth?: string; stockistId?: string } = {},
+  options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
+): Promise<z.infer<typeof SecondarySalesDashboardView>> {
+  const params = new URLSearchParams();
+  if (filters.periodMonth) params.set('periodMonth', filters.periodMonth);
+  if (filters.stockistId) params.set('stockistId', filters.stockistId);
+  const search = params.toString() ? `?${params.toString()}` : '';
+  return apiCall(`/v1/admin/analytics/secondary-sales${search}`, SecondarySalesDashboardView, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export function upsertSecondarySalesEntry(
+  accessToken: string,
+  input: UpsertSecondarySalesEntryInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof SecondarySalesDashboardView>> {
+  return apiCall('/v1/admin/analytics/secondary-sales/entries', SecondarySalesDashboardView, {
+    method: 'PUT',
+    accessToken,
+    body: input,
+    ...options,
+  });
+}
+
+export function grantSecondarySalesEditor(
+  accessToken: string,
+  input: GrantSecondarySalesEditorInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  return apiCall('/v1/admin/analytics/secondary-sales/editors', z.void(), {
+    method: 'POST',
+    accessToken,
+    body: input,
+    ...options,
+  });
+}
+
+export function revokeSecondarySalesEditor(
+  accessToken: string,
+  userId: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<void> {
+  return apiCall(
+    `/v1/admin/analytics/secondary-sales/editors/${encodeURIComponent(userId)}`,
+    z.void(),
+    {
+      method: 'DELETE',
+      accessToken,
+      ...options,
+    },
+  );
+}
+
 export function listAllBuyers(
   accessToken: string,
   options: Pick<ApiCallOptions, 'next' | 'baseUrl'> = {},
@@ -705,6 +769,23 @@ export function downloadHrWorkReportPdf(
   return apiCall(
     `/v1/admin/hr/work-logs/pdf?employeeId=${encodeURIComponent(employeeId)}&periodMonth=${encodeURIComponent(periodMonth)}`,
     WorkReportPdfDownloadResponse,
+    {
+      method: 'GET',
+      accessToken,
+      ...options,
+    },
+  );
+}
+
+export function downloadHrWorkReportCsv(
+  accessToken: string,
+  employeeId: string,
+  periodMonth: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof WorkReportCsvDownloadResponse>> {
+  return apiCall(
+    `/v1/admin/hr/work-logs/csv?employeeId=${encodeURIComponent(employeeId)}&periodMonth=${encodeURIComponent(periodMonth)}`,
+    WorkReportCsvDownloadResponse,
     {
       method: 'GET',
       accessToken,

@@ -90,6 +90,10 @@ model User {
   hrWorkLogs             EmployeeWorkLog[]      @relation("HrWorkEmployee")
   hrDocuments            EmployeeHrDocument[]   @relation("HrDocumentEmployee")
   hrDocumentsGenerated   EmployeeHrDocument[]   @relation("HrDocumentGenerator")
+  secondarySalesStockists SecondarySalesStockist[] @relation("SecondarySalesStockistBuyer")
+  secondarySalesUpdated   SecondarySalesEntry[]    @relation("SecondarySalesEntryUpdater")
+  secondarySalesEditor    SecondarySalesEditor?    @relation("SecondarySalesEditorUser")
+  secondarySalesGranted   SecondarySalesEditor[]   @relation("SecondarySalesEditorGrantor")
 
   @@index([accountStatus])
   @@index([createdAt])
@@ -272,6 +276,7 @@ model Product {
   inventory  Inventory?
   orderItems OrderItem[]
   batches    ProductBatch[]
+  secondarySalesEntries SecondarySalesEntry[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -413,6 +418,62 @@ model OrderStatusEvent {
   createdAt DateTime    @default(now())
 
   @@index([orderId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// SECONDARY SALES
+// -----------------------------------------------------------------------------
+
+model SecondarySalesStockist {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  buyerId  String? @unique
+  buyer    User?   @relation("SecondarySalesStockistBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  isActive Boolean @default(true)
+
+  entries SecondarySalesEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, name])
+}
+
+model SecondarySalesEntry {
+  id          String @id @default(cuid())
+  stockistId  String
+  stockist    SecondarySalesStockist @relation(fields: [stockistId], references: [id], onDelete: Restrict)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  periodMonth DateTime
+
+  secondaryQuantity Int @default(0)
+  closingQuantity   Int @default(0)
+  notes             String?
+
+  updatedById String?
+  updatedBy   User?   @relation("SecondarySalesEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stockistId, productId, periodMonth])
+  @@index([periodMonth])
+  @@index([productId])
+}
+
+model SecondarySalesEditor {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation("SecondarySalesEditorUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedById String?
+  grantedBy   User?  @relation("SecondarySalesEditorGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+  revokedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([revokedAt])
 }
 
 // -----------------------------------------------------------------------------

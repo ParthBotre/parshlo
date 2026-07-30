@@ -199,9 +199,9 @@ function formFromRecord(record: HrEmployeeRecord): HrRecordFormState {
   };
 }
 
-function downloadBase64Pdf(fileName: string, contentBase64: string): void {
+function downloadBase64File(fileName: string, contentBase64: string, contentType: string): void {
   const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const blob = new Blob([bytes], { type: contentType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -210,6 +210,10 @@ function downloadBase64Pdf(fileName: string, contentBase64: string): void {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadBase64Pdf(fileName: string, contentBase64: string): void {
+  downloadBase64File(fileName, contentBase64, 'application/pdf');
 }
 
 function previewBase64Pdf(contentBase64: string): void {
@@ -887,6 +891,28 @@ export function HrManagement({
       setMessage(`Work report PDF downloaded for ${periodLabel(workPeriod)}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not download work report PDF.');
+    } finally {
+      setWorkReportDownloading(false);
+    }
+  }
+
+  async function downloadWorkReportCsv(): Promise<void> {
+    if (!workDetailEmployeeId) {
+      setError('Choose an employee before downloading the work report CSV.');
+      return;
+    }
+    setWorkReportDownloading(true);
+    try {
+      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+        `/api/admin/hr/work-logs/csv?employeeId=${encodeURIComponent(workDetailEmployeeId)}&periodMonth=${encodeURIComponent(workPeriod)}`,
+        'GET',
+        undefined,
+        'Could not download work report CSV.',
+      );
+      downloadBase64File(result.fileName, result.contentBase64, 'text/csv');
+      setMessage(`Work report CSV downloaded for ${periodLabel(workPeriod)}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download work report CSV.');
     } finally {
       setWorkReportDownloading(false);
     }
@@ -1843,6 +1869,14 @@ export function HrManagement({
                 onClick={() => void downloadWorkReportPdf()}
               >
                 {workReportDownloading ? 'Downloading...' : 'Download PDF'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!workDetailEmployeeId || workReportDownloading}
+                onClick={() => void downloadWorkReportCsv()}
+              >
+                Download Excel CSV
               </Button>
             </div>
           </div>

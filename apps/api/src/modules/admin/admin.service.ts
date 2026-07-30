@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -27,6 +28,7 @@ import {
   type AdminUpdateBuyerInput,
   type AdminEmployeeView,
   type AdminUpdateEmployeeInput,
+  type AuthPrincipal,
   type EmployeeRole,
   type EmployeeLeaveBalanceView,
   type EmployeeLeaveDashboardView,
@@ -42,15 +44,23 @@ import {
   type OrderStatus,
   type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
+  type SecondarySalesDashboardView,
   type UpdateCompanyHolidayInput,
+  type UpsertSecondarySalesEntryInput,
   type UpsertHrEmployeeRecordInput,
   type UpsertHrWorkLogInput,
   type UpsertCompanyHolidayInput,
+  type WorkReportCsvDownloadResponse,
   type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-import { renderExpenseSlipPdf, renderSalarySlipPdf, renderWorkReportPdf } from '../hr/hr-pdf.js';
+import {
+  renderExpenseSlipPdf,
+  renderSalarySlipPdf,
+  renderWorkReportCsv,
+  renderWorkReportPdf,
+} from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const ORDER_STATUSES: OrderStatus[] = [
@@ -1602,6 +1612,55 @@ export class AdminService {
     employeeId: string,
     periodMonth: string,
   ): Promise<WorkReportPdfDownloadResponse> {
+    const { record, reports, start } = await this.getHrWorkReportDownloadData(
+      employeeId,
+      periodMonth,
+    );
+    const bytes = await renderWorkReportPdf(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        region: record.region,
+        headQuarter: record.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${record.employeeCode}_${periodMonth}.pdf`,
+      contentType: 'application/pdf',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  async downloadHrWorkReportCsv(
+    employeeId: string,
+    periodMonth: string,
+  ): Promise<WorkReportCsvDownloadResponse> {
+    const { record, reports, start } = await this.getHrWorkReportDownloadData(
+      employeeId,
+      periodMonth,
+    );
+    const bytes = renderWorkReportCsv(
+      {
+        employeeName: record.employee.fullName,
+        employeeCode: record.employeeCode,
+        roleTitle: record.roleTitle,
+        region: record.region,
+        headQuarter: record.headQuarter,
+      },
+      { periodMonth: start, reports },
+    );
+
+    return {
+      fileName: `work_report_${record.employeeCode}_${periodMonth}.csv`,
+      contentType: 'text/csv',
+      contentBase64: Buffer.from(bytes).toString('base64'),
+    };
+  }
+
+  private async getHrWorkReportDownloadData(employeeId: string, periodMonth: string) {
     const record = await this.getHrRecordOrThrow(employeeId);
     const { start, end } = monthBounds(periodMonth);
     const reports = await this.prisma.employeeWorkLog.findMany({
@@ -1620,22 +1679,7 @@ export class AdminService {
         note: true,
       },
     });
-    const bytes = await renderWorkReportPdf(
-      {
-        employeeName: record.employee.fullName,
-        employeeCode: record.employeeCode,
-        roleTitle: record.roleTitle,
-        region: record.region,
-        headQuarter: record.headQuarter,
-      },
-      { periodMonth: start, reports },
-    );
-
-    return {
-      fileName: `work_report_${record.employeeCode}_${periodMonth}.pdf`,
-      contentType: 'application/pdf',
-      contentBase64: Buffer.from(bytes).toString('base64'),
-    };
+    return { record, reports, start };
   }
 
   private async createHrDocumentPdf(
@@ -2677,7 +2721,7 @@ export class AdminService {
       '',
       'Employee Signature: ______________________________',
       '',
-      `Date: ${formatDateDisplay(new Date())}`,
+      'Date: ______________________________',
     ];
   }
 
@@ -3310,6 +3354,285 @@ export class AdminService {
         .map((row) => ({ ...row, sharePercent: share(row.grossPaise) }))
         .sort((a, b) => b.grossPaise - a.grossPaise),
     };
+  }
+
+  async secondarySalesDashboard(
+    user: Pick<AuthPrincipal, 'userId' | 'roles'>,
+    filters: { periodMonth?: string; stockistId?: string },
+  ): Promise<SecondarySalesDashboardView> {
+    const { year, month } = AdminService.parseAnchorMonth(filters.periodMonth);
+    const periodMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const range = AdminService.businessPeriodRange('month', periodMonth);
+    const periodMonthStart = range.start;
+    const isSuperAdmin = user.roles.includes('SUPER_ADMIN');
+
+    const [stockists, editorRecord, editors, employees] = await Promise.all([
+      this.prisma.secondarySalesStockist.findMany({
+        where: { isActive: true },
+        include: {
+          buyer: { select: { businessProfile: { select: { businessName: true } } } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.secondarySalesEditor.findFirst({
+        where: { userId: user.userId, revokedAt: null },
+      }),
+      this.prisma.secondarySalesEditor.findMany({
+        where: { revokedAt: null },
+        include: {
+          user: true,
+          grantedBy: { select: { fullName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          NOT: { roles: { has: 'BUYER' } },
+        },
+        orderBy: [{ fullName: 'asc' }],
+      }),
+    ]);
+
+    if (stockists.length === 0) {
+      return {
+        periodMonth,
+        stockists: [],
+        selectedStockistId: null,
+        selectedStockistName: null,
+        canEdit: isSuperAdmin || Boolean(editorRecord),
+        canManageEditors: isSuperAdmin,
+        editors: editors.map((editor) => ({
+          id: editor.id,
+          userId: editor.userId,
+          fullName: editor.user.fullName,
+          email: editor.user.email,
+          grantedAt: editor.createdAt.toISOString(),
+          grantedByName: editor.grantedBy?.fullName ?? null,
+        })),
+        eligibleEditors: employees.map((employee) => this.toEmployeeView(employee)),
+        totals: {
+          primaryQuantity: 0,
+          secondaryQuantity: 0,
+          closingQuantity: 0,
+          balanceQuantity: 0,
+        },
+        rows: [],
+      };
+    }
+
+    const selectedStockist = filters.stockistId
+      ? (stockists.find((stockist) => stockist.id === filters.stockistId) ?? stockists[0])
+      : stockists[0];
+
+    const buyerMatches: Prisma.UserWhereInput[] = [
+      {
+        businessProfile: {
+          businessType: 'STOCKIST',
+          businessName: { equals: selectedStockist.name, mode: 'insensitive' },
+        },
+      },
+    ];
+    if (selectedStockist.buyerId) {
+      buyerMatches.unshift({ id: selectedStockist.buyerId });
+    }
+
+    const [products, primaryOrders, secondaryEntries] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, name: true, packaging: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          placedAt: { gte: range.start, lt: range.end },
+          status: { notIn: ['CANCELLED', 'REJECTED'] },
+          buyer: { OR: buyerMatches },
+        },
+        include: { items: true },
+      }),
+      this.prisma.secondarySalesEntry.findMany({
+        where: { stockistId: selectedStockist.id, periodMonth: periodMonthStart },
+        include: {
+          updatedBy: { select: { fullName: true } },
+          product: { select: { id: true, name: true, packaging: true } },
+        },
+      }),
+    ]);
+
+    const primaryByProduct = new Map<string, number>();
+    for (const order of primaryOrders) {
+      for (const item of order.items) {
+        primaryByProduct.set(
+          item.productId,
+          (primaryByProduct.get(item.productId) ?? 0) + item.quantity + item.schemeFreeQuantity,
+        );
+      }
+    }
+
+    const entriesByProduct = new Map(secondaryEntries.map((entry) => [entry.productId, entry]));
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    for (const entry of secondaryEntries) {
+      if (!productMap.has(entry.productId)) {
+        productMap.set(entry.productId, entry.product);
+      }
+    }
+
+    const rows = [...productMap.values()]
+      .map((product) => {
+        const entry = entriesByProduct.get(product.id);
+        const primaryQuantity = primaryByProduct.get(product.id) ?? 0;
+        const secondaryQuantity = entry?.secondaryQuantity ?? 0;
+        const closingQuantity = entry?.closingQuantity ?? 0;
+        return {
+          productId: product.id,
+          productName: product.name,
+          packaging: product.packaging,
+          primaryQuantity,
+          secondaryQuantity,
+          closingQuantity,
+          balanceQuantity: primaryQuantity - secondaryQuantity - closingQuantity,
+          notes: entry?.notes ?? null,
+          updatedAt: entry?.updatedAt.toISOString() ?? null,
+          updatedByName: entry?.updatedBy?.fullName ?? null,
+        };
+      })
+      .sort((a, b) => {
+        const activityDelta =
+          b.primaryQuantity +
+          b.secondaryQuantity +
+          b.closingQuantity -
+          (a.primaryQuantity + a.secondaryQuantity + a.closingQuantity);
+        return activityDelta !== 0 ? activityDelta : a.productName.localeCompare(b.productName);
+      });
+
+    const totals = rows.reduce(
+      (sum, row) => ({
+        primaryQuantity: sum.primaryQuantity + row.primaryQuantity,
+        secondaryQuantity: sum.secondaryQuantity + row.secondaryQuantity,
+        closingQuantity: sum.closingQuantity + row.closingQuantity,
+        balanceQuantity: sum.balanceQuantity + row.balanceQuantity,
+      }),
+      { primaryQuantity: 0, secondaryQuantity: 0, closingQuantity: 0, balanceQuantity: 0 },
+    );
+
+    return {
+      periodMonth,
+      stockists: stockists.map((stockist) => ({
+        id: stockist.id,
+        name: stockist.name,
+        buyerId: stockist.buyerId,
+        buyerBusinessName: stockist.buyer?.businessProfile?.businessName ?? null,
+        isActive: stockist.isActive,
+      })),
+      selectedStockistId: selectedStockist.id,
+      selectedStockistName: selectedStockist.name,
+      canEdit: isSuperAdmin || Boolean(editorRecord),
+      canManageEditors: isSuperAdmin,
+      editors: editors.map((editor) => ({
+        id: editor.id,
+        userId: editor.userId,
+        fullName: editor.user.fullName,
+        email: editor.user.email,
+        grantedAt: editor.createdAt.toISOString(),
+        grantedByName: editor.grantedBy?.fullName ?? null,
+      })),
+      eligibleEditors: employees.map((employee) => this.toEmployeeView(employee)),
+      totals,
+      rows,
+    };
+  }
+
+  async upsertSecondarySalesEntry(
+    user: Pick<AuthPrincipal, 'userId' | 'roles'>,
+    input: UpsertSecondarySalesEntryInput,
+  ): Promise<SecondarySalesDashboardView> {
+    await this.assertCanEditSecondarySales(user);
+    const { year, month } = AdminService.parseAnchorMonth(input.periodMonth);
+    const periodMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const periodMonthStart = AdminService.businessPeriodRange('month', periodMonth).start;
+
+    await Promise.all([
+      this.prisma.secondarySalesStockist.findUniqueOrThrow({ where: { id: input.stockistId } }),
+      this.prisma.product.findUniqueOrThrow({ where: { id: input.productId } }),
+    ]);
+
+    const notes = input.notes?.trim();
+    await this.prisma.secondarySalesEntry.upsert({
+      where: {
+        stockistId_productId_periodMonth: {
+          stockistId: input.stockistId,
+          productId: input.productId,
+          periodMonth: periodMonthStart,
+        },
+      },
+      create: {
+        stockistId: input.stockistId,
+        productId: input.productId,
+        periodMonth: periodMonthStart,
+        secondaryQuantity: input.secondaryQuantity,
+        closingQuantity: input.closingQuantity,
+        notes: notes && notes.length > 0 ? notes : null,
+        updatedById: user.userId,
+      },
+      update: {
+        secondaryQuantity: input.secondaryQuantity,
+        closingQuantity: input.closingQuantity,
+        notes: notes && notes.length > 0 ? notes : null,
+        updatedById: user.userId,
+      },
+    });
+
+    return this.secondarySalesDashboard(user, {
+      periodMonth,
+      stockistId: input.stockistId,
+    });
+  }
+
+  async grantSecondarySalesEditor(userId: string, actorId: string): Promise<void> {
+    const employee = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+        NOT: { roles: { has: 'BUYER' } },
+      },
+      select: { id: true },
+    });
+    if (!employee) {
+      throw new NotFoundException({ code: 'EMPLOYEE_NOT_FOUND' });
+    }
+
+    await this.prisma.secondarySalesEditor.upsert({
+      where: { userId },
+      create: { userId, grantedById: actorId },
+      update: { grantedById: actorId, revokedAt: null },
+    });
+  }
+
+  async revokeSecondarySalesEditor(userId: string): Promise<void> {
+    await this.prisma.secondarySalesEditor.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  private async assertCanEditSecondarySales(
+    user: Pick<AuthPrincipal, 'userId' | 'roles'>,
+  ): Promise<void> {
+    if (user.roles.includes('SUPER_ADMIN')) {
+      return;
+    }
+
+    const permission = await this.prisma.secondarySalesEditor.findFirst({
+      where: { userId: user.userId, revokedAt: null },
+      select: { id: true },
+    });
+    if (!permission) {
+      throw new ForbiddenException({
+        code: 'SECONDARY_SALES_EDIT_FORBIDDEN',
+        message: 'You do not have permission to edit secondary sales.',
+      });
+    }
   }
 
   private static utcMonthStart(): Date {

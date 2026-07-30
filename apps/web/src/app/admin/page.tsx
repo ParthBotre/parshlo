@@ -1,4 +1,4 @@
-import { BadgeCheck, IndianRupee, MapPin, ScrollText, Users } from 'lucide-react';
+import { BadgeCheck, BarChart3, IndianRupee, MapPin, ScrollText, Users } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 
@@ -125,6 +125,28 @@ export default async function AdminAnalyticsPage(): Promise<JSX.Element> {
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-semibold">Secondary sales</h2>
+              <p className="text-muted-foreground text-xs">
+                Compare stockist primary stock against secondary sale and closing stock.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/analytics/secondary-sales"
+            className="text-primary text-sm hover:underline"
+          >
+            Open secondary sales →
+          </Link>
         </CardContent>
       </Card>
 

@@ -24,6 +24,7 @@ import {
   GenerateHrExpenseSlipInputSchema,
   GenerateHrDocumentInputSchema,
   GenerateHrSalarySlipInputSchema,
+  GrantSecondarySalesEditorInputSchema,
   AdminUpdateBuyerInputSchema,
   AdminUpdateEmployeeInputSchema,
   CourierReceiptUploadRequest,
@@ -34,6 +35,7 @@ import {
   UpdateCompanyHolidayInputSchema,
   UpdateCourierTrackingInput,
   UpdateOrderBeforeApprovalInput,
+  UpsertSecondarySalesEntryInputSchema,
   UpsertCompanyHolidayInputSchema,
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
@@ -46,6 +48,7 @@ import {
   type GenerateHrExpenseSlipInput,
   type GenerateHrDocumentInput,
   type GenerateHrSalarySlipInput,
+  type GrantSecondarySalesEditorInput,
   type AdminUpdateBuyerInput,
   type AdminUpdateEmployeeInput,
   type AuthPrincipal,
@@ -54,9 +57,12 @@ import {
   type ReviewHrExpenseInput,
   type ReviewLeaveRequestInput,
   type UpdateCompanyHolidayInput,
+  type UpsertSecondarySalesEntryInput,
   type UpsertCompanyHolidayInput,
   type UpsertHrEmployeeRecordInput,
   type UpsertHrWorkLogInput,
+  type WorkReportCsvDownloadResponse,
+  type WorkReportPdfDownloadResponse,
 } from '@parshlo/types';
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
@@ -117,6 +123,60 @@ export class AdminController {
     @Query('anchor') anchor?: string,
   ): ReturnType<AdminService['productSalesByCity']> {
     return this.admin.productSalesByCity({ productId, period, anchor });
+  }
+
+  @Get('analytics/secondary-sales')
+  secondarySalesDashboard(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('periodMonth') periodMonth?: string,
+    @Query('stockistId') stockistId?: string,
+  ): ReturnType<AdminService['secondarySalesDashboard']> {
+    return this.admin.secondarySalesDashboard(user, { periodMonth, stockistId });
+  }
+
+  @Put('analytics/secondary-sales/entries')
+  @Throttle(THROTTLE_MUTATION)
+  @Audit({
+    action: 'secondary_sales.entry.upsert',
+    resource: 'SecondarySalesEntry',
+    metadata: (req) => req.body as Record<string, unknown>,
+  })
+  upsertSecondarySalesEntry(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(UpsertSecondarySalesEntryInputSchema))
+    body: UpsertSecondarySalesEntryInput,
+  ): ReturnType<AdminService['upsertSecondarySalesEntry']> {
+    return this.admin.upsertSecondarySalesEntry(user, body);
+  }
+
+  @Post('analytics/secondary-sales/editors')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'secondary_sales.editor.grant',
+    resource: 'SecondarySalesEditor',
+    metadata: (req) => req.body as Record<string, unknown>,
+  })
+  async grantSecondarySalesEditor(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(new ZodValidationPipe(GrantSecondarySalesEditorInputSchema))
+    body: GrantSecondarySalesEditorInput,
+  ): Promise<void> {
+    await this.admin.grantSecondarySalesEditor(body.userId, user.userId);
+  }
+
+  @Delete('analytics/secondary-sales/editors/:userId')
+  @HttpCode(204)
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'secondary_sales.editor.revoke',
+    resource: 'SecondarySalesEditor',
+    resolveResourceId: (req) => (req.params as { userId?: string }).userId,
+  })
+  async revokeSecondarySalesEditor(@Param('userId') userId: string): Promise<void> {
+    await this.admin.revokeSecondarySalesEditor(userId);
   }
 
   @Post('orders')
@@ -534,8 +594,17 @@ export class AdminController {
   downloadHrWorkReportPdf(
     @Query('employeeId') employeeId: string,
     @Query('periodMonth') periodMonth: string,
-  ): ReturnType<AdminService['downloadHrWorkReportPdf']> {
+  ): Promise<WorkReportPdfDownloadResponse> {
     return this.admin.downloadHrWorkReportPdf(employeeId, periodMonth);
+  }
+
+  @Get('hr/work-logs/csv')
+  @RequireRoles('SUPER_ADMIN')
+  downloadHrWorkReportCsv(
+    @Query('employeeId') employeeId: string,
+    @Query('periodMonth') periodMonth: string,
+  ): Promise<WorkReportCsvDownloadResponse> {
+    return this.admin.downloadHrWorkReportCsv(employeeId, periodMonth);
   }
 
   @Get('leave-requests')
