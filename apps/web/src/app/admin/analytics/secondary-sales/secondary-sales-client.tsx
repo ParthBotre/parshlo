@@ -1,10 +1,11 @@
 'use client';
 
 import { type SecondarySalesDashboardView } from '@parshlo/types';
-import { ShieldCheck, Save, Search, UserPlus, X } from 'lucide-react';
+import { Building2, ShieldCheck, Save, Search, UserPlus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import {
+  addSecondarySalesStockist,
   grantSecondarySalesEditor,
   getSecondarySalesDashboard,
   revokeSecondarySalesEditor,
@@ -54,6 +55,7 @@ export default function SecondarySalesClient({
   const [drafts, setDrafts] = useState(initialDrafts(initialDashboard.rows));
   const [query, setQuery] = useState('');
   const [editorUserId, setEditorUserId] = useState('');
+  const [stockistBuyerId, setStockistBuyerId] = useState('');
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -145,6 +147,25 @@ export default function SecondarySalesClient({
     }
   }
 
+  async function addStockist(): Promise<void> {
+    if (!stockistBuyerId) return;
+    setError('');
+    setMessage('');
+    try {
+      const added = await addSecondarySalesStockist(accessToken, { buyerId: stockistBuyerId });
+      const next = await getSecondarySalesDashboard(accessToken, {
+        periodMonth: dashboard.periodMonth,
+        stockistId: added.stockistId,
+      });
+      setDashboard(next);
+      setDrafts(initialDrafts(next.rows));
+      setStockistBuyerId('');
+      setMessage('Stockist added to secondary sales tracking.');
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -155,8 +176,8 @@ export default function SecondarySalesClient({
       </div>
 
       {dashboard.canManageEditors ? (
-        <section className="bg-card rounded-lg border p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <section className="bg-card space-y-5 rounded-lg border p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-5">
             <div>
               <h2 className="font-display flex items-center gap-2 text-base font-semibold">
                 <ShieldCheck className="h-4 w-4" /> Secondary sales editors
@@ -210,6 +231,38 @@ export default function SecondarySalesClient({
               ))}
             </div>
           ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display flex items-center gap-2 text-base font-semibold">
+                <Building2 className="h-4 w-4" /> Tracked stockists
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Add approved STOCKIST buyers to the secondary sales register.
+              </p>
+            </div>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <select
+                value={stockistBuyerId}
+                onChange={(event) => setStockistBuyerId(event.target.value)}
+                className="border-input bg-background h-9 min-w-0 flex-1 rounded-md border px-3 text-sm sm:w-72"
+              >
+                <option value="">Select stockist buyer</option>
+                {dashboard.eligibleStockistBuyers.map((buyer) => (
+                  <option key={buyer.userId} value={buyer.userId}>
+                    {buyer.businessName} · {buyer.city}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void addStockist()}
+                disabled={!stockistBuyerId}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <UserPlus className="h-4 w-4" /> Add
+              </button>
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -223,6 +276,61 @@ export default function SecondarySalesClient({
           {error}
         </p>
       ) : null}
+
+      <section className="bg-card min-w-0 overflow-hidden rounded-lg border">
+        <div className="border-b p-5">
+          <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Month-wise primary vs secondary movement for tracked vendors.
+          </p>
+        </div>
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3">Stockist</th>
+                <th className="px-4 py-3 text-right">Primary</th>
+                <th className="px-4 py-3 text-right">Secondary</th>
+                <th className="px-4 py-3 text-right">Closing</th>
+                <th className="px-4 py-3 text-right">Variance</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.stockistAnalysisRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-muted-foreground px-4 py-10 text-center">
+                    No stockists tracked yet.
+                  </td>
+                </tr>
+              ) : (
+                dashboard.stockistAnalysisRows.map((row) => (
+                  <tr key={row.stockistId} className="border-t">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{row.stockistName}</p>
+                      {row.buyerBusinessName ? (
+                        <p className="text-muted-foreground text-xs">{row.buyerBusinessName}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{row.primaryQuantity}</td>
+                    <td className="px-4 py-3 text-right font-mono">{row.secondaryQuantity}</td>
+                    <td className="px-4 py-3 text-right font-mono">{row.closingQuantity}</td>
+                    <td className="px-4 py-3 text-right font-mono">{row.balanceQuantity}</td>
+                    <td className="px-4 py-3 text-right">
+                      <a
+                        href={`/admin/analytics/secondary-sales?month=${dashboard.periodMonth}&stockistId=${row.stockistId}`}
+                        className="text-primary text-sm font-medium hover:underline"
+                      >
+                        Open
+                      </a>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="bg-card min-w-0 overflow-hidden rounded-lg border">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">

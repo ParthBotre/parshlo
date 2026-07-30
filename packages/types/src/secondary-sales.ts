@@ -12,6 +12,30 @@ export const SecondarySalesStockistView = z.object({
 });
 export type SecondarySalesStockistView = z.infer<typeof SecondarySalesStockistView>;
 
+export const SecondarySalesStockistBuyerOptionView = z.object({
+  userId: EntityId,
+  businessName: z.string(),
+  city: z.string(),
+  state: z.string(),
+  gstin: z.string(),
+});
+export type SecondarySalesStockistBuyerOptionView = z.infer<
+  typeof SecondarySalesStockistBuyerOptionView
+>;
+
+export const SecondarySalesStockistAnalysisRowView = z.object({
+  stockistId: EntityId,
+  stockistName: z.string(),
+  buyerBusinessName: z.string().nullable(),
+  primaryQuantity: z.number().int().nonnegative(),
+  secondaryQuantity: z.number().int().nonnegative(),
+  closingQuantity: z.number().int().nonnegative(),
+  balanceQuantity: z.number().int(),
+});
+export type SecondarySalesStockistAnalysisRowView = z.infer<
+  typeof SecondarySalesStockistAnalysisRowView
+>;
+
 export const SecondarySalesProductRowView = z.object({
   productId: EntityId,
   productName: z.string(),
@@ -45,6 +69,8 @@ export const SecondarySalesDashboardView = z.object({
   canManageEditors: z.boolean(),
   editors: z.array(SecondarySalesEditorView),
   eligibleEditors: z.array(AdminEmployeeView),
+  eligibleStockistBuyers: z.array(SecondarySalesStockistBuyerOptionView),
+  stockistAnalysisRows: z.array(SecondarySalesStockistAnalysisRowView),
   totals: z.object({
     primaryQuantity: z.number().int().nonnegative(),
     secondaryQuantity: z.number().int().nonnegative(),
@@ -69,3 +95,10 @@ export const GrantSecondarySalesEditorInputSchema = z.object({
   userId: EntityId,
 });
 export type GrantSecondarySalesEditorInput = z.infer<typeof GrantSecondarySalesEditorInputSchema>;
+
+export const AddSecondarySalesStockistInputSchema = z.object({
+  buyerId: EntityId,
+});
+export type AddSecondarySalesStockistInput = z.infer<
+  typeof AddSecondarySalesStockistInputSchema
+>;

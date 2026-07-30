@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   AttachCourierReceiptInput,
+  AddSecondarySalesStockistInputSchema,
   ArchiveHrEmployeeInputSchema,
   AdminCreateBuyerInputSchema,
   AdminCreateEmployeeInputSchema,
@@ -40,6 +41,7 @@ import {
   UpsertHrEmployeeRecordInputSchema,
   UpsertHrWorkLogInputSchema,
   type ArchiveHrEmployeeInput,
+  type AddSecondarySalesStockistInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
   type CreateHrExpenseInput,
@@ -177,6 +179,22 @@ export class AdminController {
   })
   async revokeSecondarySalesEditor(@Param('userId') userId: string): Promise<void> {
     await this.admin.revokeSecondarySalesEditor(userId);
+  }
+
+  @Post('analytics/secondary-sales/stockists')
+  @Throttle(THROTTLE_MUTATION)
+  @RequireRoles('SUPER_ADMIN')
+  @Audit({
+    action: 'secondary_sales.stockist.add',
+    resource: 'SecondarySalesStockist',
+    resolveResourceId: (_req, result) => (result as { stockistId?: string }).stockistId,
+    metadata: (req) => req.body as Record<string, unknown>,
+  })
+  addSecondarySalesStockist(
+    @Body(new ZodValidationPipe(AddSecondarySalesStockistInputSchema))
+    body: AddSecondarySalesStockistInput,
+  ): ReturnType<AdminService['addSecondarySalesStockist']> {
+    return this.admin.addSecondarySalesStockist(body);
   }
 
   @Post('orders')

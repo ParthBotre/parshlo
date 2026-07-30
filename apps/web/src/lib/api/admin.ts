@@ -34,6 +34,7 @@ import {
   UpsertCompanyHolidayInputSchema,
   WorkReportCsvDownloadResponse,
   WorkReportPdfDownloadResponse,
+  type AddSecondarySalesStockistInputSchema,
   type AdminCreateBuyerInputSchema,
   type AdminUpdateBuyerInputSchema,
   type AdminUpdateEmployeeInputSchema,
@@ -49,6 +50,7 @@ import { z } from 'zod';
 import { apiCall, ApiError, type ApiCallOptions } from '../api-client';
 
 type ArchiveHrEmployeeInput = z.infer<typeof ArchiveHrEmployeeInputSchema>;
+type AddSecondarySalesStockistInput = z.infer<typeof AddSecondarySalesStockistInputSchema>;
 type AdminCreateEmployeeInput = z.infer<typeof AdminCreateEmployeeInputSchema>;
 type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
 type CreateHrExpenseInput = z.infer<typeof CreateHrExpenseInputSchema>;
@@ -306,6 +308,10 @@ const ProductSalesByCity = z.object({
   ),
 });
 
+const AddSecondarySalesStockistResponse = z.object({
+  stockistId: z.string(),
+});
+
 export function approveKyc(accessToken: string, id: string, note?: string): Promise<void> {
   return apiCall(`/v1/kyc/${encodeURIComponent(id)}/approve`, z.void(), {
     method: 'POST',
@@ -457,6 +463,23 @@ export function revokeSecondarySalesEditor(
     {
       method: 'DELETE',
       accessToken,
+      ...options,
+    },
+  );
+}
+
+export function addSecondarySalesStockist(
+  accessToken: string,
+  input: AddSecondarySalesStockistInput,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<z.infer<typeof AddSecondarySalesStockistResponse>> {
+  return apiCall(
+    '/v1/admin/analytics/secondary-sales/stockists',
+    AddSecondarySalesStockistResponse,
+    {
+      method: 'POST',
+      accessToken,
+      body: input,
       ...options,
     },
   );

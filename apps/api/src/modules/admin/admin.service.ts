@@ -12,6 +12,7 @@ import { type Prisma } from '@parshlo/db';
 import { JobProducer } from '@parshlo/queue';
 import {
   type ArchiveHrEmployeeInput,
+  type AddSecondarySalesStockistInput,
   type AdminCreateBuyerInput,
   type AdminCreateEmployeeInput,
   type CompanyHolidayView,
@@ -124,6 +125,13 @@ interface BuyerRow {
   country: string | null;
   createdAt: string;
   orderSummary: BuyerOrderSummary;
+}
+
+interface SecondaryStockistQuantityTotals {
+  primaryQuantity: number;
+  secondaryQuantity: number;
+  closingQuantity: number;
+  balanceQuantity: number;
 }
 
 function parseDateOnly(value: string): Date {
@@ -3366,7 +3374,7 @@ export class AdminService {
     const periodMonthStart = range.start;
     const isSuperAdmin = user.roles.includes('SUPER_ADMIN');
 
-    const [stockists, editorRecord, editors, employees] = await Promise.all([
+    const [stockists, editorRecord, editors, employees, stockistBuyers] = await Promise.all([
       this.prisma.secondarySalesStockist.findMany({
         where: { isActive: true },
         include: {
@@ -3392,7 +3400,41 @@ export class AdminService {
         },
         orderBy: [{ fullName: 'asc' }],
       }),
+      this.prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          accountStatus: 'APPROVED',
+          businessProfile: { businessType: 'STOCKIST' },
+        },
+        include: { businessProfile: true },
+        orderBy: { fullName: 'asc' },
+      }),
     ]);
+
+    const trackedBuyerIds = new Set(stockists.flatMap((stockist) => (stockist.buyerId ? [stockist.buyerId] : [])));
+    const trackedNames = new Set(stockists.map((stockist) => AdminService.normalizedName(stockist.name)));
+    const eligibleStockistBuyers = stockistBuyers
+      .filter((buyer) => {
+        const profile = buyer.businessProfile;
+        return (
+          profile &&
+          !trackedBuyerIds.has(buyer.id) &&
+          !trackedNames.has(AdminService.normalizedName(profile.businessName))
+        );
+      })
+      .map((buyer) => {
+        const profile = buyer.businessProfile;
+        if (!profile) {
+          throw new BadRequestException({ code: 'STOCKIST_PROFILE_REQUIRED' });
+        }
+        return {
+          userId: buyer.id,
+          businessName: profile.businessName,
+          city: profile.city,
+          state: profile.state,
+          gstin: profile.gstin,
+        };
+      });
 
     if (stockists.length === 0) {
       return {
@@ -3411,6 +3453,8 @@ export class AdminService {
           grantedByName: editor.grantedBy?.fullName ?? null,
         })),
         eligibleEditors: employees.map((employee) => this.toEmployeeView(employee)),
+        eligibleStockistBuyers,
+        stockistAnalysisRows: [],
         totals: {
           primaryQuantity: 0,
           secondaryQuantity: 0,
@@ -3437,7 +3481,7 @@ export class AdminService {
       buyerMatches.unshift({ id: selectedStockist.buyerId });
     }
 
-    const [products, primaryOrders, secondaryEntries] = await Promise.all([
+    const [products, primaryOrders, secondaryEntries, stockistAnalysisRows] = await Promise.all([
       this.prisma.product.findMany({
         where: { deletedAt: null, status: 'ACTIVE' },
         select: { id: true, name: true, packaging: true },
@@ -3458,6 +3502,7 @@ export class AdminService {
           product: { select: { id: true, name: true, packaging: true } },
         },
       }),
+      this.buildSecondarySalesStockistAnalysis(stockists, range, periodMonthStart),
     ]);
 
     const primaryByProduct = new Map<string, number>();
@@ -3538,6 +3583,8 @@ export class AdminService {
         grantedByName: editor.grantedBy?.fullName ?? null,
       })),
       eligibleEditors: employees.map((employee) => this.toEmployeeView(employee)),
+      eligibleStockistBuyers,
+      stockistAnalysisRows,
       totals,
       rows,
     };
@@ -3616,6 +3663,63 @@ export class AdminService {
     });
   }
 
+  async addSecondarySalesStockist(
+    input: AddSecondarySalesStockistInput,
+  ): Promise<{ stockistId: string }> {
+    const buyer = await this.prisma.user.findFirst({
+      where: {
+        id: input.buyerId,
+        deletedAt: null,
+        accountStatus: 'APPROVED',
+        businessProfile: { businessType: 'STOCKIST' },
+      },
+      include: { businessProfile: true },
+    });
+    if (!buyer?.businessProfile) {
+      throw new NotFoundException({
+        code: 'STOCKIST_BUYER_NOT_FOUND',
+        message: 'Select an approved stockist buyer.',
+      });
+    }
+
+    const existingForBuyer = await this.prisma.secondarySalesStockist.findUnique({
+      where: { buyerId: buyer.id },
+      select: { id: true },
+    });
+    if (existingForBuyer) {
+      await this.prisma.secondarySalesStockist.update({
+        where: { id: existingForBuyer.id },
+        data: { isActive: true },
+      });
+      return { stockistId: existingForBuyer.id };
+    }
+
+    const existingForName = await this.prisma.secondarySalesStockist.findUnique({
+      where: { name: buyer.businessProfile.businessName.trim().toUpperCase() },
+      select: { id: true, buyerId: true },
+    });
+    if (existingForName?.buyerId && existingForName.buyerId !== buyer.id) {
+      throw new ConflictException({
+        code: 'SECONDARY_STOCKIST_NAME_ALREADY_LINKED',
+        message: 'That stockist name is already linked to another buyer.',
+      });
+    }
+
+    const stockist = await this.prisma.secondarySalesStockist.upsert({
+      where: { name: buyer.businessProfile.businessName.trim().toUpperCase() },
+      create: {
+        name: buyer.businessProfile.businessName.trim().toUpperCase(),
+        buyerId: buyer.id,
+      },
+      update: {
+        buyerId: buyer.id,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    return { stockistId: stockist.id };
+  }
+
   private async assertCanEditSecondarySales(
     user: Pick<AuthPrincipal, 'userId' | 'roles'>,
   ): Promise<void> {
@@ -3633,6 +3737,121 @@ export class AdminService {
         message: 'You do not have permission to edit secondary sales.',
       });
     }
+  }
+
+  private async buildSecondarySalesStockistAnalysis(
+    stockists: {
+      id: string;
+      name: string;
+      buyerId: string | null;
+      buyer: { businessProfile: { businessName: string } | null } | null;
+    }[],
+    range: { start: Date; end: Date },
+    periodMonthStart: Date,
+  ): Promise<SecondarySalesDashboardView['stockistAnalysisRows']> {
+    const totalsByStockist = new Map<string, SecondaryStockistQuantityTotals>(
+      stockists.map((stockist) => [
+        stockist.id,
+        {
+          primaryQuantity: 0,
+          secondaryQuantity: 0,
+          closingQuantity: 0,
+          balanceQuantity: 0,
+        },
+      ]),
+    );
+
+    const [primaryOrders, entries] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          placedAt: { gte: range.start, lt: range.end },
+          status: { notIn: ['CANCELLED', 'REJECTED'] },
+          buyer: { businessProfile: { businessType: 'STOCKIST' } },
+        },
+        include: {
+          buyer: { select: { businessProfile: { select: { businessName: true } } } },
+          items: { select: { quantity: true, schemeFreeQuantity: true } },
+        },
+      }),
+      this.prisma.secondarySalesEntry.findMany({
+        where: {
+          stockistId: { in: stockists.map((stockist) => stockist.id) },
+          periodMonth: periodMonthStart,
+        },
+        select: {
+          stockistId: true,
+          secondaryQuantity: true,
+          closingQuantity: true,
+        },
+      }),
+    ]);
+
+    const stockistByBuyerId = new Map(
+      stockists.flatMap((stockist) => (stockist.buyerId ? [[stockist.buyerId, stockist]] : [])),
+    );
+    const stockistByName = new Map(
+      stockists.map((stockist) => [AdminService.normalizedName(stockist.name), stockist]),
+    );
+
+    for (const order of primaryOrders) {
+      const stockist =
+        stockistByBuyerId.get(order.buyerId) ??
+        stockistByName.get(
+          AdminService.normalizedName(order.buyer.businessProfile?.businessName ?? ''),
+        );
+      if (!stockist) {
+        continue;
+      }
+      const orderQuantity = order.items.reduce(
+        (sum, item) => sum + item.quantity + item.schemeFreeQuantity,
+        0,
+      );
+      const totals = totalsByStockist.get(stockist.id);
+      if (totals) {
+        totals.primaryQuantity += orderQuantity;
+      }
+    }
+
+    for (const entry of entries) {
+      const totals = totalsByStockist.get(entry.stockistId);
+      if (totals) {
+        totals.secondaryQuantity += entry.secondaryQuantity;
+        totals.closingQuantity += entry.closingQuantity;
+      }
+    }
+
+    return stockists
+      .map((stockist) => {
+        const totals = totalsByStockist.get(stockist.id) ?? {
+          primaryQuantity: 0,
+          secondaryQuantity: 0,
+          closingQuantity: 0,
+          balanceQuantity: 0,
+        };
+        const balanceQuantity =
+          totals.primaryQuantity - totals.secondaryQuantity - totals.closingQuantity;
+        return {
+          stockistId: stockist.id,
+          stockistName: stockist.name,
+          buyerBusinessName: stockist.buyer?.businessProfile?.businessName ?? null,
+          primaryQuantity: totals.primaryQuantity,
+          secondaryQuantity: totals.secondaryQuantity,
+          closingQuantity: totals.closingQuantity,
+          balanceQuantity,
+        };
+      })
+      .sort((a, b) => {
+        const activityDelta =
+          b.primaryQuantity +
+          b.secondaryQuantity +
+          b.closingQuantity -
+          (a.primaryQuantity + a.secondaryQuantity + a.closingQuantity);
+        return activityDelta !== 0 ? activityDelta : a.stockistName.localeCompare(b.stockistName);
+      });
+  }
+
+  private static normalizedName(name: string): string {
+    return name.trim().replace(/\s+/g, ' ').toUpperCase();
   }
 
   private static utcMonthStart(): Date {
