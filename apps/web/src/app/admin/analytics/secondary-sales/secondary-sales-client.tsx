@@ -12,6 +12,7 @@ import {
   upsertSecondarySalesEntry,
 } from '@/lib/api/admin';
 import { ApiError } from '@/lib/api-client';
+import { formatINR } from '@/lib/utils';
 
 type Dashboard = SecondarySalesDashboardView;
 type Row = Dashboard['rows'][number];
@@ -169,10 +170,26 @@ export default function SecondarySalesClient({
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Primary qty" value={dashboard.totals.primaryQuantity} />
-        <Metric label="Secondary qty" value={dashboard.totals.secondaryQuantity} />
-        <Metric label="Closing stock" value={dashboard.totals.closingQuantity} />
-        <Metric label="Variance" value={dashboard.totals.balanceQuantity} />
+        <Metric
+          label="Primary sales"
+          value={dashboard.totals.primaryQuantity}
+          amount={dashboard.totals.primaryPaise}
+        />
+        <Metric
+          label="Secondary sales"
+          value={dashboard.totals.secondaryQuantity}
+          amount={dashboard.totals.secondaryPaise}
+        />
+        <Metric
+          label="Closing stock"
+          value={dashboard.totals.closingQuantity}
+          amount={dashboard.totals.closingPaise}
+        />
+        <Metric
+          label="Variance"
+          value={dashboard.totals.balanceQuantity}
+          amount={dashboard.totals.balancePaise}
+        />
       </div>
 
       {dashboard.canManageEditors ? (
@@ -281,7 +298,8 @@ export default function SecondarySalesClient({
         <div className="border-b p-5">
           <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Month-wise primary vs secondary movement for tracked vendors.
+            Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
+            sales and closing stock are entered by approved editors.
           </p>
         </div>
         <div className="w-full overflow-x-auto">
@@ -312,10 +330,13 @@ export default function SecondarySalesClient({
                         <p className="text-muted-foreground text-xs">{row.buyerBusinessName}</p>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">{row.primaryQuantity}</td>
-                    <td className="px-4 py-3 text-right font-mono">{row.secondaryQuantity}</td>
-                    <td className="px-4 py-3 text-right font-mono">{row.closingQuantity}</td>
-                    <td className="px-4 py-3 text-right font-mono">{row.balanceQuantity}</td>
+                    <QuantityAmountCell quantity={row.primaryQuantity} amount={row.primaryPaise} />
+                    <QuantityAmountCell
+                      quantity={row.secondaryQuantity}
+                      amount={row.secondaryPaise}
+                    />
+                    <QuantityAmountCell quantity={row.closingQuantity} amount={row.closingPaise} />
+                    <QuantityAmountCell quantity={row.balanceQuantity} amount={row.balancePaise} />
                     <td className="px-4 py-3 text-right">
                       <a
                         href={`/admin/analytics/secondary-sales?month=${dashboard.periodMonth}&stockistId=${row.stockistId}`}
@@ -341,6 +362,13 @@ export default function SecondarySalesClient({
             <p className="text-muted-foreground mt-1 text-sm">
               {dashboard.canEdit ? 'Editable secondary sales register.' : 'Read-only view.'}
             </p>
+            {dashboard.stockists.find((stockist) => stockist.id === dashboard.selectedStockistId)
+              ?.buyerId ? null : (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                This stockist is not linked to an approved STOCKIST buyer yet, so primary sales only
+                match by exact stockist name.
+              </p>
+            )}
           </div>
           <label className="border-input bg-background flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm sm:w-80">
             <Search className="text-muted-foreground h-4 w-4" />
@@ -357,7 +385,7 @@ export default function SecondarySalesClient({
             <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3 text-right">Primary</th>
+                <th className="px-4 py-3 text-right">Primary from Parshlo</th>
                 <th className="px-4 py-3 text-right">Secondary</th>
                 <th className="px-4 py-3 text-right">Closing</th>
                 <th className="px-4 py-3 text-right">Variance</th>
@@ -385,13 +413,19 @@ export default function SecondarySalesClient({
                         <p className="break-words font-medium">{row.productName}</p>
                         <p className="text-muted-foreground text-xs">{row.packaging}</p>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">{row.primaryQuantity}</td>
+                      <QuantityAmountCell
+                        quantity={row.primaryQuantity}
+                        amount={row.primaryPaise}
+                      />
                       <td className="px-4 py-3 text-right">
                         <QuantityInput
                           disabled={!dashboard.canEdit}
                           value={draft.secondary}
                           onChange={(value) => updateDraft(row.productId, 'secondary', value)}
                         />
+                        <p className="text-muted-foreground mt-1 font-mono text-xs">
+                          {formatINR(row.secondaryPaise)}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <QuantityInput
@@ -399,8 +433,14 @@ export default function SecondarySalesClient({
                           value={draft.closing}
                           onChange={(value) => updateDraft(row.productId, 'closing', value)}
                         />
+                        <p className="text-muted-foreground mt-1 font-mono text-xs">
+                          {formatINR(row.closingPaise)}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">{row.balanceQuantity}</td>
+                      <QuantityAmountCell
+                        quantity={row.balanceQuantity}
+                        amount={row.balancePaise}
+                      />
                       <td className="px-4 py-3">
                         <input
                           disabled={!dashboard.canEdit}
@@ -441,12 +481,36 @@ export default function SecondarySalesClient({
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }): JSX.Element {
+function Metric({
+  label,
+  value,
+  amount,
+}: {
+  label: string;
+  value: number;
+  amount: number;
+}): JSX.Element {
   return (
     <div className="bg-card rounded-lg border p-5">
       <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
       <p className="font-display mt-1 text-2xl font-semibold">{value}</p>
+      <p className="text-muted-foreground mt-1 font-mono text-sm">{formatINR(amount)}</p>
     </div>
+  );
+}
+
+function QuantityAmountCell({
+  quantity,
+  amount,
+}: {
+  quantity: number;
+  amount: number;
+}): JSX.Element {
+  return (
+    <td className="px-4 py-3 text-right">
+      <p className="font-mono">{quantity}</p>
+      <p className="text-muted-foreground mt-1 font-mono text-xs">{formatINR(amount)}</p>
+    </td>
   );
 }
 

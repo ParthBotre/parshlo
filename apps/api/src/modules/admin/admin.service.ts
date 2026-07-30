@@ -129,9 +129,13 @@ interface BuyerRow {
 
 interface SecondaryStockistQuantityTotals {
   primaryQuantity: number;
+  primaryPaise: number;
   secondaryQuantity: number;
+  secondaryPaise: number;
   closingQuantity: number;
+  closingPaise: number;
   balanceQuantity: number;
+  balancePaise: number;
 }
 
 function parseDateOnly(value: string): Date {
@@ -3411,8 +3415,12 @@ export class AdminService {
       }),
     ]);
 
-    const trackedBuyerIds = new Set(stockists.flatMap((stockist) => (stockist.buyerId ? [stockist.buyerId] : [])));
-    const trackedNames = new Set(stockists.map((stockist) => AdminService.normalizedName(stockist.name)));
+    const trackedBuyerIds = new Set(
+      stockists.flatMap((stockist) => (stockist.buyerId ? [stockist.buyerId] : [])),
+    );
+    const trackedNames = new Set(
+      stockists.map((stockist) => AdminService.normalizedName(stockist.name)),
+    );
     const eligibleStockistBuyers = stockistBuyers
       .filter((buyer) => {
         const profile = buyer.businessProfile;
@@ -3457,9 +3465,13 @@ export class AdminService {
         stockistAnalysisRows: [],
         totals: {
           primaryQuantity: 0,
+          primaryPaise: 0,
           secondaryQuantity: 0,
+          secondaryPaise: 0,
           closingQuantity: 0,
+          closingPaise: 0,
           balanceQuantity: 0,
+          balancePaise: 0,
         },
         rows: [],
       };
@@ -3484,7 +3496,7 @@ export class AdminService {
     const [products, primaryOrders, secondaryEntries, stockistAnalysisRows] = await Promise.all([
       this.prisma.product.findMany({
         where: { deletedAt: null, status: 'ACTIVE' },
-        select: { id: true, name: true, packaging: true },
+        select: { id: true, name: true, packaging: true, rateAPaise: true },
         orderBy: { name: 'asc' },
       }),
       this.prisma.order.findMany({
@@ -3499,19 +3511,20 @@ export class AdminService {
         where: { stockistId: selectedStockist.id, periodMonth: periodMonthStart },
         include: {
           updatedBy: { select: { fullName: true } },
-          product: { select: { id: true, name: true, packaging: true } },
+          product: { select: { id: true, name: true, packaging: true, rateAPaise: true } },
         },
       }),
       this.buildSecondarySalesStockistAnalysis(stockists, range, periodMonthStart),
     ]);
 
-    const primaryByProduct = new Map<string, number>();
+    const primaryByProduct = new Map<string, { quantity: number; paise: number }>();
     for (const order of primaryOrders) {
       for (const item of order.items) {
-        primaryByProduct.set(
-          item.productId,
-          (primaryByProduct.get(item.productId) ?? 0) + item.quantity + item.schemeFreeQuantity,
-        );
+        const current = primaryByProduct.get(item.productId) ?? { quantity: 0, paise: 0 };
+        primaryByProduct.set(item.productId, {
+          quantity: current.quantity + item.quantity + item.schemeFreeQuantity,
+          paise: current.paise + Number(item.lineTotalPaise),
+        });
       }
     }
 
@@ -3526,17 +3539,25 @@ export class AdminService {
     const rows = [...productMap.values()]
       .map((product) => {
         const entry = entriesByProduct.get(product.id);
-        const primaryQuantity = primaryByProduct.get(product.id) ?? 0;
+        const primary = primaryByProduct.get(product.id) ?? { quantity: 0, paise: 0 };
+        const primaryQuantity = primary.quantity;
+        const primaryPaise = primary.paise;
         const secondaryQuantity = entry?.secondaryQuantity ?? 0;
+        const secondaryPaise = secondaryQuantity * Number(product.rateAPaise);
         const closingQuantity = entry?.closingQuantity ?? 0;
+        const closingPaise = closingQuantity * Number(product.rateAPaise);
         return {
           productId: product.id,
           productName: product.name,
           packaging: product.packaging,
           primaryQuantity,
+          primaryPaise,
           secondaryQuantity,
+          secondaryPaise,
           closingQuantity,
+          closingPaise,
           balanceQuantity: primaryQuantity - secondaryQuantity - closingQuantity,
+          balancePaise: primaryPaise - secondaryPaise - closingPaise,
           notes: entry?.notes ?? null,
           updatedAt: entry?.updatedAt.toISOString() ?? null,
           updatedByName: entry?.updatedBy?.fullName ?? null,
@@ -3554,11 +3575,24 @@ export class AdminService {
     const totals = rows.reduce(
       (sum, row) => ({
         primaryQuantity: sum.primaryQuantity + row.primaryQuantity,
+        primaryPaise: sum.primaryPaise + row.primaryPaise,
         secondaryQuantity: sum.secondaryQuantity + row.secondaryQuantity,
+        secondaryPaise: sum.secondaryPaise + row.secondaryPaise,
         closingQuantity: sum.closingQuantity + row.closingQuantity,
+        closingPaise: sum.closingPaise + row.closingPaise,
         balanceQuantity: sum.balanceQuantity + row.balanceQuantity,
+        balancePaise: sum.balancePaise + row.balancePaise,
       }),
-      { primaryQuantity: 0, secondaryQuantity: 0, closingQuantity: 0, balanceQuantity: 0 },
+      {
+        primaryQuantity: 0,
+        primaryPaise: 0,
+        secondaryQuantity: 0,
+        secondaryPaise: 0,
+        closingQuantity: 0,
+        closingPaise: 0,
+        balanceQuantity: 0,
+        balancePaise: 0,
+      },
     );
 
     return {
@@ -3754,9 +3788,13 @@ export class AdminService {
         stockist.id,
         {
           primaryQuantity: 0,
+          primaryPaise: 0,
           secondaryQuantity: 0,
+          secondaryPaise: 0,
           closingQuantity: 0,
+          closingPaise: 0,
           balanceQuantity: 0,
+          balancePaise: 0,
         },
       ]),
     );
@@ -3770,7 +3808,7 @@ export class AdminService {
         },
         include: {
           buyer: { select: { businessProfile: { select: { businessName: true } } } },
-          items: { select: { quantity: true, schemeFreeQuantity: true } },
+          items: { select: { quantity: true, schemeFreeQuantity: true, lineTotalPaise: true } },
         },
       }),
       this.prisma.secondarySalesEntry.findMany({
@@ -3782,6 +3820,7 @@ export class AdminService {
           stockistId: true,
           secondaryQuantity: true,
           closingQuantity: true,
+          product: { select: { rateAPaise: true } },
         },
       }),
     ]);
@@ -3806,9 +3845,11 @@ export class AdminService {
         (sum, item) => sum + item.quantity + item.schemeFreeQuantity,
         0,
       );
+      const orderPaise = order.items.reduce((sum, item) => sum + Number(item.lineTotalPaise), 0);
       const totals = totalsByStockist.get(stockist.id);
       if (totals) {
         totals.primaryQuantity += orderQuantity;
+        totals.primaryPaise += orderPaise;
       }
     }
 
@@ -3816,7 +3857,9 @@ export class AdminService {
       const totals = totalsByStockist.get(entry.stockistId);
       if (totals) {
         totals.secondaryQuantity += entry.secondaryQuantity;
+        totals.secondaryPaise += entry.secondaryQuantity * Number(entry.product.rateAPaise);
         totals.closingQuantity += entry.closingQuantity;
+        totals.closingPaise += entry.closingQuantity * Number(entry.product.rateAPaise);
       }
     }
 
@@ -3824,20 +3867,29 @@ export class AdminService {
       .map((stockist) => {
         const totals = totalsByStockist.get(stockist.id) ?? {
           primaryQuantity: 0,
+          primaryPaise: 0,
           secondaryQuantity: 0,
+          secondaryPaise: 0,
           closingQuantity: 0,
+          closingPaise: 0,
           balanceQuantity: 0,
+          balancePaise: 0,
         };
         const balanceQuantity =
           totals.primaryQuantity - totals.secondaryQuantity - totals.closingQuantity;
+        const balancePaise = totals.primaryPaise - totals.secondaryPaise - totals.closingPaise;
         return {
           stockistId: stockist.id,
           stockistName: stockist.name,
           buyerBusinessName: stockist.buyer?.businessProfile?.businessName ?? null,
           primaryQuantity: totals.primaryQuantity,
+          primaryPaise: totals.primaryPaise,
           secondaryQuantity: totals.secondaryQuantity,
+          secondaryPaise: totals.secondaryPaise,
           closingQuantity: totals.closingQuantity,
+          closingPaise: totals.closingPaise,
           balanceQuantity,
+          balancePaise,
         };
       })
       .sort((a, b) => {

@@ -28,9 +28,13 @@ export const SecondarySalesStockistAnalysisRowView = z.object({
   stockistName: z.string(),
   buyerBusinessName: z.string().nullable(),
   primaryQuantity: z.number().int().nonnegative(),
+  primaryPaise: z.number().int().nonnegative(),
   secondaryQuantity: z.number().int().nonnegative(),
+  secondaryPaise: z.number().int().nonnegative(),
   closingQuantity: z.number().int().nonnegative(),
+  closingPaise: z.number().int().nonnegative(),
   balanceQuantity: z.number().int(),
+  balancePaise: z.number().int(),
 });
 export type SecondarySalesStockistAnalysisRowView = z.infer<
   typeof SecondarySalesStockistAnalysisRowView
@@ -41,9 +45,13 @@ export const SecondarySalesProductRowView = z.object({
   productName: z.string(),
   packaging: z.string(),
   primaryQuantity: z.number().int().nonnegative(),
+  primaryPaise: z.number().int().nonnegative(),
   secondaryQuantity: z.number().int().nonnegative(),
+  secondaryPaise: z.number().int().nonnegative(),
   closingQuantity: z.number().int().nonnegative(),
+  closingPaise: z.number().int().nonnegative(),
   balanceQuantity: z.number().int(),
+  balancePaise: z.number().int(),
   notes: z.string().nullable(),
   updatedAt: IsoDateString.nullable(),
   updatedByName: z.string().nullable(),
@@ -73,9 +81,13 @@ export const SecondarySalesDashboardView = z.object({
   stockistAnalysisRows: z.array(SecondarySalesStockistAnalysisRowView),
   totals: z.object({
     primaryQuantity: z.number().int().nonnegative(),
+    primaryPaise: z.number().int().nonnegative(),
     secondaryQuantity: z.number().int().nonnegative(),
+    secondaryPaise: z.number().int().nonnegative(),
     closingQuantity: z.number().int().nonnegative(),
+    closingPaise: z.number().int().nonnegative(),
     balanceQuantity: z.number().int(),
+    balancePaise: z.number().int(),
   }),
   rows: z.array(SecondarySalesProductRowView),
 });
@@ -99,6 +111,4 @@ export type GrantSecondarySalesEditorInput = z.infer<typeof GrantSecondarySalesE
 export const AddSecondarySalesStockistInputSchema = z.object({
   buyerId: EntityId,
 });
-export type AddSecondarySalesStockistInput = z.infer<
-  typeof AddSecondarySalesStockistInputSchema
->;
+export type AddSecondarySalesStockistInput = z.infer<typeof AddSecondarySalesStockistInputSchema>;
