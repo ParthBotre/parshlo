@@ -19,7 +19,11 @@ export function createKycWorker({
     QUEUE_KYC,
     async (job) => {
       const data = KycDecisionJob.parse(job.data);
-      const log = logger.child({ queue: QUEUE_KYC, jobId: job.id, applicationId: data.applicationId });
+      const log = logger.child({
+        queue: QUEUE_KYC,
+        jobId: job.id,
+        applicationId: data.applicationId,
+      });
 
       const app = await prisma.kycApplication.findUnique({
         where: { id: data.applicationId },

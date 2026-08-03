@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Gstin, IndianMobile, IndianPin, Pan } from '../common.js';
+import { Gstin, IndianMobile, IndianPin, OptionalIndianPin, Pan } from '../common.js';
 
 describe('GSTIN validation', () => {
   it('accepts a valid GSTIN', () => {
@@ -40,8 +40,14 @@ describe('IndianPin validation', () => {
   it('accepts 6-digit PIN', () => {
     expect(IndianPin.parse('560001')).toBe('560001');
   });
+  it('allows optional PIN to be omitted or blank', () => {
+    expect(OptionalIndianPin.parse(undefined)).toBeUndefined();
+    expect(OptionalIndianPin.parse('')).toBe('');
+    expect(OptionalIndianPin.parse(' 560001 ')).toBe('560001');
+  });
   it('rejects bad PIN', () => {
     expect(() => IndianPin.parse('060001')).toThrow();
     expect(() => IndianPin.parse('56000')).toThrow();
+    expect(() => OptionalIndianPin.parse('56000')).toThrow();
   });
 });

@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getPublicProduct, listPublicProducts } from '@/lib/api/products';
 import { ApiError } from '@/lib/api-client';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -18,7 +19,7 @@ interface PageProps {
 
 export async function generateStaticParams(): Promise<{ slug: string }[]> {
   try {
-    const products = await listPublicProducts();
+    const products = await listPublicProducts({ cache: 'no-store' });
     return products.map((p) => ({ slug: p.slug }));
   } catch {
     return [];
@@ -28,10 +29,10 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const p = await getPublicProduct(slug);
+    const p = await getPublicProduct(slug, { cache: 'no-store' });
     return {
       title: p.name,
-      description: `${p.composition}. ${p.form} · ${p.packaging}.`,
+      description: `${p.form} · ${p.packaging}.`,
     };
   } catch {
     return { title: 'Product' };
@@ -42,7 +43,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
   const { slug } = await params;
   let product;
   try {
-    product = await getPublicProduct(slug);
+    product = await getPublicProduct(slug, { cache: 'no-store' });
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       notFound();
@@ -56,7 +57,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
         href="/products"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to catalog
+        <ArrowLeft className="h-4 w-4" /> Back to products
       </Link>
 
       <div className="mt-8 grid gap-10 md:grid-cols-2">
@@ -73,18 +74,15 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
 
         <div className="space-y-6">
           <div className="space-y-3">
-            <Badge variant="secondary">{product.category}</Badge>
             <h1 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
-              {product.name}
+              {product.name.toUpperCase()}
             </h1>
-            <p className="text-muted-foreground text-base">{product.composition}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <Field label="Strength" value={product.strength} />
             <Field label="Form" value={product.form} />
             <Field label="Packaging" value={product.packaging} value2 />
-            <Field label="Manufacturer" value={product.manufacturer} value2 />
+            <Field label="Products Marketed By" value={product.manufacturer} value2 />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -111,24 +109,19 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
             <CardContent className="p-5">
               <h3 className="font-display text-base font-semibold">Wholesale ordering</h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Pricing, MOQ, and real-time inventory are available to verified B2B accounts.
+                Pricing is available to verified B2B accounts.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild>
-                  <Link href="/auth/register">Request access</Link>
+                  <Link href="/auth/sign-in">Sign in</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href="/auth/sign-in">Sign in</Link>
+                  <Link href="/auth/register">Request access</Link>
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      <div className="prose prose-sm text-foreground/90 md:prose-base mt-12 max-w-none">
-        <h2>About this product</h2>
-        <p>{product.description}</p>
       </div>
     </div>
   );

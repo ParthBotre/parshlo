@@ -1,0 +1,316 @@
+import { ArrowLeft } from 'lucide-react';
+import { type Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { type ReactNode } from 'react';
+
+import { Card, CardContent } from '@/components/ui/card';
+import { getProductSalesByCity } from '@/lib/api/admin';
+import { ApiError } from '@/lib/api-client';
+import { getSession } from '@/lib/auth/session';
+import { dateInputKeyIst } from '@/lib/format-datetime';
+import { formatINR } from '@/lib/utils';
+
+export const metadata: Metadata = {
+  title: 'Admin · Product sales by city',
+  robots: { index: false, follow: false },
+};
+
+const PERIODS = [
+  { key: 'day', label: 'Daily' },
+  { key: 'week', label: 'Weekly' },
+  { key: 'month', label: 'Monthly' },
+  { key: 'year', label: 'Yearly' },
+] as const;
+
+type Period = (typeof PERIODS)[number]['key'];
+
+interface PageProps {
+  searchParams: Promise<{
+    productId?: string;
+    period?: string;
+    anchor?: string;
+  }>;
+}
+
+function isPeriod(value: string | undefined): value is Period {
+  return value === 'day' || value === 'week' || value === 'month' || value === 'year';
+}
+
+function todayKey(): string {
+  return dateInputKeyIst();
+}
+
+function defaultAnchor(period: Period): string {
+  const today = todayKey();
+  if (period === 'day') return today;
+  if (period === 'month') return today.slice(0, 7);
+  if (period === 'year') return today.slice(0, 4);
+  return today;
+}
+
+function normalizeAnchor(period: Period, anchor: string | undefined): string {
+  const fallback = defaultAnchor(period);
+  if (!anchor) return fallback;
+  if (period === 'year') return /^\d{4}$/.test(anchor) ? anchor : fallback;
+  if (period === 'month') return /^\d{4}-\d{2}$/.test(anchor) ? anchor : fallback;
+  return /^\d{4}-\d{2}-\d{2}$/.test(anchor) ? anchor : fallback;
+}
+
+function monthOptions(): { value: string; label: string }[] {
+  const today = todayKey();
+  const [yearRaw, monthRaw] = today.split('-');
+  const startYear = Number(yearRaw);
+  const startMonth = Number(monthRaw);
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+
+  return Array.from({ length: 36 }, (_, index) => {
+    const date = new Date(Date.UTC(startYear, startMonth - 1 - index, 1));
+    const value = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    return { value, label: formatter.format(date) };
+  });
+}
+
+function yearOptions(): string[] {
+  const currentYear = Number(todayKey().slice(0, 4));
+  return Array.from({ length: 11 }, (_, index) => String(currentYear - index));
+}
+
+function periodFieldLabel(period: Period): string {
+  if (period === 'day') return 'Day';
+  if (period === 'week') return 'Week starting';
+  if (period === 'month') return 'Month';
+  return 'Year';
+}
+
+function productDetailHref(productId: string, period: Period, anchor: string): string {
+  const params = new URLSearchParams({ productId, period, anchor });
+  return `/admin/analytics/gross/product?${params.toString()}`;
+}
+
+export default async function ProductSalesByCityPage({
+  searchParams,
+}: PageProps): Promise<JSX.Element> {
+  const session = await getSession();
+  if (!session) {
+    return <></>;
+  }
+
+  const { productId: rawProductId, period: rawPeriod, anchor: rawAnchor } = await searchParams;
+  const productId = rawProductId?.trim();
+  if (!productId) {
+    notFound();
+  }
+
+  const period = isPeriod(rawPeriod) ? rawPeriod : 'month';
+  const anchor = normalizeAnchor(period, rawAnchor);
+  const months = monthOptions();
+  const years = yearOptions();
+
+  let report: Awaited<ReturnType<typeof getProductSalesByCity>> | null = null;
+  let loadError: string | null = null;
+  try {
+    report = await getProductSalesByCity(
+      session.accessToken,
+      { productId, period, anchor },
+      { next: { revalidate: 0 } },
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      loadError = err.problem.detail ?? err.message;
+    } else {
+      throw err;
+    }
+  }
+
+  return (
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
+      <Link
+        href={`/admin/analytics/gross?period=${period}&anchor=${anchor}`}
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+      >
+        <ArrowLeft className="h-4 w-4" /> Sales analytics
+      </Link>
+
+      <div>
+        <h1 className="font-display break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+          {report?.productName ?? 'Product sales by city'}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          City-wise sales for this product in the selected period.
+        </p>
+      </div>
+
+      <Card className="min-w-0 overflow-hidden">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="bg-secondary/50 flex w-full max-w-full overflow-x-auto rounded-md p-1 sm:w-auto">
+              {PERIODS.map((p) => (
+                <Link
+                  key={p.key}
+                  href={productDetailHref(productId, p.key, defaultAnchor(p.key))}
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    period === p.key
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {p.label}
+                </Link>
+              ))}
+            </div>
+            <form
+              method="get"
+              className="grid w-full max-w-full gap-2 sm:flex sm:flex-wrap sm:items-end"
+            >
+              <input type="hidden" name="productId" value={productId} />
+              <input type="hidden" name="period" value={period} />
+              {period === 'month' ? (
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {periodFieldLabel(period)}
+                  <select
+                    name="anchor"
+                    defaultValue={anchor}
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-52"
+                  >
+                    {months.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : period === 'year' ? (
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {periodFieldLabel(period)}
+                  <select
+                    name="anchor"
+                    defaultValue={anchor}
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-36"
+                  >
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+                  {periodFieldLabel(period)}
+                  <input
+                    type="date"
+                    name="anchor"
+                    defaultValue={anchor}
+                    className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-44"
+                  />
+                </label>
+              )}
+              <button
+                type="submit"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 w-full rounded-md px-4 text-sm font-medium sm:w-auto"
+              >
+                Apply
+              </button>
+            </form>
+          </div>
+        </CardContent>
+      </Card>
+
+      {loadError ? (
+        <p className="text-destructive border-destructive/30 bg-destructive/10 rounded-lg border px-4 py-3 text-sm">
+          {loadError}
+        </p>
+      ) : null}
+
+      <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Product gross" value={formatINR(report?.totalGrossPaise ?? 0)} />
+        <Metric label="Orders" value={String(report?.totalOrders ?? 0)} />
+        <Metric label="Paid qty" value={String(report?.chargedQuantity ?? 0)} />
+        <Metric label="Free qty" value={String(report?.freeQuantity ?? 0)} />
+      </div>
+
+      <SalesTable
+        title={`City-wise product sales${report ? ` · ${report.label}` : ''}`}
+        empty="No city sales for this product in this period."
+        headers={['City', 'Orders', 'Paid Qty', 'Free Qty', 'Gross', 'Share']}
+        rows={(report?.cityRows ?? []).map((row) => [
+          row.city,
+          row.orderCount,
+          row.chargedQuantity,
+          row.freeQuantity,
+          formatINR(row.grossPaise),
+          `${row.sharePercent}%`,
+        ])}
+      />
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <Card className="min-w-0 overflow-hidden">
+      <CardContent className="p-5">
+        <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
+        <p className="font-display mt-1 break-words text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SalesTable({
+  title,
+  headers,
+  rows,
+  empty,
+}: {
+  title: string;
+  headers: string[];
+  rows: ReactNode[][];
+  empty: string;
+}): JSX.Element {
+  return (
+    <Card className="min-w-0 overflow-hidden">
+      <CardContent className="p-0">
+        <div className="border-b p-5">
+          <h2 className="font-display text-base font-semibold">{title}</h2>
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-muted-foreground p-8 text-center text-sm">{empty}</p>
+        ) : (
+          <div className="w-full max-w-full overflow-x-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+                <tr>
+                  {headers.map((header, index) => (
+                    <th key={header} className={`px-4 py-3 ${index === 0 ? '' : 'text-right'}`}>
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={index} className="border-t">
+                    {row.map((cell, cellIndex) => (
+                      <td
+                        key={`${index}-${cellIndex}`}
+                        className={`px-4 py-3 ${cellIndex === 0 ? 'max-w-[260px] whitespace-normal break-words font-medium' : 'whitespace-nowrap text-right font-mono'}`}
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

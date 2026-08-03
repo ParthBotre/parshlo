@@ -15,7 +15,7 @@ import { Redis } from 'ioredis';
 
 import { config } from './config.js';
 import { prisma } from './db.js';
-import { type S3Client, createS3Client } from './s3.js';
+import { createS3Client } from './s3.js';
 import { createEmailWorker } from './workers/email.worker.js';
 import { createInvoiceWorker } from './workers/invoice.worker.js';
 import { createKycWorker } from './workers/kyc.worker.js';
@@ -29,12 +29,12 @@ function main(): void {
     enableReadyCheck: true,
   });
 
-  const s3: S3Client = createS3Client();
-
   const workers = [
-    createEmailWorker({ connection, prisma }),
-    createInvoiceWorker({ connection, prisma, s3 }),
-    createKycWorker({ connection, prisma }),
+    ...(config.EMAIL_NOTIFICATIONS_ENABLED ? [createEmailWorker({ connection, prisma })] : []),
+    ...(config.INVOICE_GENERATION_ENABLED
+      ? [createInvoiceWorker({ connection, prisma, s3: createS3Client() })]
+      : []),
+    ...(config.EMAIL_NOTIFICATIONS_ENABLED ? [createKycWorker({ connection, prisma })] : []),
   ];
 
   workers.forEach((w) => {
@@ -59,7 +59,13 @@ function main(): void {
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
-  logger.info('Worker ready · queues: email, invoice, kyc');
+  logger.info(
+    {
+      emailNotificationsEnabled: config.EMAIL_NOTIFICATIONS_ENABLED,
+      invoiceGenerationEnabled: config.INVOICE_GENERATION_ENABLED,
+    },
+    `Worker ready · queues: ${workers.map((w) => w.name).join(', ') || 'none enabled'}`,
+  );
 }
 
 try {

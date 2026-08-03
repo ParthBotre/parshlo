@@ -8,8 +8,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { Public } from '../../common/decorators/public.decorator.js';
+import { THROTTLE_AUTH } from '../../common/throttling/throttle.constants.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
@@ -26,6 +28,7 @@ export class AuthDevController {
   ) {}
 
   @Public()
+  @Throttle(THROTTLE_AUTH)
   @Get('resolve')
   async resolve(
     @Query('email') email: string,

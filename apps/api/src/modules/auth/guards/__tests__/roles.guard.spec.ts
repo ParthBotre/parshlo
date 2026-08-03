@@ -1,8 +1,8 @@
-import { Reflector } from '@nestjs/core';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
-import { RolesGuard } from '../roles.guard.js';
 import { ROLES_KEY } from '../../../../common/decorators/roles.decorator.js';
+import { RolesGuard } from '../roles.guard.js';
 
 function makeCtx(user: { roles: string[] } | undefined): ExecutionContext {
   return {

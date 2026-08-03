@@ -7,10 +7,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { type FastifyRequest } from 'fastify';
 
-import { Auth0JwtVerifier } from '../auth0-jwt.verifier.js';
-import { DevJwtVerifier } from '../dev-jwt.verifier.js';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator.js';
 import { type AuthenticatedRequest } from '../../../common/types/request.js';
+import { Auth0JwtVerifier } from '../auth0-jwt.verifier.js';
+import { DevJwtVerifier } from '../dev-jwt.verifier.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -39,11 +39,8 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException({ code: 'TOKEN_MISSING' });
     }
 
-    // Pick verifier by token shape: HS256 dev tokens vs RS256 Auth0 tokens.
-    // Header alg is base64url-encoded JSON; cheap to peek.
     const alg = peekAlg(token);
-    const useDev =
-      process.env.AUTH_MODE === 'dev' && alg === 'HS256';
+    const useDev = process.env.AUTH_MODE === 'dev' && alg === 'HS256';
 
     req.user = useDev
       ? await this.devVerifier.verify(token)

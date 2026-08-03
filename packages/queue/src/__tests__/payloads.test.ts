@@ -21,25 +21,47 @@ describe('SendEmailJob', () => {
     expect(Array.isArray(p.to)).toBe(true);
   });
 
+  it('accepts PDF attachments', () => {
+    const p = SendEmailJob.parse({
+      kind: 'HR_DOCUMENT_READY',
+      to: 'employee@example.com',
+      cc: ['hemantbotre@gmail.com'],
+      bcc: ['audit@example.com'],
+      attachments: [
+        {
+          filename: 'offer-letter.pdf',
+          content: 'cGRm',
+          contentType: 'application/pdf',
+        },
+      ],
+      data: {},
+    });
+    expect(p.attachments?.[0]?.filename).toBe('offer-letter.pdf');
+    expect(p.cc).toEqual(['hemantbotre@gmail.com']);
+    expect(p.bcc).toEqual(['audit@example.com']);
+  });
+
   it('rejects empty recipient array', () => {
-    expect(() =>
-      SendEmailJob.parse({ kind: 'ORDER_PLACED_BUYER', to: [], data: {} }),
-    ).toThrow();
+    expect(() => SendEmailJob.parse({ kind: 'ORDER_PLACED_BUYER', to: [], data: {} })).toThrow();
   });
 
   it('rejects unknown kinds', () => {
     expect(() =>
-      SendEmailJob.parse({ kind: 'NOPE' as unknown as 'ORDER_PLACED_BUYER', to: 'a@b.com', data: {} }),
+      SendEmailJob.parse({
+        kind: 'NOPE' as unknown as 'ORDER_PLACED_BUYER',
+        to: 'a@b.com',
+        data: {},
+      }),
     ).toThrow();
   });
 });
 
 describe('GenerateInvoiceJob', () => {
-  it('requires UUID orderId', () => {
-    expect(() => GenerateInvoiceJob.parse({ orderId: 'not-uuid' })).toThrow();
-    expect(
-      GenerateInvoiceJob.parse({ orderId: '11111111-1111-1111-1111-111111111111' }).orderId,
-    ).toBe('11111111-1111-1111-1111-111111111111');
+  it('accepts the database-issued order id used when invoice generation is enabled', () => {
+    expect(GenerateInvoiceJob.parse({ orderId: 'cmp9l1tl6000rl8880it3d610' }).orderId).toBe(
+      'cmp9l1tl6000rl8880it3d610',
+    );
+    expect(() => GenerateInvoiceJob.parse({ orderId: '' })).toThrow();
   });
 });
 

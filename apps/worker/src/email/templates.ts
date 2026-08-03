@@ -12,7 +12,12 @@ interface Rendered {
   text: string;
 }
 
-function shell(opts: { title: string; preheader: string; body: string; cta?: { href: string; label: string } }): string {
+function shell(opts: {
+  title: string;
+  preheader: string;
+  body: string;
+  cta?: { href: string; label: string };
+}): string {
   const cta = opts.cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px"><tr><td style="border-radius:8px;background:#0e4733"><a href="${opts.cta.href}" style="display:inline-block;padding:12px 20px;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${opts.cta.label}</a></td></tr></table>`
     : '';
@@ -35,7 +40,7 @@ function shell(opts: { title: string; preheader: string; body: string; cta?: { h
           ${cta}
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #eef0f3;font-size:11px;color:#6b7480">
-          Parshlo Pharma · B2B Ordering Platform · This is a transactional message.
+          Parshlo · B2B Ordering Platform · This is a transactional message.
         </td></tr>
       </table>
     </td></tr>
@@ -54,7 +59,7 @@ function itemRow(i: { productName: string; quantity: number; lineTotalPaise: num
 export interface OrderPlacedBuyerData {
   buyerName: string;
   orderNumber: string;
-  items: Array<{ productName: string; quantity: number; lineTotalPaise: number }>;
+  items: { productName: string; quantity: number; lineTotalPaise: number }[];
   subtotalPaise: number;
   gstPaise: number;
   totalPaise: number;
@@ -69,7 +74,7 @@ export function renderOrderPlacedBuyer(d: OrderPlacedBuyerData): Rendered {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
       ${rows}
       <tr><td style="padding:8px 0">Subtotal</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace">${rupees(d.subtotalPaise)}</td></tr>
-      <tr><td style="padding:8px 0;color:#6b7480">GST</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;color:#6b7480">${rupees(d.gstPaise)}</td></tr>
+      <tr><td style="padding:8px 0;color:#6b7480">GST Rate</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;color:#6b7480">5% included in price</td></tr>
       <tr><td style="padding:8px 0;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;font-family:ui-monospace,monospace;font-weight:600">${rupees(d.totalPaise)}</td></tr>
     </table>
   `;
@@ -128,7 +133,7 @@ export interface KycDecisionData {
 export function renderKycApproved(d: KycDecisionData): Rendered {
   const body = `
     <p>Hi ${d.buyerName},</p>
-    <p>Your B2B account for <strong>${d.businessName}</strong> has been verified and approved. You now have access to wholesale pricing, MOQ, live inventory, and order placement on Parshlo.</p>
+    <p>Your B2B account for <strong>${d.businessName}</strong> has been verified and approved. You now have access to wholesale pricing, live inventory, and order placement on Parshlo.</p>
   `;
   return {
     subject: `Welcome to Parshlo — ${d.businessName} approved`,
@@ -157,5 +162,89 @@ export function renderKycRejected(d: KycDecisionData): Rendered {
       body,
     }),
     text: `Your Parshlo application for ${d.businessName} was not approved.${d.reason ? ` Reason: ${d.reason}` : ''}`,
+  };
+}
+
+export interface LeaveRequestData {
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  dayCount: number;
+  reason?: string;
+  status?: 'APPROVED' | 'REJECTED';
+  reviewerNote?: string;
+  adminUrl?: string;
+}
+
+export function renderLeaveRequestCreated(d: LeaveRequestData): Rendered {
+  const body = `
+    <p><strong>${d.employeeName}</strong> submitted a holiday request.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
+      <tr><td style="padding:6px 0;color:#6b7480">Dates</td><td style="padding:6px 0;text-align:right">${d.startDate} to ${d.endDate}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7480">Days</td><td style="padding:6px 0;text-align:right">${String(d.dayCount)}</td></tr>
+      ${d.reason ? `<tr><td style="padding:6px 0;color:#6b7480">Reason</td><td style="padding:6px 0;text-align:right">${d.reason}</td></tr>` : ''}
+    </table>
+  `;
+  return {
+    subject: `[Action] Holiday request from ${d.employeeName}`,
+    html: shell({
+      title: 'Holiday request submitted',
+      preheader: `${d.employeeName} requested ${String(d.dayCount)} day(s) off`,
+      body,
+      cta: d.adminUrl ? { href: d.adminUrl, label: 'Review request' } : undefined,
+    }),
+    text: `${d.employeeName} requested holiday from ${d.startDate} to ${d.endDate} (${String(d.dayCount)} day(s)).`,
+  };
+}
+
+export function renderLeaveRequestReviewed(d: LeaveRequestData): Rendered {
+  const status = d.status ?? 'APPROVED';
+  const approved = status === 'APPROVED';
+  const body = `
+    <p>Hi ${d.employeeName},</p>
+    <p>Your holiday request for <strong>${d.startDate} to ${d.endDate}</strong> (${String(d.dayCount)} day(s)) was <strong>${approved ? 'approved' : 'rejected'}</strong>.</p>
+    ${d.reviewerNote ? `<p style="margin-top:12px;padding:12px;border-left:3px solid #0e4733;background:#eef8f3;color:#0e4733"><strong>Note:</strong> ${d.reviewerNote}</p>` : ''}
+  `;
+  return {
+    subject: `Holiday request ${approved ? 'approved' : 'rejected'}`,
+    html: shell({
+      title: `Holiday request ${approved ? 'approved' : 'rejected'}`,
+      preheader: `${d.startDate} to ${d.endDate}`,
+      body,
+    }),
+    text: `Your holiday request for ${d.startDate} to ${d.endDate} was ${approved ? 'approved' : 'rejected'}.${d.reviewerNote ? ` Note: ${d.reviewerNote}` : ''}`,
+  };
+}
+
+export interface HrDocumentReadyData {
+  employeeName: string;
+  documentType: 'OFFER_LETTER' | 'APPOINTMENT_LETTER' | 'INCREMENT_LETTER' | 'SALARY_SLIP';
+  referenceNumber: string;
+}
+
+export function renderHrDocumentReady(d: HrDocumentReadyData): Rendered {
+  const label =
+    d.documentType === 'OFFER_LETTER'
+      ? 'Offer letter'
+      : d.documentType === 'APPOINTMENT_LETTER'
+        ? 'Appointment letter'
+        : d.documentType === 'INCREMENT_LETTER'
+          ? 'Increment letter'
+          : 'Salary slip';
+  const body = `
+    <p>Hi ${d.employeeName},</p>
+    <p>Your <strong>${label}</strong> is attached to this email.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:13px">
+      <tr><td style="padding:6px 0;color:#6b7480">Reference</td><td style="padding:6px 0;text-align:right;font-weight:600">${d.referenceNumber}</td></tr>
+    </table>
+  `;
+  return {
+    subject: `${label} from Parshlo`,
+    html: shell({
+      title: label,
+      preheader: `${label} attached`,
+      body,
+    }),
+    text: `Hi ${d.employeeName}, your ${label} is attached. Reference: ${d.referenceNumber}.`,
   };
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { approveKyc } from '@/lib/api/admin';
 import { getSession } from '@/lib/auth/session';
+import { clientErrorResponse } from '@/lib/safe-error';
 
 export async function POST(
   _req: Request,
@@ -15,10 +16,7 @@ export async function POST(
   try {
     await approveKyc(session.accessToken, id);
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Approval failed' },
-      { status: 500 },
-    );
+  } catch {
+    return clientErrorResponse('Approval failed. Please try again.', 500);
   }
 }

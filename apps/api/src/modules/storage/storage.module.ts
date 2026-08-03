@@ -19,6 +19,9 @@ export { S3_CLIENT };
           region: config.get<string>('AWS_REGION') ?? 'ap-south-1',
           endpoint: config.get<string>('S3_ENDPOINT'),
           forcePathStyle: Boolean(config.get<string>('S3_ENDPOINT')),
+          // AWS SDK v3 defaults add CRC32 checksums to PutObject; LocalStack rejects them on presigned PUT.
+          requestChecksumCalculation: 'WHEN_REQUIRED',
+          responseChecksumValidation: 'WHEN_REQUIRED',
           credentials:
             process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
               ? {

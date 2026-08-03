@@ -42,21 +42,24 @@ enum AccountStatus {
   SUSPENDED
 }
 
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum BusinessType {
-  PHARMACY
   CHEMIST
   STOCKIST
-  DISTRIBUTOR
-  HOSPITAL
-  WHOLESALER
 }
 
 model User {
-  id        String   @id @default(cuid())
-  auth0Id   String   @unique
-  email     String   @unique
-  fullName  String
-  roles     Role[]   @default([BUYER])
+  id       String @id @default(cuid())
+  auth0Id  String @unique
+  email    String @unique
+  fullName String
+  roles    Role[] @default([BUYER])
 
   accountStatus    AccountStatus @default(PENDING_VERIFICATION)
   suspendedAt      DateTime?
@@ -69,36 +72,52 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  businessProfile  BusinessProfile?
-  kycApplications  KycApplication[]
-  orders           Order[]
-  auditEvents      AuditLog[]         @relation("AuditActor")
-  kycReviewed      KycApplication[]   @relation("KycReviewer")
-  inquiries        ContactInquiry[]
+  businessProfile        BusinessProfile?
+  kycApplications        KycApplication[]
+  orders                 Order[]
+  auditEvents            AuditLog[]             @relation("AuditActor")
+  kycReviewed            KycApplication[]       @relation("KycReviewer")
+  inquiries              ContactInquiry[]
+  leaveRequests          EmployeeLeaveRequest[] @relation("LeaveEmployee")
+  leaveReviewed          EmployeeLeaveRequest[] @relation("LeaveReviewer")
+  hrRecord               EmployeeHrRecord?
+  hrSalarySlips          EmployeeSalarySlip[]   @relation("HrSalaryEmployee")
+  hrSalaryGenerated      EmployeeSalarySlip[]   @relation("HrSalaryGenerator")
+  hrExpenseSlips         EmployeeExpenseSlip[]  @relation("HrExpenseSlipEmployee")
+  hrExpenseSlipGenerated EmployeeExpenseSlip[]  @relation("HrExpenseSlipGenerator")
+  hrExpenses             EmployeeExpense[]      @relation("HrExpenseEmployee")
+  hrExpenseReviewed      EmployeeExpense[]      @relation("HrExpenseReviewer")
+  hrWorkLogs             EmployeeWorkLog[]      @relation("HrWorkEmployee")
+  hrDocuments            EmployeeHrDocument[]   @relation("HrDocumentEmployee")
+  hrDocumentsGenerated   EmployeeHrDocument[]   @relation("HrDocumentGenerator")
+  secondarySalesStockists SecondarySalesStockist[] @relation("SecondarySalesStockistBuyer")
+  secondarySalesUpdated   SecondarySalesEntry[]    @relation("SecondarySalesEntryUpdater")
+  secondarySalesEditor    SecondarySalesEditor?    @relation("SecondarySalesEditorUser")
+  secondarySalesGranted   SecondarySalesEditor[]   @relation("SecondarySalesEditorGrantor")
 
   @@index([accountStatus])
   @@index([createdAt])
 }
 
 model BusinessProfile {
-  id        String @id @default(cuid())
-  userId    String @unique
-  user      User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   businessName               String
   businessType               BusinessType
-  gstin                      String  @unique
+  gstin                      String       @unique
   pan                        String?
   drugLicenseNumber          String
-  pharmacyRegistrationNumber String
+  pharmacyRegistrationNumber String?
   mobile                     String
   businessEmail              String
 
   addressLine1 String
   addressLine2 String?
   city         String
-  state        String  // ISO 3166-2:IN code, e.g. "KA"
-  pin          String
+  state        String // ISO 3166-2:IN code, e.g. "KA"
+  pin          String?
   country      String  @default("IN")
 
   createdAt DateTime @default(now())
@@ -147,16 +166,16 @@ model KycApplication {
 }
 
 model KycDocument {
-  id               String          @id @default(cuid())
-  applicationId    String
-  application      KycApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  documentType     KycDocumentType
-  s3Bucket         String
-  s3Key            String
-  contentType      String
-  sizeBytes        Int
-  sha256           String          // Integrity check on upload
-  uploadedAt       DateTime        @default(now())
+  id            String          @id @default(cuid())
+  applicationId String
+  application   KycApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentType  KycDocumentType
+  s3Bucket      String
+  s3Key         String
+  contentType   String
+  sizeBytes     Int
+  sha256        String // Integrity check on upload
+  uploadedAt    DateTime        @default(now())
 
   @@unique([applicationId, documentType])
   @@index([s3Key])
@@ -197,11 +216,16 @@ enum ProductStatus {
   OUT_OF_STOCK
 }
 
+enum ProductPriceTier {
+  RATE_A
+  RATE_B
+}
+
 enum GstRate {
-  ZERO       // 0%
-  FIVE       // 5%
-  TWELVE     // 12%
-  EIGHTEEN   // 18%
+  ZERO // 0%
+  FIVE // 5%
+  TWELVE // 12%
+  EIGHTEEN // 18%
   TWENTYEIGHT // 28%
 }
 
@@ -216,35 +240,43 @@ model ProductCategory {
 }
 
 model Product {
-  id           String          @id @default(cuid())
-  slug         String          @unique
+  id           String      @id @default(cuid())
+  slug         String      @unique
   name         String
   composition  String
   strength     String
   form         ProductForm
   packaging    String
-  description  String          @db.Text
+  description  String      @db.Text
   manufacturer String
   hsnCode      String
 
   categoryId String
   category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
-  imageKeys String[]  // S3 keys, served via signed URLs
+  imageKeys String[] // S3 keys, served via signed URLs
 
   prescriptionRequired Boolean      @default(true)
   scheduleDrug         ScheduleDrug @default(NONE)
 
+  /// Selected/base wholesale price retained for backwards-compatible clients.
+  /// New pricing should prefer rateAPaise/rateBPaise.
   wholesalePricePaise BigInt
+  /// Rate A: stockist rate.
+  rateAPaise          BigInt  @default(0)
+  /// Rate B: chemist rate.
+  rateBPaise          BigInt  @default(0)
   mrpPaise            BigInt
+  /// Display-only GST band. PTR/PTS already include GST.
   gstRate             GstRate
-  moq                 Int            @default(1)
+  moq                 Int     @default(1)
 
   status ProductStatus @default(DRAFT)
 
-  inventory Inventory?
+  inventory  Inventory?
   orderItems OrderItem[]
-  batches   ProductBatch[]
+  batches    ProductBatch[]
+  secondarySalesEntries SecondarySalesEntry[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -293,15 +325,23 @@ enum OrderStatus {
   REJECTED
 }
 
+enum CourierService {
+  PROFESSIONAL
+  MARK
+  TEJ
+  SHIPKART
+  VISHWA
+}
+
 model Order {
   id          String @id @default(cuid())
   orderNumber String @unique // human-readable: PSH-YYYY-NNNNNN
   buyerId     String
   buyer       User   @relation(fields: [buyerId], references: [id], onDelete: Restrict)
 
-  status               OrderStatus @default(RECEIVED)
-  purchaseOrderNumber  String?
-  notes                String?
+  status              OrderStatus @default(RECEIVED)
+  purchaseOrderNumber String?
+  notes               String?
 
   // Snapshot of GST + business name at time of order (for compliance)
   buyerBusinessName String
@@ -318,29 +358,47 @@ model Order {
   /// Idempotency: identical key + buyer returns the same order.
   idempotencyKey String
 
-  placedAt      DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  dispatchedAt  DateTime?
-  deliveredAt   DateTime?
-  cancelledAt   DateTime?
-  rejectedAt    DateTime?
+  placedAt     DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  dispatchedAt DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  rejectedAt   DateTime?
+
+  /// Courier / logistics receipt photo or PDF captured at dispatch.
+  courierReceiptBucket      String?
+  courierReceiptKey         String?
+  courierReceiptContentType String?
+  courierReceiptUploadedAt  DateTime?
+
+  /// Courier partner + docket for shipment tracking (admin-entered).
+  courierService           CourierService?
+  courierPartnerId         String?
+  courierPartner           CourierPartner? @relation(fields: [courierPartnerId], references: [id], onDelete: SetNull)
+  courierDocketNumber      String?
+  courierTrackingSetAt     DateTime?
+  courierTrackingUpdatedAt DateTime?
 
   @@unique([buyerId, idempotencyKey])
   @@index([status])
+  @@index([courierPartnerId])
   @@index([buyerId, placedAt(sort: Desc)])
   @@index([placedAt])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
-  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  productNameSnapshot String  // immutable snapshot for invoice integrity
+  productNameSnapshot String // immutable snapshot for invoice integrity
   quantity            Int
+  schemeFreeQuantity  Int              @default(0)
   unitPricePaise      BigInt
+  discountPaise       BigInt           @default(0)
+  priceTier           ProductPriceTier @default(RATE_A)
   gstRate             GstRate
   lineSubtotalPaise   BigInt
   lineGstPaise        BigInt
@@ -356,10 +414,66 @@ model OrderStatusEvent {
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    OrderStatus
   note      String?
-  actorId   String?     // null = system
+  actorId   String? // null = system
   createdAt DateTime    @default(now())
 
   @@index([orderId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// SECONDARY SALES
+// -----------------------------------------------------------------------------
+
+model SecondarySalesStockist {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  buyerId  String? @unique
+  buyer    User?   @relation("SecondarySalesStockistBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  isActive Boolean @default(true)
+
+  entries SecondarySalesEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, name])
+}
+
+model SecondarySalesEntry {
+  id          String @id @default(cuid())
+  stockistId  String
+  stockist    SecondarySalesStockist @relation(fields: [stockistId], references: [id], onDelete: Restrict)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  periodMonth DateTime
+
+  secondaryQuantity Int @default(0)
+  closingQuantity   Int @default(0)
+  notes             String?
+
+  updatedById String?
+  updatedBy   User?   @relation("SecondarySalesEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stockistId, productId, periodMonth])
+  @@index([periodMonth])
+  @@index([productId])
+}
+
+model SecondarySalesEditor {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation("SecondarySalesEditorUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedById String?
+  grantedBy   User?  @relation("SecondarySalesEditorGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+  revokedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([revokedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -394,23 +508,275 @@ model NotificationLog {
 }
 
 // -----------------------------------------------------------------------------
+// EMPLOYEE HOLIDAYS / PTO
+// -----------------------------------------------------------------------------
+
+model EmployeeLeaveRequest {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("LeaveEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  startDate DateTime
+  endDate   DateTime
+  dayCount  Int
+  reason    String?
+
+  status LeaveRequestStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewerNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId, startDate])
+  @@index([status, startDate])
+  @@index([reviewedById])
+}
+
+model CompanyHoliday {
+  id          String   @id @default(cuid())
+  holidayDate DateTime @unique
+  name        String
+  fiscalYear  String
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fiscalYear, holidayDate])
+  @@index([isActive, holidayDate])
+}
+
+// -----------------------------------------------------------------------------
+// HR RECORDS / PAYROLL / EMPLOYEE DOCUMENTS (SUPER ADMIN ONLY)
+// -----------------------------------------------------------------------------
+
+enum HrDocumentType {
+  OFFER_LETTER
+  APPOINTMENT_LETTER
+  APPOINTMENT_ACKNOWLEDGEMENT
+  INCREMENT_LETTER
+  SALARY_SLIP
+  EXPENSE_BILL
+}
+
+enum HrExpenseType {
+  DAILY_ALLOWANCE
+  PETROL
+  MOBILE
+  MISCELLANEOUS
+}
+
+enum HrExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model EmployeeHrRecord {
+  id         String @id @default(cuid())
+  employeeId String @unique
+  employee   User   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  employeeCode                 String    @unique
+  serialNumber                 Int?
+  namePrefix                   String?
+  roleTitle                    String
+  address                      String    @db.Text
+  headQuarter                  String
+  joiningDate                  DateTime
+  offerDate                    DateTime?
+  appointmentDate              DateTime?
+  mobileNumber                 String?
+  mailId                       String?
+  gender                       String?
+  department                   String?
+  region                       String?
+  bankDetails                  String?
+  bankAccountNumber            String?
+  bloodGroup                   String?
+  dateOfBirth                  DateTime?
+  marriageAnniversary          DateTime?
+  emergencyContactPerson       String?
+  emergencyContactRelationship String?
+  emergencyContactNumber       String?
+  panNumber                    String?
+  aadhaarNumber                String?
+
+  grossMonthlyPaise            BigInt
+  basicMonthlyPaise            BigInt
+  hraMonthlyPaise              BigInt
+  specialAllowanceMonthlyPaise BigInt
+  allowanceMonthlyPaise        BigInt @default(1500000)
+  dailyAllowancePaise          BigInt @default(50000)
+  petrolAllowancePaise         BigInt @default(100000)
+  mobileAllowancePaise         BigInt @default(100000)
+  deductionPaise               BigInt @default(20000)
+
+  archivedAt    DateTime?
+  archiveReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([archivedAt])
+  @@index([employeeCode])
+  @@index([serialNumber])
+}
+
+model EmployeeHrDocument {
+  id            String  @id @default(cuid())
+  employeeId    String
+  employee      User    @relation("HrDocumentEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?   @relation("HrDocumentGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  type            HrDocumentType
+  referenceNumber String
+  fileName        String
+  payload         Json
+  generatedAt     DateTime       @default(now())
+
+  @@unique([type, referenceNumber])
+  @@index([employeeId, generatedAt])
+}
+
+model EmployeeSalarySlip {
+  id            String  @id @default(cuid())
+  employeeId    String
+  employee      User    @relation("HrSalaryEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?   @relation("HrSalaryGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  periodMonth DateTime
+  workingDays Int
+  leaveDays   Int
+
+  basicPaise            BigInt
+  hraPaise              BigInt
+  specialAllowancePaise BigInt
+  grossPaise            BigInt
+  dailyAllowancePaise   BigInt
+  petrolAllowancePaise  BigInt
+  mobileAllowancePaise  BigInt
+  approvedExpensePaise  BigInt @default(0)
+  bonusPaise            BigInt @default(0)
+  deductionPaise        BigInt @default(20000)
+  netPayPaise           BigInt
+
+  transactionDate      DateTime?
+  transactionReference String?
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodMonth])
+  @@index([periodMonth])
+}
+
+model EmployeeExpenseSlip {
+  id            String  @id @default(cuid())
+  employeeId    String
+  employee      User    @relation("HrExpenseSlipEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  generatedById String?
+  generatedBy   User?   @relation("HrExpenseSlipGenerator", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  periodMonth DateTime
+
+  workingDays                   Int
+  dailyAllowancePaise           BigInt
+  petrolAllowancePaise          BigInt
+  mobileAllowancePaise          BigInt
+  monthlyAllowanceCapPaise      BigInt
+  calculatedDailyAllowancePaise BigInt
+  calculatedAllowancePaise      BigInt
+  approvedExtraExpensePaise     BigInt @default(0)
+  pendingExtraExpensePaise      BigInt @default(0)
+  totalPayablePaise             BigInt
+
+  transactionDate      DateTime?
+  transactionReference String?
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodMonth])
+  @@index([periodMonth])
+}
+
+model EmployeeExpense {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrExpenseEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  expenseDate     DateTime
+  type            HrExpenseType
+  amountPaise     BigInt
+  description     String?
+  billBucket      String?
+  billKey         String?
+  billContentType String?
+  status          HrExpenseStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("HrExpenseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewerNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId, expenseDate])
+  @@index([status, expenseDate])
+}
+
+model EmployeeWorkLog {
+  id         String @id @default(cuid())
+  employeeId String
+  employee   User   @relation("HrWorkEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  workDate     DateTime
+  worked       Boolean  @default(true)
+  location     String?
+  orthCalls    Int      @default(0)
+  mdCalls      Int      @default(0)
+  gpCalls      Int      @default(0)
+  gynCalls     Int      @default(0)
+  otherCalls   Int      @default(0)
+  totalDoctors Int      @default(0)
+  totalChemist Int      @default(0)
+  note         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, workDate])
+  @@index([employeeId, workDate])
+}
+
+// -----------------------------------------------------------------------------
 // PUBLIC INQUIRIES (contact form)
 // -----------------------------------------------------------------------------
 
 model ContactInquiry {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  phone     String?
-  company   String?
-  subject   String
-  message   String   @db.Text
-  ipAddress String?
-  userAgent String?
+  id         String    @id @default(cuid())
+  name       String
+  email      String
+  phone      String?
+  company    String?
+  subject    String
+  message    String    @db.Text
+  ipAddress  String?
+  userAgent  String?
   // If a logged-in user submitted it
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
   resolvedAt DateTime?
   resolvedBy String?
 
@@ -423,17 +789,17 @@ model ContactInquiry {
 // -----------------------------------------------------------------------------
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  action      String   // e.g. "kyc.approve", "order.update_status", "product.create"
-  resource    String   // e.g. "User", "Order", "Product"
-  resourceId  String?
-  ipAddress   String?
-  userAgent   String?
-  metadata    Json?    // structured details (before/after, reason, etc.)
-  requestId   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String // e.g. "kyc.approve", "order.update_status", "product.create"
+  resource   String // e.g. "User", "Order", "Product"
+  resourceId String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json? // structured details (before/after, reason, etc.)
+  requestId  String?
+  createdAt  DateTime @default(now())
 
   @@index([actorId, createdAt])
   @@index([resource, resourceId])
@@ -445,13 +811,101 @@ model AuditLog {
 // -----------------------------------------------------------------------------
 
 model IdempotencyKey {
-  key         String   @id
-  scope       String   // e.g. "order.place"
-  userId      String
-  responseHash String  // hash of the response we returned (so we can replay)
+  key          String   @id
+  scope        String // e.g. "order.place"
+  userId       String
+  responseHash String // hash of the response we returned (so we can replay)
   responseBody Json
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// -----------------------------------------------------------------------------
+// DECOUPLED LOGISTICS FINANCIAL AUDIT MODULE (ADMIN ONLY)
+// -----------------------------------------------------------------------------
+
+enum AdminLogisticsType {
+  INCOMING
+  OUTGOING
+}
+
+enum AuditMatchStatus {
+  UNBILLED
+  MATCHED
+  DISCREPANCY
+  MANUALLY_RESOLVED
+}
+
+enum AdminStatementStatus {
+  UNRECONCILED
+  RECONCILED
+  FLAGGED
+  PAID
+}
+
+model CourierPartner {
+  id         String  @id @default(cuid())
+  name       String
+  websiteUrl String?
+  isActive   Boolean @default(true)
+
+  orders       Order[]
+  consignments AdminConsignmentLog[]
+  statements   CourierLedgerStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminConsignmentLog {
+  id        String         @id @default(cuid())
+  courierId String
+  courier   CourierPartner @relation(fields: [courierId], references: [id], onDelete: Restrict)
+
+  type            AdminLogisticsType
+  docketNumber    String
+  consignmentDate DateTime
+
+  amountPaise BigInt
+  weightKg    Float?
+  boxCount    Int    @default(1)
+
+  status      AuditMatchStatus        @default(UNBILLED)
+  statementId String?
+  statement   CourierLedgerStatement? @relation(fields: [statementId], references: [id], onDelete: SetNull)
+
+  associatedPoNumber    String?
+  associatedOrderNumber String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courierId, docketNumber])
+  @@index([status])
+  @@index([docketNumber])
+}
+
+model CourierLedgerStatement {
+  id        String         @id @default(cuid())
+  courierId String
+  courier   CourierPartner @relation(fields: [courierId], references: [id], onDelete: Restrict)
+
+  statementInvoiceNumber     String
+  billingPeriodStart         DateTime
+  billingPeriodEnd           DateTime
+  courierChargedTotalPaise   BigInt
+  systemCalculatedTotalPaise BigInt
+
+  status AdminStatementStatus @default(UNRECONCILED)
+  note   String?
+
+  consignments AdminConsignmentLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courierId, statementInvoiceNumber])
+  @@index([status])
 }

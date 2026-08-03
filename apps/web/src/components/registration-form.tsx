@@ -1,18 +1,26 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  BusinessType,
+  Gstin,
+  IndianMobile,
+  IndianStateCode,
+  OptionalIndianPin,
+  Pan,
+} from '@parshlo/types';
 import { CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-
-import { BusinessType, Gstin, IndianMobile, IndianPin, Pan } from '@parshlo/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { submitB2BApplication } from '@/lib/api/registration';
+import { ApiError } from '@/lib/api-client';
 
 const Schema = z.object({
   businessName: z.string().trim().min(2, 'Business name is required.'),
@@ -21,46 +29,78 @@ const Schema = z.object({
   gstin: Gstin,
   pan: Pan.optional().or(z.literal('')),
   drugLicenseNumber: z.string().trim().min(3, 'Drug license number is required.'),
-  pharmacyRegistrationNumber: z
-    .string()
-    .trim()
-    .min(3, 'Pharmacy registration number is required.'),
+  pharmacyRegistrationNumber: z.string().trim().min(3).max(60).optional().or(z.literal('')),
   mobile: IndianMobile,
   businessEmail: z.string().email('Valid business email required.'),
   addressLine1: z.string().trim().min(3, 'Address is required.'),
   city: z.string().trim().min(2, 'City is required.'),
-  state: z.string().trim().length(2, 'State code (2 letters).'),
-  pin: IndianPin,
+  state: IndianStateCode,
+  pin: OptionalIndianPin,
 });
 type Values = z.infer<typeof Schema>;
 
 export function RegistrationForm(): JSX.Element {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(Schema) });
 
-  const onSubmit = (_values: Values): void => {
-    // TODO: 1) request presigned URLs for KYC docs → upload to S3
-    //       2) POST /v1/kyc/register with object keys
-    // For the scaffold, simulate success.
-    setSubmitted(true);
+  const onSubmit = async (values: Values): Promise<void> => {
+    setSubmitError(null);
+    try {
+      await submitB2BApplication({
+        businessName: values.businessName,
+        ownerName: values.ownerName,
+        businessType: values.businessType,
+        gstin: values.gstin.toUpperCase(),
+        pan: values.pan?.trim() ? values.pan.toUpperCase() : undefined,
+        drugLicenseNumber: values.drugLicenseNumber,
+        pharmacyRegistrationNumber: values.pharmacyRegistrationNumber?.trim()
+          ? values.pharmacyRegistrationNumber.trim()
+          : undefined,
+        mobile: values.mobile,
+        businessEmail: values.businessEmail,
+        address: {
+          line1: values.addressLine1,
+          city: values.city,
+          state: values.state,
+          pin: values.pin?.trim() ?? '',
+          country: 'IN',
+        },
+      });
+      setSubmitted(true);
+    } catch (err) {
+      let message = 'Failed to submit application. Please try again.';
+      if (err instanceof ApiError) {
+        message = err.problem.detail ?? err.problem.title;
+      } else if (
+        err instanceof TypeError ||
+        (err instanceof Error && err.message === 'Load failed')
+      ) {
+        message =
+          'Could not reach the server. Ensure `make dev` is running (API on port 4000) and try again.';
+      } else if (err instanceof Error && err.message) {
+        message = err.message;
+      }
+      setSubmitError(message);
+    }
   };
 
   if (submitted) {
     return (
-      <Card className="border-emerald-200 bg-emerald-50">
+      <Card className="border-emerald-500/30 bg-emerald-500/10">
         <CardContent className="flex items-start gap-4 p-8">
-          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-600" />
+          <CheckCircle2 className="mt-0.5 h-6 w-6 flex-shrink-0 text-emerald-300" />
           <div>
-            <h3 className="font-display text-lg font-semibold text-emerald-900">
+            <h3 className="font-display text-lg font-semibold text-emerald-100">
               Application received — review in progress.
             </h3>
-            <p className="mt-1 text-sm text-emerald-900/90">
-              We will email <span className="font-medium">verification updates</span> within 48 hours.
-              You will be able to sign in once approved.
+            <p className="mt-1 text-sm text-emerald-200/90">
+              We will email <span className="font-medium">verification updates</span> within 48
+              hours. You will be able to sign in once approved.
             </p>
           </div>
         </CardContent>
@@ -71,17 +111,23 @@ export function RegistrationForm(): JSX.Element {
   return (
     <Card>
       <CardContent className="p-6 md:p-8">
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-sm text-amber-200">
           <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <p>
-            All information is verified against government records. False or
-            duplicate submissions will be rejected and may be reported.
+            All information is verified against government records. False or duplicate submissions
+            will be rejected and may be reported.
           </p>
         </div>
 
-        <form className="grid gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form
+          className="grid gap-6"
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
+          }}
+          noValidate
+        >
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Business details
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
@@ -94,7 +140,7 @@ export function RegistrationForm(): JSX.Element {
               <Field label="Business type" error={errors.businessType?.message}>
                 <select
                   {...register('businessType')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="border-input bg-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2"
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -117,7 +163,7 @@ export function RegistrationForm(): JSX.Element {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Compliance identifiers
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
@@ -139,7 +185,7 @@ export function RegistrationForm(): JSX.Element {
                 <Input {...register('drugLicenseNumber')} />
               </Field>
               <Field
-                label="Pharmacy registration number"
+                label="Pharmacy registration number (optional)"
                 error={errors.pharmacyRegistrationNumber?.message}
               >
                 <Input {...register('pharmacyRegistrationNumber')} />
@@ -148,7 +194,7 @@ export function RegistrationForm(): JSX.Element {
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
               Address
             </h2>
             <Field label="Address line 1" error={errors.addressLine1?.message}>
@@ -161,23 +207,28 @@ export function RegistrationForm(): JSX.Element {
               <Field label="State (code)" error={errors.state?.message}>
                 <Input {...register('state')} placeholder="KA" className="uppercase" />
               </Field>
-              <Field label="PIN" error={errors.pin?.message}>
+              <Field label="PIN (optional)" error={errors.pin?.message}>
                 <Input {...register('pin')} placeholder="560001" />
               </Field>
             </div>
           </section>
 
           <section className="space-y-4">
-            <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Documents (uploaded after submission)
+            <h2 className="font-display text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+              Documents
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Once you submit the form, you will be asked to upload your GST
-              certificate, drug license, and pharmacy registration certificate
-              as PDF or image (max 10 MB each). Uploads use signed URLs and your
-              files are encrypted at rest.
+            <p className="text-muted-foreground text-sm">
+              Document upload will be requested after your initial application is reviewed. For now,
+              we verify your GSTIN, drug license, and pharmacy registration numbers against your
+              submission.
             </p>
           </section>
+
+          {submitError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {submitError}
+            </p>
+          ) : null}
 
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? (
@@ -207,7 +258,7 @@ function Field({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-destructive text-xs">{error}</p> : null}
     </div>
   );
 }

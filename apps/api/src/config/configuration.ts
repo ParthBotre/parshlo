@@ -32,10 +32,26 @@ export interface AppConfig {
   swagger: {
     enabled: boolean;
   };
+  features: {
+    emailNotificationsEnabled: boolean;
+    invoiceGenerationEnabled: boolean;
+    storageEnabled: boolean;
+  };
+}
+
+function parseNodeEnv(value: string | undefined): AppConfig['nodeEnv'] {
+  if (value === 'production' || value === 'test') {
+    return value;
+  }
+  return 'development';
+}
+
+function parseBooleanFlag(value: string | undefined): boolean {
+  return value === 'true';
 }
 
 export const configuration = (): AppConfig => ({
-  nodeEnv: (process.env.NODE_ENV as AppConfig['nodeEnv']) ?? 'development',
+  nodeEnv: parseNodeEnv(process.env.NODE_ENV),
   port: Number.parseInt(process.env.PORT ?? '4000', 10),
   cookieSecret: process.env.AUTH0_SECRET ?? 'dev-cookie-secret-change-me',
   cors: {
@@ -58,8 +74,8 @@ export const configuration = (): AppConfig => ({
   aws: {
     region: process.env.AWS_REGION ?? 'ap-south-1',
     s3: {
-      kycBucket: process.env.S3_BUCKET_KYC ?? 'parshlo-kyc-dev',
-      invoicesBucket: process.env.S3_BUCKET_INVOICES ?? 'parshlo-invoices-dev',
+      kycBucket: process.env.S3_BUCKET_KYC ?? '',
+      invoicesBucket: process.env.S3_BUCKET_INVOICES ?? '',
       endpoint: process.env.S3_ENDPOINT,
     },
   },
@@ -70,5 +86,10 @@ export const configuration = (): AppConfig => ({
   },
   swagger: {
     enabled: process.env.NODE_ENV !== 'production',
+  },
+  features: {
+    emailNotificationsEnabled: parseBooleanFlag(process.env.EMAIL_NOTIFICATIONS_ENABLED),
+    invoiceGenerationEnabled: parseBooleanFlag(process.env.INVOICE_GENERATION_ENABLED),
+    storageEnabled: parseBooleanFlag(process.env.STORAGE_ENABLED),
   },
 });

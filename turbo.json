@@ -1,27 +1,12 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalDependencies": [
-    "**/.env.*local",
-    "**/.env",
-    "tsconfig.base.json",
-    "packages/config/**"
-  ],
-  "globalEnv": [
-    "NODE_ENV",
-    "CI",
-    "VERCEL",
-    "VERCEL_ENV"
-  ],
+  "globalDependencies": ["**/.env.*local", "**/.env", "tsconfig.base.json", "packages/config/**"],
+  "globalEnv": ["NODE_ENV", "CI", "VERCEL", "VERCEL_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/*.spec.ts"
-      ],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!**/*.spec.ts"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "build/**"],
       "env": [
         "NEXT_PUBLIC_*",
@@ -66,8 +51,8 @@
       "outputs": ["dist/**", "node_modules/.prisma/**", "../../node_modules/.prisma/**"]
     },
     "@parshlo/db#generate": {
-      "inputs": ["prisma/schema.prisma"],
-      "outputs": ["node_modules/.prisma/**", "../../node_modules/.prisma/**"]
+      "cache": false,
+      "inputs": ["prisma/schema.prisma"]
     },
     "@parshlo/db#migrate": {
       "cache": false,

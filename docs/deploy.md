@@ -1,6 +1,45 @@
 # Deployment guide
 
-## Architecture (production)
+This guide has two parts:
+
+- **Current staging**: Vercel web plus a DigitalOcean droplet running Caddy, API, Postgres, and Redis.
+- **Future production**: production database cluster plus a hardened app/runtime deployment. The Terraform/AWS section is a reference target, not the current staging path.
+
+## Current staging API deploy
+
+Staging web deploys automatically from Vercel after a push to `staging`. The API must be deployed on the droplet:
+
+```bash
+cd /opt/parshlo
+git pull origin staging
+
+docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
+
+docker run --rm \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  --entrypoint sh \
+  parshlo-api:staging \
+  -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
+
+docker rm -f parshlo-api
+docker run -d \
+  --name parshlo-api \
+  --restart unless-stopped \
+  --env-file /opt/parshlo/api.staging.env \
+  --network parshlo_default \
+  -p 127.0.0.1:4000:4000 \
+  parshlo-api:staging
+
+sleep 10
+curl http://127.0.0.1:4000/v1/health
+curl http://127.0.0.1:4000/v1/health/ready
+curl https://staging-api.parshlo.com/v1/health
+```
+
+Run the migration step for every deploy. Prisma will report "No pending migrations" when no schema change exists.
+
+## Future production architecture reference
 
 ```
               ┌───────────────────────┐
@@ -34,21 +73,21 @@
                           └─────────────┘
 ```
 
-## Image build & registry
+## Future image build & registry
 
-CI builds three images per release:
+Future CI should build the deployed runtime images per release:
 
-| Image | Dockerfile |
-| --- | --- |
-| `parshlo/api`    | `infra/docker/api.Dockerfile`    |
-| `parshlo/web`    | `infra/docker/web.Dockerfile`    |
-| `parshlo/worker` | `infra/docker/worker.Dockerfile` |
+| Image            | Dockerfile                                                          |
+| ---------------- | ------------------------------------------------------------------- |
+| `parshlo/api`    | `infra/docker/api.Dockerfile`                                       |
+| `parshlo/web`    | `infra/docker/web.Dockerfile`                                       |
+| `parshlo/worker` | `infra/docker/worker.Dockerfile`, when worker deployment is enabled |
 
 Each is multi-stage, non-root, and pinned to a Node 22-alpine runtime.
 Tags follow `vYYYY.MM.DD-<short-sha>`. Latest immutable tag is also
 labelled `latest-<env>`.
 
-## Deploy flow
+## Future production deploy flow
 
 ```bash
 # 1. Build & push (CI does this automatically on tags)
@@ -70,21 +109,20 @@ DATABASE_URL=postgres://… pnpm --filter @parshlo/db migrate
 
 ## Secrets
 
-Secrets live in **AWS Secrets Manager**, never in Terraform vars or env files.
-ECS task definitions reference them by ARN and inject them at start time:
+Production secrets should live in the selected managed secrets store, never in Terraform vars or committed env files. If using ECS/AWS, task definitions reference them by ARN and inject them at start time:
 
 - `parshlo/<env>/db-url`
 - `parshlo/<env>/redis-url`
 - `parshlo/<env>/auth0-secret`
-- `parshlo/<env>/resend-api-key`
+- `parshlo/<env>/email-provider-api-key`, once email is enabled
 - `parshlo/<env>/sentry-dsn`
 
 Rotation is monthly via Secrets Manager rotation lambdas.
 
 ## Health & readiness
 
-- Liveness: `GET /health` — process is up.
-- Readiness: `GET /health/ready` — DB + Redis reachable.
+- Liveness: `GET /v1/health` — process is up.
+- Readiness: `GET /v1/health/ready` — DB reachable.
 - Metrics: `GET /metrics` (Prometheus exposition format).
 - Traces: OTLP/HTTP to the OTel Collector (run as a sidecar or DaemonSet).
 

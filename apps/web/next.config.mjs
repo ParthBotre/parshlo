@@ -1,14 +1,20 @@
+import { withSentryConfig } from '@sentry/nextjs';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants.js';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: [
-    '@parshlo/types',
-    '@parshlo/logger',
-    '@parshlo/db',
-    '@parshlo/queue',
-    '@parshlo/telemetry',
-  ],
+  compiler: {
+    // Strip console.* from client bundles in production — API traffic must not leak.
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  eslint: {
+    // `pnpm lint` runs ESLint as a separate CI gate. Next's deprecated
+    // build-time linter misdetects our shared flat config and emits noise.
+    ignoreDuringBuilds: true,
+  },
+  transpilePackages: ['@parshlo/types'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
@@ -38,4 +44,49 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+function withProductionWebpackWarningFilters(config) {
+  return {
+    ...config,
+    webpack(webpackConfig) {
+      webpackConfig.ignoreWarnings = [
+        ...(webpackConfig.ignoreWarnings ?? []),
+        {
+          module: /@auth0[\\/]nextjs-auth0[\\/]dist[\\/]utils[\\/]dpopUtils\.js/,
+          message: /Critical dependency: the request of a dependency is an expression/,
+        },
+        {
+          module: /require-in-the-middle/,
+          message: /Critical dependency: require function is used/,
+        },
+      ];
+      return webpackConfig;
+    },
+  };
+}
+
+function withSentry(config) {
+  const enabled = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN);
+  if (!enabled) {
+    return config;
+  }
+
+  return withSentryConfig(config, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: true,
+    webpack: {
+      treeshake: {
+        removeDebugLogging: true,
+      },
+    },
+  });
+}
+
+export default function config(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    return withSentry(withProductionWebpackWarningFilters(nextConfig));
+  }
+
+  return withSentry(nextConfig);
+}

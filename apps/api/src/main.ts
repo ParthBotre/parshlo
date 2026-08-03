@@ -100,8 +100,33 @@ async function bootstrap(): Promise<void> {
     }
     done?.();
   });
-  fastify.get('/metrics', async (_req, reply) => {
-    const rep = reply as { type: (mime: string) => unknown; send: (body: string) => unknown };
+  const metricsHits = new Map<string, { count: number; resetAt: number }>();
+  const METRICS_LIMIT = 30;
+  const METRICS_WINDOW_MS = 60_000;
+
+  fastify.get('/metrics', async (req, reply) => {
+    const r = req as { ip?: string };
+    const ip = r.ip ?? 'unknown';
+    const now = Date.now();
+    const bucket = metricsHits.get(ip);
+    if (!bucket || bucket.resetAt <= now) {
+      metricsHits.set(ip, { count: 1, resetAt: now + METRICS_WINDOW_MS });
+    } else {
+      bucket.count += 1;
+      if (bucket.count > METRICS_LIMIT) {
+        const rep = reply as { status: (code: number) => { send: (body: unknown) => void } };
+        rep.status(429).send({
+          type: 'about:blank',
+          title: 'Too Many Requests',
+          status: 429,
+          code: 'RATE_LIMITED',
+          detail: 'Metrics endpoint rate limit exceeded.',
+        });
+        return;
+      }
+    }
+
+    const rep = reply as { type: (mime: string) => void; send: (body: string) => void };
     rep.type(registry.contentType);
     rep.send(await registry.metrics());
   });

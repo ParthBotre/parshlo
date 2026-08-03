@@ -34,6 +34,7 @@ export default [
       'react/prop-types': 'off',
       'react/jsx-no-target-blank': ['error', { allowReferrer: false }],
       'jsx-a11y/anchor-is-valid': 'off', // Next.js Link wraps <a>
+      'no-console': 'error',
     },
   },
 ];

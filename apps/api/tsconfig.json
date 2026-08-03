@@ -4,7 +4,8 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@parshlo/types": ["../../packages/types/dist/index.d.ts"]
     },
     "verbatimModuleSyntax": false,
     "isolatedModules": false,

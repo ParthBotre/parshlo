@@ -1,9 +1,18 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JobProducer } from '@parshlo/queue';
 import {
+  type B2BApplicationInput,
   type KycApprovalInput,
   type KycRejectionInput,
   type RegisterBusinessInput,
+  Role,
 } from '@parshlo/types';
 
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -15,7 +24,78 @@ export class KycService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobs: JobProducer,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Public B2B access request: creates (or reuses) a pending buyer user, then
+   * opens a KYC application for admin review.
+   */
+  async applyForAccess(input: B2BApplicationInput): Promise<{ applicationId: string }> {
+    const email = input.businessEmail.trim().toLowerCase();
+    const gstConflict = await this.prisma.businessProfile.findUnique({
+      where: { gstin: input.gstin },
+      include: { user: true },
+    });
+    if (gstConflict && gstConflict.user.email !== email) {
+      throw new ConflictException({
+        code: 'GSTIN_ALREADY_REGISTERED',
+        message: 'A business with this GSTIN has already registered.',
+      });
+    }
+
+    let userId: string;
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+
+    if (existing) {
+      if (existing.deletedAt) {
+        throw new ConflictException({
+          code: 'ACCOUNT_UNAVAILABLE',
+          message: 'This email cannot be used. Contact support.',
+        });
+      }
+      if (existing.accountStatus === 'APPROVED') {
+        throw new ConflictException({
+          code: 'ALREADY_APPROVED',
+          message: 'An approved account already exists for this email. Sign in instead.',
+        });
+      }
+      if (!existing.roles.includes(Role.enum.BUYER)) {
+        throw new ConflictException({
+          code: 'EMAIL_IN_USE',
+          message: 'This email is associated with another account type.',
+        });
+      }
+      userId = existing.id;
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { fullName: input.ownerName },
+      });
+    } else {
+      const created = await this.prisma.user.create({
+        data: {
+          auth0Id: `pending|${email}`,
+          email,
+          fullName: input.ownerName,
+          roles: ['BUYER'],
+          accountStatus: 'PENDING_VERIFICATION',
+        },
+      });
+      userId = created.id;
+    }
+
+    const docPrefix = `applications/${userId}`;
+    return this.register(userId, {
+      ...input,
+      businessEmail: email,
+      documents: {
+        gstCertificateKey: `${docPrefix}/gst-certificate.pending`,
+        drugLicenseKey: `${docPrefix}/drug-license.pending`,
+        pharmacyLicenseKey: `${docPrefix}/pharmacy-license.pending`,
+        ...(input.pan ? { panCardKey: `${docPrefix}/pan-card.pending` } : {}),
+      },
+    });
+  }
 
   /**
    * Submit a B2B registration. Creates the business profile and a pending
@@ -51,7 +131,7 @@ export class KycService {
           addressLine2: input.address.line2 ?? null,
           city: input.address.city,
           state: input.address.state,
-          pin: input.address.pin,
+          pin: input.address.pin?.trim() ? input.address.pin.trim() : null,
           country: input.address.country,
         },
         update: {
@@ -66,7 +146,7 @@ export class KycService {
           addressLine2: input.address.line2 ?? null,
           city: input.address.city,
           state: input.address.state,
-          pin: input.address.pin,
+          pin: input.address.pin?.trim() ? input.address.pin.trim() : null,
           country: input.address.country,
         },
       });
@@ -175,9 +255,11 @@ export class KycService {
       }),
     ]);
 
-    void this.jobs
-      .enqueueKycDecision({ applicationId, decision: 'APPROVED' })
-      .catch((err: unknown) => this.log.error({ err }, 'KYC approval enqueue failed'));
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      void this.jobs
+        .enqueueKycDecision({ applicationId, decision: 'APPROVED' })
+        .catch((err: unknown) => this.log.error({ err }, 'KYC approval enqueue failed'));
+    }
   }
 
   async reject(applicationId: string, reviewerId: string, input: KycRejectionInput): Promise<void> {
@@ -203,12 +285,14 @@ export class KycService {
       }),
     ]);
 
-    void this.jobs
-      .enqueueKycDecision({
-        applicationId,
-        decision: 'REJECTED',
-        reason: input.reason,
-      })
-      .catch((err: unknown) => this.log.error({ err }, 'KYC rejection enqueue failed'));
+    if (this.config.get<boolean>('features.emailNotificationsEnabled') === true) {
+      void this.jobs
+        .enqueueKycDecision({
+          applicationId,
+          decision: 'REJECTED',
+          reason: input.reason,
+        })
+        .catch((err: unknown) => this.log.error({ err }, 'KYC rejection enqueue failed'));
+    }
   }
 }

@@ -7,8 +7,12 @@ import { site } from '@/lib/site';
 
 import './globals.css';
 
+const appBaseUrl =
+  process.env.WEB_BASE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : site.url);
+
 export const metadata: Metadata = {
-  metadataBase: new URL(site.url),
+  metadataBase: new URL(appBaseUrl),
   title: {
     default: `${site.name} — ${site.tagline}`,
     template: `%s | ${site.name}`,
@@ -19,7 +23,8 @@ export const metadata: Metadata = {
     'pharmaceutical wholesale',
     'B2B medicines',
     'pharmacy distributor',
-    'WHO-GMP',
+    'FSSAI',
+    'CDSCO',
     'GST invoicing',
     'India pharma',
   ],
@@ -45,20 +50,17 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#06141a' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0b' },
   ],
+  colorScheme: 'light dark',
   width: 'device-width',
   initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans text-foreground">
+      <body className="bg-background text-foreground min-h-screen font-sans">
         <Providers>
           <div className="flex min-h-screen flex-col">
             <SiteHeader />

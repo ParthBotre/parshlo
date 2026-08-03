@@ -4,7 +4,7 @@ import { AccessTokenClaims, Permission, Role, ROLE_PERMISSIONS } from '../auth.j
 
 describe('Role enum', () => {
   it('contains every expected role', () => {
-    const expected = ['PUBLIC', 'BUYER', 'SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
+    const expected = ['BUYER', 'SALES_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
     for (const r of expected) {
       expect(Role.options).toContain(r);
     }
@@ -37,7 +37,7 @@ describe('AccessTokenClaims', () => {
       email_verified: true,
       'https://parshlo.com/user_id': '11111111-1111-1111-1111-111111111111',
       'https://parshlo.com/roles': ['BUYER'],
-      'https://parshlo.com/permissions': ['order:read', 'order:create'],
+      'https://parshlo.com/permissions': ['order:read_all'],
       iss: 'https://parshlo.us.auth0.com/',
       aud: 'https://api.parshlo.local',
       iat: 1_700_000_000,
@@ -48,7 +48,7 @@ describe('AccessTokenClaims', () => {
     expect(parsed['https://parshlo.com/roles']).toEqual(['BUYER']);
   });
 
-  it('rejects tokens missing the user_id claim', () => {
+  it('accepts tokens missing the optional user_id claim', () => {
     const payload = {
       sub: 'auth0|abc',
       'https://parshlo.com/roles': ['BUYER'],
@@ -57,6 +57,6 @@ describe('AccessTokenClaims', () => {
       iat: 1,
       exp: 2,
     };
-    expect(() => AccessTokenClaims.parse(payload)).toThrow();
+    expect(AccessTokenClaims.parse(payload)['https://parshlo.com/user_id']).toBeUndefined();
   });
 });

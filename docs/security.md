@@ -4,14 +4,14 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 1. Identity & access
 
-| Control | Where |
-| --- | --- |
-| Auth0 (MFA required for B2B accounts) | tenant configuration |
-| RS256 JWTs validated via JWKS with key cache + rate limit | `apps/api/src/modules/auth/auth0-jwt.verifier.ts` |
-| `JwtAuthGuard` runs by default; `@Public()` opts-out | `apps/api/src/modules/auth/guards/jwt-auth.guard.ts` |
-| `RolesGuard` enforces `@RequireRoles(...)` | `apps/api/src/modules/auth/guards/roles.guard.ts` |
-| Permission set derived from roles (single source of truth) | `packages/types/src/auth.ts → ROLE_PERMISSIONS` |
-| `accountStatus` checked at every buyer-only endpoint | `ProductController.listForBuyer`, `OrderService.placeOrder` |
+| Control                                                    | Where                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------- |
+| Auth0 (MFA required for B2B accounts)                      | tenant configuration                                        |
+| RS256 JWTs validated via JWKS with key cache + rate limit  | `apps/api/src/modules/auth/auth0-jwt.verifier.ts`           |
+| `JwtAuthGuard` runs by default; `@Public()` opts-out       | `apps/api/src/modules/auth/guards/jwt-auth.guard.ts`        |
+| `RolesGuard` enforces `@RequireRoles(...)`                 | `apps/api/src/modules/auth/guards/roles.guard.ts`           |
+| Permission set derived from roles (single source of truth) | `packages/types/src/auth.ts → ROLE_PERMISSIONS`             |
+| `accountStatus` checked at every buyer-only endpoint       | `ProductController.listForBuyer`, `OrderService.placeOrder` |
 
 ## 2. Transport & network
 
@@ -24,7 +24,7 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 - **Zod everywhere**: every controller body/query/param is validated via `ZodValidationPipe` against schemas shared with the frontend (`@parshlo/types`).
 - **Prisma**: parameterized queries only; raw SQL is reviewed case-by-case.
-- **File uploads** go to S3 via presigned URLs with enforced `Content-Type` and `Content-Length` limits. Size cap: 10 MB per document.
+- **File uploads** are behind the `STORAGE_ENABLED` feature flag. When enabled, uploads should use presigned object-store URLs with enforced `Content-Type` and `Content-Length` limits. Size cap: 10 MB per document.
 
 ## 4. Output / logging
 
@@ -43,7 +43,7 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 - All env vars validated at boot with Zod (`apps/api/src/config/validation.ts`). Missing variables fail fast in CI.
 - `.env*` and `*.pem/*.key/*.cert` ignored via `.gitignore`.
-- AWS keys, Auth0 secrets, Resend keys belong in a secrets manager (AWS Secrets Manager / HashiCorp Vault) — **never** in the repo.
+- Auth0, Sentry, database, email, and object-storage secrets belong in the deployment platform secret store — Vercel environment variables, the root-only droplet env file for staging, and a managed secrets service for production. They must never be committed.
 
 ## 7. Rate limiting
 
@@ -53,19 +53,19 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 8. STRIDE threat model (excerpt)
 
-| Threat | Vector | Mitigation |
-| --- | --- | --- |
-| **S**poofing | Stolen/replayed JWT | Short-lived access tokens, Auth0 anomaly detection, `aud`/`iss` strictly validated, refresh tokens rotated. |
-| **T**ampering | Buyer modifies order body to lower price | Server snapshots `wholesalePricePaise` and `gstRate` at order time; client price never trusted. |
-| **R**epudiation | "I didn't place that order" | Immutable `AuditLog` with actor, IP, UA, request id; order status events with reviewer id. |
-| **I**nformation disclosure | Wholesale pricing leaks to public | Two distinct API surfaces: `/products/public` strips price/MOQ/inventory; only `/products/catalog` (auth + APPROVED) returns full view. |
-| **D**enial of service | Burst of registration / login attempts | Throttler tiers + Cloudflare/WAF + CAPTCHA on registration in production. |
-| **E**levation of privilege | Buyer hits admin route | `RolesGuard` denies; `RequireRoles` enumerates allowed roles; permission set derived in code. |
+| Threat                     | Vector                                   | Mitigation                                                                                                                              |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **S**poofing               | Stolen/replayed JWT                      | Short-lived access tokens, Auth0 anomaly detection, `aud`/`iss` strictly validated, refresh tokens rotated.                             |
+| **T**ampering              | Buyer modifies order body to lower price | Server snapshots `wholesalePricePaise` and `gstRate` at order time; client price never trusted.                                         |
+| **R**epudiation            | "I didn't place that order"              | Immutable `AuditLog` with actor, IP, UA, request id; order status events with reviewer id.                                              |
+| **I**nformation disclosure | Wholesale pricing leaks to public        | Two distinct API surfaces: `/products/public` strips price/MOQ/inventory; only `/products/catalog` (auth + APPROVED) returns full view. |
+| **D**enial of service      | Burst of registration / login attempts   | Throttler tiers + Cloudflare/WAF + CAPTCHA on registration in production.                                                               |
+| **E**levation of privilege | Buyer hits admin route                   | `RolesGuard` denies; `RequireRoles` enumerates allowed roles; permission set derived in code.                                           |
 
 ## 9. KYC + compliance
 
 - Drug license, pharmacy registration, and GSTIN collected at registration.
-- Documents stored encrypted at rest in S3 (SSE-KMS in prod), accessed only via presigned URLs scoped to a single object.
+- Document storage is disabled in current staging unless `STORAGE_ENABLED=true`. When enabled for production, documents must be encrypted at rest and accessed only via presigned URLs scoped to a single object.
 - Review workflow:
   ```
   PENDING_VERIFICATION → UNDER_REVIEW → (APPROVED | REJECTED)
@@ -80,11 +80,11 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 11. To-do (production hardening)
 
-- [ ] Move secrets to AWS Secrets Manager + KMS rotation.
+- [ ] Move production secrets to the selected managed secrets store with rotation.
 - [ ] Enable CSP report-only first, then strict.
-- [ ] Add Sentry session replay + performance instrumentation.
+- [ ] Add Sentry performance instrumentation; keep session replay off unless privacy masking is intentionally configured.
 - [ ] Configure WAF rules for OWASP Top 10 + custom rules for `/auth/*`.
 - [ ] Adopt CodeQL + Dependabot + npm audit gating on PRs.
 - [ ] Add SOC 2-grade access reviews via Auth0 logs export to a SIEM.
-- [ ] Add ClamAV virus scan worker for uploaded KYC docs.
+- [ ] Add ClamAV virus scan worker for uploaded KYC docs when document storage is enabled.
 - [ ] Penetration test before public launch.

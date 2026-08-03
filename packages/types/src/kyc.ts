@@ -1,13 +1,46 @@
 import { z } from 'zod';
 
-import { Gstin, IndianMobile, IndianPin, IsoDateString, Pan, Uuid } from './common.js';
-import { BusinessType } from './user.js';
+import { EntityId, Gstin, IndianMobile, IsoDateString, OptionalIndianPin, Pan } from './common.js';
+import { AccountStatus, BusinessType } from './user.js';
 
 /** Indian states & UTs (ISO-3166-2:IN codes). */
 export const IndianStateCode = z.enum([
-  'AN', 'AP', 'AR', 'AS', 'BR', 'CH', 'CT', 'DN', 'DD', 'DL', 'GA', 'GJ',
-  'HR', 'HP', 'JK', 'JH', 'KA', 'KL', 'LA', 'LD', 'MP', 'MH', 'MN', 'ML',
-  'MZ', 'NL', 'OR', 'PY', 'PB', 'RJ', 'SK', 'TN', 'TS', 'TR', 'UP', 'UT',
+  'AN',
+  'AP',
+  'AR',
+  'AS',
+  'BR',
+  'CH',
+  'CT',
+  'DN',
+  'DD',
+  'DL',
+  'GA',
+  'GJ',
+  'HR',
+  'HP',
+  'JK',
+  'JH',
+  'KA',
+  'KL',
+  'LA',
+  'LD',
+  'MP',
+  'MH',
+  'MN',
+  'ML',
+  'MZ',
+  'NL',
+  'OR',
+  'PY',
+  'PB',
+  'RJ',
+  'SK',
+  'TN',
+  'TS',
+  'TR',
+  'UP',
+  'UT',
   'WB',
 ]);
 export type IndianStateCode = z.infer<typeof IndianStateCode>;
@@ -18,7 +51,7 @@ export const BusinessAddress = z.object({
   line2: z.string().trim().max(200).optional(),
   city: z.string().trim().min(1).max(100),
   state: IndianStateCode,
-  pin: IndianPin,
+  pin: OptionalIndianPin,
   country: z.literal('IN').default('IN'),
 });
 export type BusinessAddress = z.infer<typeof BusinessAddress>;
@@ -31,7 +64,7 @@ export const RegisterBusinessInput = z.object({
   gstin: Gstin,
   pan: Pan.optional(),
   drugLicenseNumber: z.string().trim().min(3).max(60),
-  pharmacyRegistrationNumber: z.string().trim().min(3).max(60),
+  pharmacyRegistrationNumber: z.string().trim().min(3).max(60).optional(),
   mobile: IndianMobile,
   businessEmail: z.string().email().max(254),
   address: BusinessAddress,
@@ -45,6 +78,56 @@ export const RegisterBusinessInput = z.object({
   }),
 });
 export type RegisterBusinessInput = z.infer<typeof RegisterBusinessInput>;
+
+/**
+ * Public B2B access request (no auth). Documents are provisioned server-side
+ * as placeholders until the applicant uploads files after approval prep.
+ */
+export const B2BApplicationInputSchema = RegisterBusinessInput.omit({ documents: true });
+export type B2BApplicationInput = z.infer<typeof B2BApplicationInputSchema>;
+
+/** Admin-created buyer account. Staff can approve immediately or leave pending. */
+const UnregisteredBuyerGstin = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^UNREGISTERED(?:-[0-9]+)?$/, 'Invalid GSTIN format');
+export const AdminBuyerGstin = Gstin.or(UnregisteredBuyerGstin).or(z.literal('')).optional();
+const AdminBuyerAccountStatus = AccountStatus.extract([
+  'PENDING_VERIFICATION',
+  'UNDER_REVIEW',
+  'APPROVED',
+]);
+
+export const AdminCreateBuyerInputSchema = B2BApplicationInputSchema.extend({
+  gstin: AdminBuyerGstin,
+  accountStatus: AdminBuyerAccountStatus.default('APPROVED'),
+});
+export type AdminCreateBuyerInput = z.infer<typeof AdminCreateBuyerInputSchema>;
+
+const AdminUpdateBuyerAddress = z.object({
+  line1: z.string().trim().max(200).optional(),
+  line2: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(100).optional(),
+  state: IndianStateCode.optional(),
+  pin: OptionalIndianPin.or(z.literal('000000')),
+  country: z.literal('IN').default('IN').optional(),
+});
+
+export const AdminUpdateBuyerInputSchema = z.object({
+  businessName: z.string().trim().max(200).optional(),
+  ownerName: z.string().trim().max(120).optional(),
+  businessType: BusinessType.optional(),
+  gstin: AdminBuyerGstin,
+  pan: Pan.or(z.literal('')).optional(),
+  drugLicenseNumber: z.string().trim().max(60).optional(),
+  pharmacyRegistrationNumber: z.string().trim().max(60).optional(),
+  mobile: IndianMobile.or(z.literal('')).optional(),
+  businessEmail: z.string().trim().max(254).optional(),
+  address: AdminUpdateBuyerAddress.optional(),
+  accountStatus: AdminBuyerAccountStatus.optional(),
+});
+export type AdminUpdateBuyerInput = z.infer<typeof AdminUpdateBuyerInputSchema>;
 
 /** KYC document types we accept. */
 export const KycDocumentType = z.enum([
@@ -60,7 +143,11 @@ export type KycDocumentType = z.infer<typeof KycDocumentType>;
 export const PresignedUploadRequest = z.object({
   documentType: KycDocumentType,
   contentType: z.enum(['application/pdf', 'image/jpeg', 'image/png']),
-  contentLength: z.number().int().positive().max(10 * 1024 * 1024), // 10 MB
+  contentLength: z
+    .number()
+    .int()
+    .positive()
+    .max(10 * 1024 * 1024), // 10 MB
 });
 export type PresignedUploadRequest = z.infer<typeof PresignedUploadRequest>;
 
@@ -83,17 +170,17 @@ export type KycRejectionInput = z.infer<typeof KycRejectionInput>;
 
 /** Admin view of a pending KYC application. */
 export const KycApplicationView = z.object({
-  id: Uuid,
-  userId: Uuid,
+  id: EntityId,
+  userId: EntityId,
   status: z.enum(['PENDING_VERIFICATION', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']),
   businessName: z.string(),
   businessType: BusinessType,
   gstin: Gstin,
   drugLicenseNumber: z.string(),
-  pharmacyRegistrationNumber: z.string(),
+  pharmacyRegistrationNumber: z.string().nullable(),
   submittedAt: IsoDateString,
   reviewedAt: IsoDateString.nullable(),
-  reviewedBy: Uuid.nullable(),
+  reviewedBy: EntityId.nullable(),
   rejectionReason: z.string().nullable(),
 });
 export type KycApplicationView = z.infer<typeof KycApplicationView>;

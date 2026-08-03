@@ -8,6 +8,7 @@
     "./eslint/base": "./eslint/base.js",
     "./eslint/next": "./eslint/next.js",
     "./eslint/node": "./eslint/node.js",
+    "./eslint/test": "./eslint/test.js",
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/node.json": "./tsconfig/node.json",
     "./tsconfig/next.json": "./tsconfig/next.json",
@@ -19,9 +20,9 @@
     "typecheck": "echo 'no typecheck for config package'"
   },
   "dependencies": {
-    "@eslint/js": "9.18.0",
-    "@next/eslint-plugin-next": "15.1.4",
-    "eslint": "9.18.0",
+    "@eslint/js": "9.22.0",
+    "@next/eslint-plugin-next": "15.5.18",
+    "eslint": "9.22.0",
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",

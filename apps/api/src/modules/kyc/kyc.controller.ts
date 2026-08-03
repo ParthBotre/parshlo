@@ -1,7 +1,10 @@
 import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   type AuthPrincipal,
+  type B2BApplicationInput,
+  B2BApplicationInputSchema,
   KycApprovalInput,
   KycRejectionInput,
   RegisterBusinessInput,
@@ -9,8 +12,11 @@ import {
 
 import { Audit } from '../../common/decorators/audit.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { RequireRoles } from '../../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { THROTTLE_AUTH, THROTTLE_MUTATION } from '../../common/throttling/throttle.constants.js';
+
 import { KycService } from './kyc.service.js';
 
 @ApiTags('kyc')
@@ -19,8 +25,24 @@ import { KycService } from './kyc.service.js';
 export class KycController {
   constructor(private readonly kyc: KycService) {}
 
+  /**
+   * Public B2B access request — no sign-in required. Creates a pending buyer
+   * account and KYC application for the admin queue.
+   */
+  @Public()
+  @Post('apply')
+  @HttpCode(201)
+  @Throttle(THROTTLE_AUTH)
+  @Audit({ action: 'kyc.apply', resource: 'KycApplication' })
+  apply(
+    @Body(new ZodValidationPipe(B2BApplicationInputSchema)) body: B2BApplicationInput,
+  ): Promise<{ applicationId: string }> {
+    return this.kyc.applyForAccess(body);
+  }
+
   @Post('register')
   @HttpCode(201)
+  @Throttle(THROTTLE_MUTATION)
   @Audit({ action: 'kyc.register', resource: 'KycApplication' })
   register(
     @CurrentUser() user: AuthPrincipal,
@@ -31,6 +53,7 @@ export class KycController {
 
   @Post(':id/approve')
   @HttpCode(204)
+  @Throttle(THROTTLE_AUTH)
   @RequireRoles('ADMIN', 'SUPER_ADMIN')
   @Audit({
     action: 'kyc.approve',
@@ -47,6 +70,7 @@ export class KycController {
 
   @Post(':id/reject')
   @HttpCode(204)
+  @Throttle(THROTTLE_AUTH)
   @RequireRoles('ADMIN', 'SUPER_ADMIN')
   @Audit({
     action: 'kyc.reject',

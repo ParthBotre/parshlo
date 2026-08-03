@@ -2,12 +2,12 @@ import { type Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { BuyerCatalog } from '@/components/dashboard/buyer-catalog';
-import { ApiError } from '@/lib/api-client';
 import { listBuyerCatalog } from '@/lib/api/products';
+import { ApiError } from '@/lib/api-client';
 import { getSession } from '@/lib/auth/session';
 
 export const metadata: Metadata = {
-  title: 'Catalog',
+  title: 'Products',
   robots: { index: false, follow: false },
 };
 
@@ -32,18 +32,22 @@ export default async function CatalogPage(): Promise<JSX.Element> {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Catalog</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Live wholesale pricing. Minimum order quantities apply.
-        </p>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Products</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Wholesale pricing for your account.</p>
       </div>
 
       {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
+          <p>{error}</p>
+          {error.toLowerCase().includes('not yet approved') ? (
+            <p className="text-muted-foreground mt-2">
+              Your B2B application is still in review. You will be able to browse pricing and place
+              orders once an admin approves your account.
+            </p>
+          ) : null}
         </div>
       ) : (
-        <BuyerCatalog products={products} accessToken={session.accessToken} />
+        <BuyerCatalog products={products} />
       )}
     </div>
   );

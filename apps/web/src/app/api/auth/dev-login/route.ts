@@ -13,7 +13,7 @@ import {
  * Issues a short-lived HS256 token impersonating a seeded persona.
  */
 const Body = z.object({
-  persona: z.enum(['admin', 'buyer']),
+  persona: z.enum(['admin', 'manager', 'buyer']),
   redirectTo: z.string().optional(),
 });
 
@@ -62,6 +62,6 @@ export async function POST(req: Request): Promise<Response> {
   });
   await setSessionCookie(token, expiresAt - Math.floor(Date.now() / 1000));
 
-  const redirect = body.redirectTo ?? (persona === 'admin' ? '/admin' : '/dashboard');
+  const redirect = body.redirectTo ?? (persona === 'buyer' ? '/dashboard' : '/admin');
   return NextResponse.json({ ok: true, redirectTo: redirect });
 }

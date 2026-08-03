@@ -17,10 +17,15 @@ const PACKAGES = [
 
 const ROOT = process.cwd();
 
+/** Test paths are linted by Jest, not type-checked ESLint (see @parshlo/config/eslint/test). */
+const TEST_FILE = /(?:^|\/)(?:test|__tests__)(?:\/|$)|\.(?:spec|test)\.[cm]?[jt]sx?$/;
+
 const toRel = (file) => path.relative(ROOT, file);
 
 const findPackage = (relFile) =>
   PACKAGES.find((pkg) => relFile === pkg || relFile.startsWith(`${pkg}${path.sep}`));
+
+const isLintableSource = (relFile) => !TEST_FILE.test(relFile);
 
 const quote = (file) => JSON.stringify(file);
 
@@ -31,8 +36,13 @@ export default {
 
     const byPackage = new Map();
     for (const file of relFiles) {
+      if (!isLintableSource(file)) {
+        continue;
+      }
       const pkg = findPackage(file);
-      if (!pkg) continue;
+      if (!pkg) {
+        continue;
+      }
       if (!byPackage.has(pkg)) {
         byPackage.set(pkg, []);
       }

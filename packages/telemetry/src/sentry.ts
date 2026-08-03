@@ -21,8 +21,7 @@ export function startSentry(opts: SentryInitOptions = {}): void {
     environment: opts.environment ?? process.env.NODE_ENV ?? 'development',
     release: opts.release ?? process.env.SERVICE_VERSION,
     tracesSampleRate:
-      opts.tracesSampleRate ??
-      Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
+      opts.tracesSampleRate ?? Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
   });
 }
 

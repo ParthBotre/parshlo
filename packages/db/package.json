@@ -22,13 +22,13 @@
   ],
   "scripts": {
     "build": "dotenv -e ../../.env -- prisma generate && tsup",
-    "dev": "tsup --watch",
+    "dev": "dotenv -e ../../.env -- prisma generate && tsup --watch",
     "generate": "dotenv -e ../../.env -- prisma generate",
     "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
-    "migrate:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
+    "migrate:reset": "dotenv -e ../../.env -- node ../../scripts/guard-dev-db.mjs migrate:reset && dotenv -e ../../.env -- prisma migrate reset --force",
     "studio": "dotenv -e ../../.env -- prisma studio",
-    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "seed": "dotenv -e ../../.env -- node ../../scripts/guard-dev-db.mjs seed && dotenv -e ../../.env -- tsx prisma/seed.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist .turbo"
@@ -39,10 +39,10 @@
   "devDependencies": {
     "@parshlo/config": "workspace:*",
     "@types/node": "22.10.5",
-    "dotenv-cli": "8.0.0",
+    "dotenv-cli": "7.4.4",
     "prisma": "5.22.0",
-    "tsup": "8.3.5",
-    "tsx": "4.19.2",
+    "tsup": "8.5.1",
+    "tsx": "4.22.0",
     "typescript": "5.7.3"
   },
   "prisma": {

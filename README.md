@@ -66,16 +66,11 @@ flowchart LR
 
   subgraph Data
     PG[(Postgres 16<br/>Prisma)]
-    Redis[(Redis<br/>BullMQ + rate-limit)]
-    S3[(S3<br/>KYC docs + Invoices)]
+    Redis[(Redis<br/>rate-limit + future queues)]
   end
 
-  subgraph Workers
-    Jobs[Background workers<br/>email / invoice PDF / exports]
-  end
-
-  subgraph Email
-    Resend[Resend / SendGrid]
+  subgraph Observability
+    Sentry[Sentry<br/>web + api errors]
   end
 
   User -->|HTTPS| CDN --> Web
@@ -84,11 +79,8 @@ flowchart LR
   API -->|JWKS verify| Auth0
   API --> PG
   API --> Redis
-  API --> S3
-  API -->|enqueue| Jobs
-  Jobs --> Resend
-  Jobs --> PG
-  Jobs --> S3
+  Web --> Sentry
+  API --> Sentry
 ```
 
 The full architecture decisions are recorded as ADRs under [`docs/adr/`](./docs/adr/).
@@ -97,21 +89,21 @@ The full architecture decisions are recorded as ADRs under [`docs/adr/`](./docs/
 
 ## Tech stack
 
-| Layer | Choice | Why |
-| --- | --- | --- |
-| Monorepo | **Turborepo + pnpm workspaces** | Fast, cached, content-aware task graph; industry standard. |
-| Frontend | **Next.js 15** App Router, **TypeScript** strict, **Tailwind**, **shadcn/ui**, **Framer Motion**, **TanStack Query** | RSC for fast public pages; familiar to FAANG-tier hiring teams. |
-| Backend | **NestJS 10** on **Fastify**, **Zod** validation, **Pino** logs | Opinionated, modular, DI-friendly; testable; production hardened. |
-| DB | **PostgreSQL 16** + **Prisma 5** | Type-safe ORM, painless migrations, transactional integrity. |
-| Cache / queue | **Redis 7** + **BullMQ** | Sessions, rate limits, async jobs (emails, invoices). |
-| Auth | **Auth0** with MFA, JWKS-validated RS256 JWTs | Enterprise SSO/MFA without rolling our own auth. |
-| Storage | **S3** (LocalStack in dev) | Encrypted-at-rest KYC documents + invoices. |
-| Email | **Resend** + React Email templates | Modern, reliable transactional email. |
-| Observability | **Pino** + **OpenTelemetry** hooks + **Sentry** | Structured logs, distributed traces, error monitoring. |
-| Testing | **Vitest**, **Jest**, **Supertest**, **Playwright**, **Testcontainers** | Unit, integration, contract, E2E coverage. |
-| Quality | ESLint flat config, Prettier, Husky + lint-staged, commitlint | Conventional Commits enforced. |
-| CI/CD | **GitHub Actions** (lint, typecheck, test, build, CodeQL, npm audit) | Fast feedback, security scanning baked in. |
-| Containers | Docker multi-stage (non-root), `docker-compose` for local | Reproducible local + prod parity. |
+| Layer         | Choice                                                                                                               | Why                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Monorepo      | **Turborepo + pnpm workspaces**                                                                                      | Fast, cached, content-aware task graph; industry standard.        |
+| Frontend      | **Next.js 15** App Router, **TypeScript** strict, **Tailwind**, **shadcn/ui**, **Framer Motion**, **TanStack Query** | RSC for fast public pages; familiar to FAANG-tier hiring teams.   |
+| Backend       | **NestJS 11** on **Fastify**, **Zod** validation, **Pino** logs                                                      | Opinionated, modular, DI-friendly; testable; production hardened. |
+| DB            | **PostgreSQL 16** + **Prisma 5**                                                                                     | Type-safe ORM, painless migrations, transactional integrity.      |
+| Cache / queue | **Redis 7** + **BullMQ-ready queue package**                                                                         | Rate limits now; async jobs later without changing API contracts. |
+| Auth          | **Auth0** with MFA, JWKS-validated RS256 JWTs                                                                        | Enterprise SSO/MFA without rolling our own auth.                  |
+| Storage       | **Static product images now; S3/R2-ready upload contracts**                                                          | Keep staging simple while preserving a clean path for documents.  |
+| Notifications | **NotificationLog foundation; email provider deferred**                                                              | PTO/order events can be connected to email later.                 |
+| Observability | **Pino** + **OpenTelemetry** hooks + **Sentry**                                                                      | Structured logs, distributed traces, error monitoring.            |
+| Testing       | **Vitest**, **Jest**, **Supertest**, **Playwright**, **Testcontainers**                                              | Unit, integration, contract, E2E coverage.                        |
+| Quality       | ESLint flat config, Prettier, Husky + lint-staged, commitlint                                                        | Conventional Commits enforced.                                    |
+| CI/CD         | **GitHub Actions** (lint, typecheck, test, build, CodeQL, npm audit)                                                 | Fast feedback, security scanning baked in.                        |
+| Containers    | Docker multi-stage (non-root), `docker-compose` for local                                                            | Reproducible local + prod parity.                                 |
 
 ---
 
@@ -122,20 +114,26 @@ parshlo/
 ├── apps/
 │   ├── api/                  # NestJS + Fastify backend (REST /v1)
 │   ├── web/                  # Next.js 15 site + B2B + admin portals
-│   └── worker/               # BullMQ background processor
-│                             #   · transactional email
-│                             #   · invoice PDF generation
-│                             #   · KYC decision notifications
+│   │                         #   · /admin/analytics/gross sales + product/region analytics
+│   │                         #   · /admin/orders/[id] order inspection
+│   │                         #   · /api/admin/orders/[id] pre-approval order edit + CSV export
+│   │                         #   · /admin/buyers/[id] buyer analytics
+│   │                         #   · /admin/holidays employee PTO requests
+│   │                         #   · /admin/finance/logistics reconciliation
+│   └── worker/               # Deferred BullMQ worker app
+│                             #   · planned transactional email
+│                             #   · planned invoice PDF generation
+│                             #   · planned notification delivery
 ├── packages/
 │   ├── config/               # Shared ESLint, tsconfig, Tailwind preset
-│   ├── db/                   # Prisma schema + migrations + client + seed
+│   ├── db/                   # Prisma schema + migrations + client + dev-only seed
 │   ├── logger/               # Pino structured logger (PII redaction)
 │   ├── queue/                # Typed BullMQ producers + payload contracts
 │   ├── telemetry/            # OTel + Sentry + Prometheus init
 │   └── types/                # Zod schemas (single source of truth)
 ├── infra/
 │   ├── docker/               # Dockerfiles + LocalStack init
-│   └── terraform/            # AWS IaC: VPC, RDS, ElastiCache, S3, ECS, ALB
+│   └── terraform/            # Future AWS IaC: VPC, RDS, ElastiCache, S3, ECS, ALB
 │       ├── bootstrap/        # State backend (S3 + DynamoDB locks)
 │       ├── modules/          # network, data, ecs, edge
 │       └── environments/     # dev / staging / prod
@@ -145,7 +143,7 @@ parshlo/
 │   ├── runbooks/             # Incident response
 │   ├── architecture.md
 │   ├── security.md           # Security model + STRIDE threat model
-│   ├── deploy.md             # Production deploy guide
+│   ├── deploy.md             # Current staging deploy flow + production notes
 │   ├── demo-script.md        # End-to-end walkthrough for Looms
 │   └── release-process.md
 ├── .github/                  # CI workflows, PR & issue templates
@@ -160,11 +158,13 @@ parshlo/
 ## Getting started
 
 ### Prerequisites
+
 - **Node.js 22.x** (`.nvmrc` provided)
 - **pnpm 9** (managed via `packageManager` in `package.json`)
-- **Docker** (for local Postgres / Redis / MailHog / LocalStack)
+- **Docker** (for local Postgres / Redis / optional MailHog / LocalStack)
 
 ### 1. Install
+
 ```bash
 nvm use            # picks up .nvmrc
 corepack enable    # turns on pnpm via Node
@@ -172,29 +172,33 @@ pnpm install
 ```
 
 ### 2. Bring up infra
+
 ```bash
-make up            # postgres + redis + mailhog + localstack
+make up            # postgres + redis + optional local services
 cp .env.example .env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
 ### 3. Migrate + seed the database
+
 ```bash
 make db-migrate
 make db-seed
 ```
 
 ### 4. Run the app
+
 ```bash
-make dev           # api on :4000, web on :3000, worker in same task graph
+make dev           # api on :4000, web on :3000
 ```
 
 Open:
+
 - Web — http://localhost:3000
 - API Swagger — http://localhost:4000/docs
 - API metrics — http://localhost:4000/metrics
-- MailHog — http://localhost:8025
-- LocalStack S3 — http://localhost:4566
+- MailHog — http://localhost:8025, if email testing is enabled locally
+- LocalStack S3 — http://localhost:4566, if storage testing is enabled locally
 
 ### 5. Sign in (dev mode)
 
@@ -205,6 +209,8 @@ On the sign-in page choose:
   with a real business profile, GSTIN, and drug license. Buyer dashboard,
   catalog with prices, cart, and order placement all work end-to-end.
 - **Continue as Demo Admin** — analytics, KYC queue, orders, buyers.
+- **Continue as Demo Manager** — staff order placement without admin-only
+  approval, status-transition, logistics, or shipment controls.
 
 Set `AUTH_MODE=auth0` plus the Auth0 vars to switch to a real tenant.
 
@@ -216,8 +222,9 @@ The Prisma schema (`packages/db/prisma/schema.prisma`) encodes the entire busine
 
 - **User**, **BusinessProfile** — accounts + KYC details (GSTIN unique, account lifecycle: `PENDING_VERIFICATION → UNDER_REVIEW → APPROVED|REJECTED|SUSPENDED`).
 - **KycApplication**, **KycDocument** — review workflow with reviewer + reason.
-- **Product**, **ProductCategory**, **Inventory**, **ProductBatch** — formulations, MOQ, GST rate, schedule drug class, stock tracking.
-- **Order**, **OrderItem**, **OrderStatusEvent**, **Invoice** — full procurement lifecycle (`RECEIVED → UNDER_REVIEW → APPROVED → PREPARING → DISPATCHED → OUT_FOR_DELIVERY → DELIVERED`, with `CANCELLED` / `REJECTED` terminals).
+- **Product**, **ProductCategory**, **Inventory**, **ProductBatch** — formulations, MOQ, display GST rate, MRP, Rate A/PTS, Rate B/PTR, schedule drug class, stock tracking.
+- **Order**, **OrderItem**, **OrderStatusEvent**, **Invoice** — full procurement lifecycle (`RECEIVED → UNDER_REVIEW → APPROVED → PREPARING → DISPATCHED`, with `CANCELLED` / `REJECTED` terminals). Manager-created orders require admin or super admin approval, and only admin/super admin roles can transition status, enter shipment tracking, or manage logistics statements.
+- **EmployeeLeaveRequest** — annual PTO requests for internal staff, with 30 days per calendar year, super-admin approval, and notification log records ready for future email delivery.
 - **AuditLog** — immutable trail for every mutating action.
 - **IdempotencyKey** — duplicate-order protection on retries.
 - **ContactInquiry** — public contact form submissions.
@@ -241,7 +248,7 @@ Highlights — see [`docs/security.md`](./docs/security.md) for the full STRIDE-
 - **Secrets**: All env vars validated at boot via Zod; missing config fails fast in CI/production.
 - **PII**: Pino redaction strips GSTIN, PAN, license numbers, mobile, tokens from logs.
 - **Idempotency**: Orders require an `Idempotency-Key`; replays return the prior result.
-- **Storage**: KYC docs and invoices uploaded to S3 via presigned URLs only; SSE-S3 / SSE-KMS in production.
+- **Storage**: public product photos are static web assets today; KYC/invoice upload endpoints are guarded by `STORAGE_ENABLED` and intended for S3/R2 when enabled.
 - **DB**: Parameterized queries via Prisma; `Serializable` transactions for order placement.
 
 ---
@@ -270,33 +277,36 @@ make help                 # full menu
 - [x] Auth: dev-mode HS256 IdP **+** real Auth0 path via `AUTH_MODE` switch; httpOnly session cookie; Next.js middleware protects `/dashboard/*` and `/admin/*`.
 - [x] Buyer flow: catalog with wholesale pricing, persistent zustand cart, MOQ-aware quantity controls, place-order via idempotency key, order detail with state-machine progress.
 - [x] Admin flow: analytics overview, KYC queue with approve/reject, all orders, buyers list, products inventory view.
-- [x] API: NestJS on Fastify, `/v1` versioning, RFC 7807 problem details, audit interceptor, Zod-derived Swagger, Prometheus `/metrics`, RBAC, Serializable order transactions, presigned S3 URLs.
-- [x] Worker: BullMQ workers for email (Mailhog dev / Resend prod), invoice PDF (pdf-lib + SHA-256 + S3), KYC notifications.
+- [x] API: NestJS on Fastify, `/v1` versioning, RFC 7807 problem details, audit interceptor, Zod-derived Swagger, Prometheus `/metrics`, RBAC, Serializable order transactions, and storage contracts behind feature flags.
+- [x] Admin operations: buyer management, product/catalog management, order editing/deletion controls, logistics reconciliation, gross analytics, and employee PTO approval.
+- [x] Notifications foundation: `NotificationLog` rows for PTO events, ready for a future email/browser notification sender.
 - [x] Observability: OpenTelemetry hooks, Sentry, Prometheus histograms + counters (`parshlo_orders_placed_total`, etc.).
 - [x] Tests: 30+ Vitest tests on shared schemas + cart math, Jest + Supertest tests on order state machine + dev-jwt verifier, Playwright E2E for the buyer happy path.
 - [x] Load: k6 scripts for catalog reads (ramps to 10k VUs) + authenticated order placement (SLOs encoded as thresholds).
-- [x] IaC: Terraform skeleton for AWS — VPC, RDS Multi-AZ, ElastiCache, S3 (versioned, SSE, 8-yr GST retention), ECS Fargate, ALB, remote state on S3+DynamoDB.
+- [x] IaC skeleton: Terraform modules for future AWS production — VPC, RDS Multi-AZ, ElastiCache, S3, ECS Fargate, ALB, remote state on S3+DynamoDB.
 - [x] CI/CD: GitHub Actions lint/typecheck/test/build/CodeQL/commitlint; Conventional Commits enforced.
 
 ---
 
 ## Docs index
 
-| Doc | Purpose |
-| --- | --- |
-| [`docs/architecture.md`](./docs/architecture.md) | System overview, request flow, data model walkthrough |
-| [`docs/security.md`](./docs/security.md) | Security controls + STRIDE threat model |
-| [`docs/deploy.md`](./docs/deploy.md) | Production deploy guide (Docker + Terraform + ECS) |
-| [`docs/demo-script.md`](./docs/demo-script.md) | 5-minute walkthrough script (great for Loom recordings) |
-| [`docs/release-process.md`](./docs/release-process.md) | Branching, tagging, hotfixes, rollback |
-| [`docs/adr/0001-monorepo.md`](./docs/adr/0001-monorepo.md) | Why pnpm + Turborepo |
-| [`docs/adr/0002-nestjs-on-fastify.md`](./docs/adr/0002-nestjs-on-fastify.md) | Why NestJS + Fastify |
-| [`docs/adr/0003-prisma-postgres.md`](./docs/adr/0003-prisma-postgres.md) | Why Prisma + Postgres |
-| [`docs/adr/0004-auth0.md`](./docs/adr/0004-auth0.md) | Why Auth0 over rolling our own |
-| [`docs/adr/0005-zod-shared-types.md`](./docs/adr/0005-zod-shared-types.md) | Why Zod as the contract source |
-| [`docs/runbooks/incident-response.md`](./docs/runbooks/incident-response.md) | On-call response template |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Branch + commit + PR conventions |
-| [`SECURITY.md`](./SECURITY.md) | Responsible disclosure |
+| Doc                                                                          | Purpose                                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`docs/architecture.md`](./docs/architecture.md)                             | System overview, request flow, data model walkthrough   |
+| [`docs/security.md`](./docs/security.md)                                     | Security controls + STRIDE threat model                 |
+| [`docs/deploy.md`](./docs/deploy.md)                                         | Current staging deploy flow + future production notes   |
+| [`docs/STAGING_PRODUCTION_README.md`](./docs/STAGING_PRODUCTION_README.md)   | Staging/prod operating model, users, products, backups  |
+| [`docs/demo-script.md`](./docs/demo-script.md)                               | 5-minute walkthrough script (great for Loom recordings) |
+| [`docs/release-process.md`](./docs/release-process.md)                       | Branching, tagging, hotfixes, rollback                  |
+| [`docs/adr/0001-monorepo.md`](./docs/adr/0001-monorepo.md)                   | Why pnpm + Turborepo                                    |
+| [`docs/adr/0002-nestjs-on-fastify.md`](./docs/adr/0002-nestjs-on-fastify.md) | Why NestJS + Fastify                                    |
+| [`docs/adr/0003-prisma-postgres.md`](./docs/adr/0003-prisma-postgres.md)     | Why Prisma + Postgres                                   |
+| [`docs/adr/0004-auth0.md`](./docs/adr/0004-auth0.md)                         | Why Auth0 over rolling our own                          |
+| [`docs/adr/0005-zod-shared-types.md`](./docs/adr/0005-zod-shared-types.md)   | Why Zod as the contract source                          |
+| [`docs/runbooks/incident-response.md`](./docs/runbooks/incident-response.md) | On-call response template                               |
+| [`docs/runbooks/backup-restore.md`](./docs/runbooks/backup-restore.md)       | Backup, restore, and restore-drill runbook              |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                       | Branch + commit + PR conventions                        |
+| [`SECURITY.md`](./SECURITY.md)                                               | Responsible disclosure                                  |
 
 ---
 
