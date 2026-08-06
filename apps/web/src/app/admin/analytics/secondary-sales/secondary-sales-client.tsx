@@ -172,22 +172,22 @@ export default function SecondarySalesClient({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Primary sales"
-          value={dashboard.totals.primaryQuantity}
+          quantity={dashboard.totals.primaryQuantity}
           amount={dashboard.totals.primaryPaise}
         />
         <Metric
           label="Secondary sales"
-          value={dashboard.totals.secondaryQuantity}
+          quantity={dashboard.totals.secondaryQuantity}
           amount={dashboard.totals.secondaryPaise}
         />
         <Metric
           label="Closing stock"
-          value={dashboard.totals.closingQuantity}
+          quantity={dashboard.totals.closingQuantity}
           amount={dashboard.totals.closingPaise}
         />
         <Metric
           label="Variance"
-          value={dashboard.totals.balanceQuantity}
+          quantity={dashboard.totals.balanceQuantity}
           amount={dashboard.totals.balancePaise}
         />
       </div>
@@ -299,7 +299,7 @@ export default function SecondarySalesClient({
           <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
-            sales and closing stock are entered by approved editors.
+            sales and closing stock are entered as strips/bottles by approved editors.
           </p>
         </div>
         <div className="w-full overflow-x-auto">
@@ -307,10 +307,10 @@ export default function SecondarySalesClient({
             <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Stockist</th>
-                <th className="px-4 py-3 text-right">Primary</th>
-                <th className="px-4 py-3 text-right">Secondary</th>
-                <th className="px-4 py-3 text-right">Closing</th>
-                <th className="px-4 py-3 text-right">Variance</th>
+                <th className="px-4 py-3 text-right">Primary value</th>
+                <th className="px-4 py-3 text-right">Secondary value</th>
+                <th className="px-4 py-3 text-right">Closing value</th>
+                <th className="px-4 py-3 text-right">Variance value</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -386,9 +386,9 @@ export default function SecondarySalesClient({
               <tr>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3 text-right">Primary from Parshlo</th>
-                <th className="px-4 py-3 text-right">Secondary</th>
-                <th className="px-4 py-3 text-right">Closing</th>
-                <th className="px-4 py-3 text-right">Variance</th>
+                <th className="px-4 py-3 text-right">Secondary qty</th>
+                <th className="px-4 py-3 text-right">Closing qty</th>
+                <th className="px-4 py-3 text-right">Variance value</th>
                 <th className="px-4 py-3">Notes</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
@@ -483,18 +483,18 @@ export default function SecondarySalesClient({
 
 function Metric({
   label,
-  value,
+  quantity,
   amount,
 }: {
   label: string;
-  value: number;
+  quantity: number;
   amount: number;
 }): JSX.Element {
   return (
     <div className="bg-card rounded-lg border p-5">
       <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
-      <p className="font-display mt-1 text-2xl font-semibold">{value}</p>
-      <p className="text-muted-foreground mt-1 font-mono text-sm">{formatINR(amount)}</p>
+      <p className="font-display mt-1 text-2xl font-semibold">{formatINR(amount)}</p>
+      <p className="text-muted-foreground mt-1 font-mono text-sm">{quantity} strips/bottles</p>
     </div>
   );
 }
@@ -508,8 +508,8 @@ function QuantityAmountCell({
 }): JSX.Element {
   return (
     <td className="px-4 py-3 text-right">
-      <p className="font-mono">{quantity}</p>
-      <p className="text-muted-foreground mt-1 font-mono text-xs">{formatINR(amount)}</p>
+      <p className="font-mono font-medium">{formatINR(amount)}</p>
+      <p className="text-muted-foreground mt-1 font-mono text-xs">{quantity} strips/bottles</p>
     </td>
   );
 }

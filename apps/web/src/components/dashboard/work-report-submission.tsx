@@ -285,12 +285,12 @@ export function WorkReportSubmission({
       );
       const json: unknown = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(readProblem(json, 'Could not download work report CSV.'));
+        setError(readProblem(json, 'Could not download work report Excel file.'));
         return;
       }
-      const payload = json as { fileName: string; contentBase64: string };
-      downloadBase64File(payload.fileName, payload.contentBase64, 'text/csv');
-      setMessage(`Work report CSV downloaded for ${selectedReportPeriodLabel}.`);
+      const payload = json as { fileName: string; contentBase64: string; contentType: string };
+      downloadBase64File(payload.fileName, payload.contentBase64, payload.contentType);
+      setMessage(`Work report Excel downloaded for ${selectedReportPeriodLabel}.`);
     } catch {
       setError('Network connection failed. Please check internet and try again.');
     } finally {
@@ -425,7 +425,7 @@ export function WorkReportSubmission({
                   disabled={downloadingReport}
                   onClick={() => void downloadWorkReportCsv()}
                 >
-                  Download Excel CSV
+                  Download Excel
                 </Button>
               </div>
             </div>

@@ -898,21 +898,25 @@ export function HrManagement({
 
   async function downloadWorkReportCsv(): Promise<void> {
     if (!workDetailEmployeeId) {
-      setError('Choose an employee before downloading the work report CSV.');
+      setError('Choose an employee before downloading the work report Excel file.');
       return;
     }
     setWorkReportDownloading(true);
     try {
-      const result = await submitJson<{ fileName: string; contentBase64: string }>(
+      const result = await submitJson<{
+        fileName: string;
+        contentBase64: string;
+        contentType: string;
+      }>(
         `/api/admin/hr/work-logs/csv?employeeId=${encodeURIComponent(workDetailEmployeeId)}&periodMonth=${encodeURIComponent(workPeriod)}`,
         'GET',
         undefined,
-        'Could not download work report CSV.',
+        'Could not download work report Excel file.',
       );
-      downloadBase64File(result.fileName, result.contentBase64, 'text/csv');
-      setMessage(`Work report CSV downloaded for ${periodLabel(workPeriod)}.`);
+      downloadBase64File(result.fileName, result.contentBase64, result.contentType);
+      setMessage(`Work report Excel downloaded for ${periodLabel(workPeriod)}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not download work report CSV.');
+      setError(err instanceof Error ? err.message : 'Could not download work report Excel file.');
     } finally {
       setWorkReportDownloading(false);
     }
@@ -1876,7 +1880,7 @@ export function HrManagement({
                 disabled={!workDetailEmployeeId || workReportDownloading}
                 onClick={() => void downloadWorkReportCsv()}
               >
-                Download Excel CSV
+                Download Excel
               </Button>
             </div>
           </div>

@@ -20,7 +20,11 @@ export async function GET(req: Request): Promise<Response> {
   const employeeId = url.searchParams.get('employeeId');
   const periodMonth = url.searchParams.get('periodMonth');
   if (!employeeId || !periodMonth) {
-    return problem(400, 'VALIDATION_ERROR', 'Choose an employee and month before downloading.');
+    return problem(
+      400,
+      'VALIDATION_ERROR',
+      'Choose an employee and month before downloading the Excel report.',
+    );
   }
   try {
     return NextResponse.json(

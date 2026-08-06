@@ -64,6 +64,24 @@ const STATS = [
   { value: '100%', label: 'On-time dispatch rate' },
 ] as const;
 
+const CONCEPTS = [
+  {
+    prefix: 'PAR',
+    meaning: 'Can symbolize “Parenthood, Pregnancy, Protection”',
+    body: 'Core aspects of gynecology.',
+  },
+  {
+    prefix: 'SH',
+    meaning: 'Suggests “She, Shield, Support”',
+    body: "Directly tied to women's wellness.",
+  },
+  {
+    prefix: 'LO',
+    meaning: 'Resonates with “Love, Longevity, Life”',
+    body: 'Emotional and holistic care.',
+  },
+] as const;
+
 export default function HomePage(): JSX.Element {
   return (
     <>
@@ -119,6 +137,40 @@ export default function HomePage(): JSX.Element {
                 </Card>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CONCEPT ------------------------------------------------------- */}
+      <section className="border-border/40 bg-card/30 border-b">
+        <div className="container grid gap-8 py-20 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <Badge
+              variant="outline"
+              className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
+            >
+              Conceptual Connection
+            </Badge>
+            <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
+              PARSHLO represents care through every stage.
+            </h2>
+          </div>
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              {CONCEPTS.map((item) => (
+                <Card key={item.prefix} className="h-full">
+                  <CardContent className="space-y-3 p-5">
+                    <p className="text-primary font-display text-3xl font-bold">{item.prefix}</p>
+                    <p className="font-medium">{item.meaning}</p>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{item.body}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-balance text-lg leading-relaxed">
+              Together, PARSHLO can be positioned as a brand that protects and supports women with
+              love and care throughout their reproductive journey.
+            </p>
           </div>
         </div>
       </section>

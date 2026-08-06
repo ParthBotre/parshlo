@@ -358,7 +358,7 @@ export type WorkReportPdfDownloadResponse = z.infer<typeof WorkReportPdfDownload
 
 export const WorkReportCsvDownloadResponse = z.object({
   fileName: z.string(),
-  contentType: z.literal('text/csv'),
+  contentType: z.enum(['text/csv', 'application/vnd.ms-excel']),
   contentBase64: z.string(),
 });
 export type WorkReportCsvDownloadResponse = z.infer<typeof WorkReportCsvDownloadResponse>;

@@ -138,15 +138,16 @@ function formatMonthYear(value: Date): string {
   }).format(value);
 }
 
-function escapeCsvCell(value: string | number | null | undefined): string {
+function escapeHtmlCell(value: string | number | null | undefined): string {
   const text = value === null || value === undefined ? '' : String(value);
-  if (/[",\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-export function renderWorkReportCsv(
+export function renderWorkReportExcel(
   record: WorkReportPdfRecord,
   data: WorkReportPdfData,
 ): Uint8Array {
@@ -183,8 +184,33 @@ export function renderWorkReportCsv(
       report.note ?? '',
     ]),
   ];
-  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
-  return Buffer.from(`\uFEFF${csv}`, 'utf8');
+  const tableRows = rows
+    .map((row, rowIndex) => {
+      const cells = row.length === 0 ? [''] : row;
+      const tag = rowIndex === 0 || rowIndex === 7 ? 'th' : 'td';
+      const colspan = rowIndex === 0 ? ' colspan="10"' : '';
+      return `<tr>${cells
+        .map((cell, cellIndex) =>
+          cellIndex === 0 && colspan
+            ? `<${tag}${colspan}>${escapeHtmlCell(cell)}</${tag}>`
+            : `<${tag}>${escapeHtmlCell(cell)}</${tag}>`,
+        )
+        .join('')}</tr>`;
+    })
+    .join('');
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11pt; }
+    th { background: #eaf3ef; color: #103f2f; font-weight: 700; }
+    th, td { border: 1px solid #9fb0aa; padding: 6px 8px; vertical-align: top; }
+  </style>
+</head>
+<body><table>${tableRows}</table></body>
+</html>`;
+  return Buffer.from(html, 'utf8');
 }
 
 function sanitize(text: string): string {

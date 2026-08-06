@@ -59,7 +59,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   renderExpenseSlipPdf,
   renderSalarySlipPdf,
-  renderWorkReportCsv,
+  renderWorkReportExcel,
   renderWorkReportPdf,
 } from '../hr/hr-pdf.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -1654,7 +1654,7 @@ export class AdminService {
       employeeId,
       periodMonth,
     );
-    const bytes = renderWorkReportCsv(
+    const bytes = renderWorkReportExcel(
       {
         employeeName: record.employee.fullName,
         employeeCode: record.employeeCode,
@@ -1666,8 +1666,8 @@ export class AdminService {
     );
 
     return {
-      fileName: `work_report_${record.employeeCode}_${periodMonth}.csv`,
-      contentType: 'text/csv',
+      fileName: `work_report_${record.employeeCode}_${periodMonth}.xls`,
+      contentType: 'application/vnd.ms-excel',
       contentBase64: Buffer.from(bytes).toString('base64'),
     };
   }

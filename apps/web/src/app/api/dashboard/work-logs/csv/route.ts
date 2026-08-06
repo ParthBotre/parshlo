@@ -16,7 +16,7 @@ export async function GET(req: Request): Promise<Response> {
   if (!session) return problem(401, 'UNAUTHENTICATED', 'Sign in to download work reports.');
   const periodMonth = new URL(req.url).searchParams.get('periodMonth');
   if (!periodMonth) {
-    return problem(400, 'VALIDATION_ERROR', 'Choose a month before downloading.');
+    return problem(400, 'VALIDATION_ERROR', 'Choose a month before downloading the Excel report.');
   }
   try {
     return NextResponse.json(await downloadMyWorkReportCsv(session.accessToken, periodMonth));
