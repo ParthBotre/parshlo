@@ -271,16 +271,17 @@ export default function SecondarySalesClient({
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
             <div>
               <h2 className="font-display flex items-center gap-2 text-base font-semibold">
-                <Building2 className="h-4 w-4" /> Tracked stockists
+                <Building2 className="h-4 w-4" /> Stockist secondary sales
               </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Open tracked stockists for secondary sales entry, or link approved STOCKIST buyers.
+                Select an existing stockist to view or enter monthly secondary sales. Add a new
+                approved stockist only when it is not already tracked.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1.5">
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  Open tracked stockist
+                  Select stockist to edit
                 </span>
                 <select
                   value={dashboard.selectedStockistId ?? ''}
@@ -288,7 +289,7 @@ export default function SecondarySalesClient({
                   disabled={loadingStockist || dashboard.stockists.length === 0}
                   className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
                 >
-                  <option value="">Select tracked stockist</option>
+                  <option value="">Choose existing stockist</option>
                   {dashboard.stockists.map((stockist) => (
                     <option key={stockist.id} value={stockist.id}>
                       {stockist.name}
@@ -298,7 +299,7 @@ export default function SecondarySalesClient({
               </label>
               <label className="space-y-1.5">
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  Link approved buyer
+                  Add new stockist buyer
                 </span>
                 <div className="flex gap-2">
                   <select
@@ -309,8 +310,8 @@ export default function SecondarySalesClient({
                   >
                     <option value="">
                       {dashboard.eligibleStockistBuyers.length === 0
-                        ? 'No unlinked approved buyers'
-                        : 'Select stockist buyer'}
+                        ? 'All approved stockists already added'
+                        : 'Choose approved stockist buyer'}
                     </option>
                     {dashboard.eligibleStockistBuyers.map((buyer) => (
                       <option key={buyer.userId} value={buyer.userId}>
@@ -324,7 +325,7 @@ export default function SecondarySalesClient({
                     disabled={!stockistBuyerId}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <UserPlus className="h-4 w-4" /> Link
+                    <UserPlus className="h-4 w-4" /> Add
                   </button>
                 </div>
               </label>
