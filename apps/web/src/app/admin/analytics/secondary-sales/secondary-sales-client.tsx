@@ -58,6 +58,7 @@ export default function SecondarySalesClient({
   const [editorUserId, setEditorUserId] = useState('');
   const [stockistBuyerId, setStockistBuyerId] = useState('');
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const [loadingStockist, setLoadingStockist] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -167,6 +168,25 @@ export default function SecondarySalesClient({
     }
   }
 
+  async function selectTrackedStockist(stockistId: string): Promise<void> {
+    if (!stockistId || stockistId === dashboard.selectedStockistId) return;
+    setLoadingStockist(true);
+    setError('');
+    setMessage('');
+    try {
+      const next = await getSecondarySalesDashboard(accessToken, {
+        periodMonth: dashboard.periodMonth,
+        stockistId,
+      });
+      setDashboard(next);
+      setDrafts(initialDrafts(next.rows));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoadingStockist(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -248,36 +268,66 @@ export default function SecondarySalesClient({
               ))}
             </div>
           ) : null}
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
             <div>
               <h2 className="font-display flex items-center gap-2 text-base font-semibold">
                 <Building2 className="h-4 w-4" /> Tracked stockists
               </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Link approved STOCKIST buyers to the secondary sales register.
+                Open tracked stockists for secondary sales entry, or link approved STOCKIST buyers.
               </p>
             </div>
-            <div className="flex w-full gap-2 sm:w-auto">
-              <select
-                value={stockistBuyerId}
-                onChange={(event) => setStockistBuyerId(event.target.value)}
-                className="border-input bg-background h-9 min-w-0 flex-1 rounded-md border px-3 text-sm sm:w-72"
-              >
-                <option value="">Select stockist buyer</option>
-                {dashboard.eligibleStockistBuyers.map((buyer) => (
-                  <option key={buyer.userId} value={buyer.userId}>
-                    {buyer.businessName} · {buyer.city}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void addStockist()}
-                disabled={!stockistBuyerId}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <UserPlus className="h-4 w-4" /> Add
-              </button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  Open tracked stockist
+                </span>
+                <select
+                  value={dashboard.selectedStockistId ?? ''}
+                  onChange={(event) => void selectTrackedStockist(event.target.value)}
+                  disabled={loadingStockist || dashboard.stockists.length === 0}
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-70"
+                >
+                  <option value="">Select tracked stockist</option>
+                  {dashboard.stockists.map((stockist) => (
+                    <option key={stockist.id} value={stockist.id}>
+                      {stockist.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  Link approved buyer
+                </span>
+                <div className="flex gap-2">
+                  <select
+                    value={stockistBuyerId}
+                    onChange={(event) => setStockistBuyerId(event.target.value)}
+                    disabled={dashboard.eligibleStockistBuyers.length === 0}
+                    className="border-input bg-background h-9 min-w-0 flex-1 rounded-md border px-3 text-sm disabled:opacity-70"
+                  >
+                    <option value="">
+                      {dashboard.eligibleStockistBuyers.length === 0
+                        ? 'No unlinked approved buyers'
+                        : 'Select stockist buyer'}
+                    </option>
+                    {dashboard.eligibleStockistBuyers.map((buyer) => (
+                      <option key={buyer.userId} value={buyer.userId}>
+                        {buyer.businessName} · {buyer.city}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void addStockist()}
+                    disabled={!stockistBuyerId}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <UserPlus className="h-4 w-4" /> Link
+                  </button>
+                </div>
+              </label>
             </div>
           </div>
         </section>
