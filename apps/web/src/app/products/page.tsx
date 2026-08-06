@@ -1,9 +1,7 @@
 import { type Metadata } from 'next';
-import Link from 'next/link';
 
 import { PublicCatalogGrid } from '@/components/catalog/public-catalog-grid';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { listPublicProducts } from '@/lib/api/products';
 import { ApiError } from '@/lib/api-client';
 
@@ -49,23 +47,6 @@ export default async function ProductsPage(): Promise<JSX.Element> {
       ) : (
         <PublicCatalogGrid products={products} />
       )}
-
-      <div className="bg-secondary/40 mt-14 rounded-xl border p-6 text-center md:p-10">
-        <h2 className="font-display text-xl font-semibold">Need account-protected details?</h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Sign in with your authorized account to view pricing and ordering workflows.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Button asChild>
-            <Link href="/auth/sign-in">Sign in</Link>
-          </Button>
-          {/*
-          <Button asChild variant="outline">
-            <Link href="/auth/register">Request B2B Access</Link>
-          </Button>
-          */}
-        </div>
-      </div>
     </div>
   );
 }

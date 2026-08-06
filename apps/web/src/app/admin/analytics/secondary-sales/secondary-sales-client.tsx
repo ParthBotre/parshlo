@@ -254,7 +254,7 @@ export default function SecondarySalesClient({
                 <Building2 className="h-4 w-4" /> Tracked stockists
               </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Add approved STOCKIST buyers to the secondary sales register.
+                Link approved STOCKIST buyers to the secondary sales register.
               </p>
             </div>
             <div className="flex w-full gap-2 sm:w-auto">
@@ -299,7 +299,7 @@ export default function SecondarySalesClient({
           <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
-            sales and closing stock are entered as strips/bottles by approved editors.
+            sales and closing stock are entered by approved editors.
           </p>
         </div>
         <div className="w-full overflow-x-auto">
@@ -330,13 +330,10 @@ export default function SecondarySalesClient({
                         <p className="text-muted-foreground text-xs">{row.buyerBusinessName}</p>
                       ) : null}
                     </td>
-                    <QuantityAmountCell quantity={row.primaryQuantity} amount={row.primaryPaise} />
-                    <QuantityAmountCell
-                      quantity={row.secondaryQuantity}
-                      amount={row.secondaryPaise}
-                    />
-                    <QuantityAmountCell quantity={row.closingQuantity} amount={row.closingPaise} />
-                    <QuantityAmountCell quantity={row.balanceQuantity} amount={row.balancePaise} />
+                    <AmountCell amount={row.primaryPaise} />
+                    <AmountCell amount={row.secondaryPaise} />
+                    <AmountCell amount={row.closingPaise} />
+                    <AmountCell amount={row.balancePaise} />
                     <td className="px-4 py-3 text-right">
                       <a
                         href={`/admin/analytics/secondary-sales?month=${dashboard.periodMonth}&stockistId=${row.stockistId}`}
@@ -362,13 +359,6 @@ export default function SecondarySalesClient({
             <p className="text-muted-foreground mt-1 text-sm">
               {dashboard.canEdit ? 'Editable secondary sales register.' : 'Read-only view.'}
             </p>
-            {dashboard.stockists.find((stockist) => stockist.id === dashboard.selectedStockistId)
-              ?.buyerId ? null : (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                This stockist is not linked to an approved STOCKIST buyer yet, so primary sales only
-                match by exact stockist name.
-              </p>
-            )}
           </div>
           <label className="border-input bg-background flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm sm:w-80">
             <Search className="text-muted-foreground h-4 w-4" />
@@ -510,6 +500,14 @@ function QuantityAmountCell({
     <td className="px-4 py-3 text-right">
       <p className="font-mono font-medium">{formatINR(amount)}</p>
       <p className="text-muted-foreground mt-1 font-mono text-xs">{quantity} strips/bottles</p>
+    </td>
+  );
+}
+
+function AmountCell({ amount }: { amount: number }): JSX.Element {
+  return (
+    <td className="px-4 py-3 text-right">
+      <p className="font-mono font-medium">{formatINR(amount)}</p>
     </td>
   );
 }

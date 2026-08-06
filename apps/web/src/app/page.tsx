@@ -11,12 +11,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { listPublicProducts } from '@/lib/api/products';
-import { ApiError } from '@/lib/api-client';
 
 const PARTNER_TYPES = [
   // { icon: Building2, label: 'Hospitals' },
@@ -85,19 +82,7 @@ const CONCEPTS = [
   },
 ] as const;
 
-export default async function HomePage(): Promise<JSX.Element> {
-  let products: Awaited<ReturnType<typeof listPublicProducts>>;
-  try {
-    products = await listPublicProducts({ cache: 'no-store' });
-  } catch (err) {
-    if (err instanceof ApiError) {
-      products = [];
-    } else {
-      throw err;
-    }
-  }
-  const featuredProducts = products.slice(0, 6);
-
+export default function HomePage(): JSX.Element {
   return (
     <>
       {/* HERO ---------------------------------------------------------- */}
@@ -111,14 +96,14 @@ export default async function HomePage(): Promise<JSX.Element> {
               <ShieldCheck className="h-3.5 w-3.5" /> Strictly B2B · Not for retail sale
             </Badge>
             <h1 className="tracking-display-tight font-display text-balance text-5xl font-bold leading-[1.05] md:text-7xl">
-              A product-focused portfolio for{' '}
+              The trusted platform for{' '}
               <span className="from-primary via-primary to-brand-300 bg-gradient-to-br bg-clip-text text-transparent">
-                women’s healthcare.
+                B2B Pharmaceuticals.
               </span>
             </h1>
             <p className="text-muted-foreground max-w-xl text-balance text-lg leading-relaxed md:text-xl">
-              Explore Parshlo’s therapeutic products, packaging, prescription status, and marketed
-              by information from a clean catalog built for fast product discovery.
+              Explore Parshlo’s therapeutic portfolio, packaging, prescription status, and marketed
+              by information through a clean catalog built for fast product discovery.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Button asChild size="xl">
@@ -136,56 +121,22 @@ export default async function HomePage(): Promise<JSX.Element> {
           {/* Hero visual ---------------------------------------------- */}
           <div className="relative hidden md:block">
             <div className="grid-noise absolute inset-0 -z-10 opacity-40" aria-hidden />
-            {featuredProducts.length > 0 ? (
-              <div className="relative grid gap-4 lg:grid-cols-2">
-                {featuredProducts.slice(0, 4).map((product, i) => (
-                  <Link
-                    key={product.slug}
-                    href={`/products/${product.slug}`}
-                    className="lift group block"
-                    style={{ animationDelay: `${String(i * 60)}ms` }}
-                  >
-                    <Card className="h-full overflow-hidden">
-                      <CardContent className="flex items-center gap-4 p-4">
-                        <div className="bg-secondary/40 ring-border/70 h-20 w-20 shrink-0 overflow-hidden rounded-xl ring-1">
-                          <ProductImage
-                            slug={product.slug}
-                            alt={product.name}
-                            className="h-full w-full"
-                            iconClassName="h-9 w-9"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="line-clamp-2 text-sm font-semibold">
-                            {product.name.toUpperCase()}
-                          </p>
-                          <p className="text-muted-foreground mt-1 line-clamp-1 text-xs uppercase tracking-wider">
-                            {product.form} · {product.packaging}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="relative grid gap-3.5 lg:grid-cols-2">
-                {PARTNER_TYPES.map((p, i) => (
-                  <Card
-                    key={p.label}
-                    className="lift group"
-                    style={{ animationDelay: `${String(i * 60)}ms` }}
-                  >
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
-                        <p.icon className="h-5 w-5" />
-                      </div>
-                      <p className="text-sm font-medium">{p.label}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            <div className="relative grid gap-3.5 lg:grid-cols-2">
+              {PARTNER_TYPES.map((p, i) => (
+                <Card
+                  key={p.label}
+                  className="lift group"
+                  style={{ animationDelay: `${String(i * 60)}ms` }}
+                >
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
+                      <p.icon className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm font-medium">{p.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -227,10 +178,7 @@ export default async function HomePage(): Promise<JSX.Element> {
       {/* STATS --------------------------------------------------------- */}
       <section className="border-border/40 bg-card/30 border-b">
         <div className="container grid grid-cols-2 gap-6 py-16 md:grid-cols-4 md:gap-10">
-          {[
-            { value: String(products.length || STATS[1].value), label: 'Products listed' },
-            ...STATS.filter((stat) => stat.label !== 'Verified B2B partners'),
-          ].map((s) => (
+          {STATS.map((s) => (
             <div key={s.label} className="space-y-2">
               <div className="tracking-display-tight from-foreground to-foreground/60 font-display bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
                 {s.value}
@@ -240,61 +188,6 @@ export default async function HomePage(): Promise<JSX.Element> {
           ))}
         </div>
       </section>
-
-      {featuredProducts.length > 0 ? (
-        <section className="container py-24 md:py-28">
-          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div className="max-w-2xl">
-              <Badge
-                variant="outline"
-                className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
-              >
-                Featured Products
-              </Badge>
-              <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
-                Browse the portfolio before you sign in.
-              </h2>
-              <p className="text-muted-foreground mt-4 text-lg leading-relaxed">
-                Product pages are built for quick review of medicine names, forms, packaging, and
-                prescription status.
-              </p>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/products">View all products</Link>
-            </Button>
-          </div>
-
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featuredProducts.map((product) => (
-              <Link key={product.slug} href={`/products/${product.slug}`} className="block">
-                <Card className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md">
-                  <div className="bg-secondary/30 relative aspect-square overflow-hidden border-b">
-                    <ProductImage
-                      slug={product.slug}
-                      alt={product.name}
-                      className="h-full w-full"
-                      iconClassName="h-20 w-20"
-                    />
-                    {product.prescriptionRequired ? (
-                      <Badge variant="warning" className="absolute right-3 top-3 shadow-sm">
-                        Rx
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <CardContent className="flex flex-1 flex-col gap-2 p-5">
-                    <h3 className="font-display line-clamp-2 text-lg font-semibold leading-tight">
-                      {product.name.toUpperCase()}
-                    </h3>
-                    <p className="text-muted-foreground mt-auto line-clamp-1 pt-1 text-xs uppercase tracking-wider">
-                      {product.form} · {product.packaging}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* FEATURES ------------------------------------------------------ */}
       <section className="container py-24 md:py-28">

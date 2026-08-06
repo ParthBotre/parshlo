@@ -3418,16 +3418,19 @@ export class AdminService {
     const trackedBuyerIds = new Set(
       stockists.flatMap((stockist) => (stockist.buyerId ? [stockist.buyerId] : [])),
     );
-    const trackedNames = new Set(
-      stockists.map((stockist) => AdminService.normalizedName(stockist.name)),
+    const trackedStockistByName = new Map(
+      stockists.map((stockist) => [AdminService.normalizedName(stockist.name), stockist]),
     );
     const eligibleStockistBuyers = stockistBuyers
       .filter((buyer) => {
         const profile = buyer.businessProfile;
+        const matchingTrackedStockist = profile
+          ? trackedStockistByName.get(AdminService.normalizedName(profile.businessName))
+          : undefined;
         return (
           profile &&
           !trackedBuyerIds.has(buyer.id) &&
-          !trackedNames.has(AdminService.normalizedName(profile.businessName))
+          (!matchingTrackedStockist || !matchingTrackedStockist.buyerId)
         );
       })
       .map((buyer) => {
