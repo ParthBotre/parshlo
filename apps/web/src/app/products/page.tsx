@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/api-client';
 export const metadata: Metadata = {
   title: 'Products',
   description:
-    'Browse Parshlo therapeutic products. Wholesale pricing is reserved for verified B2B partners.',
+    'Browse the Parshlo therapeutic product portfolio, including product forms, packaging, and prescription status.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +38,7 @@ export default async function ProductsPage(): Promise<JSX.Element> {
           Therapeutic Portfolio
         </h1>
         <p className="text-muted-foreground mt-4">
-          Wholesale pricing is visible only to verified B2B accounts.
+          Explore product names, forms, packaging, and prescription status before signing in.
         </p>
       </div>
 
@@ -51,17 +51,19 @@ export default async function ProductsPage(): Promise<JSX.Element> {
       )}
 
       <div className="bg-secondary/40 mt-14 rounded-xl border p-6 text-center md:p-10">
-        <h2 className="font-display text-xl font-semibold">Looking for wholesale pricing?</h2>
+        <h2 className="font-display text-xl font-semibold">Need account-protected details?</h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          Get approved as a B2B partner to unlock pricing for all products.
+          Sign in with your authorized account to view pricing and ordering workflows.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild>
             <Link href="/auth/sign-in">Sign in</Link>
           </Button>
+          {/*
           <Button asChild variant="outline">
             <Link href="/auth/register">Request B2B Access</Link>
           </Button>
+          */}
         </div>
       </div>
     </div>

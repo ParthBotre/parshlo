@@ -68,12 +68,14 @@ export default async function SignInPage({ searchParams }: PageProps): Promise<J
             </Button>
           )}
 
+          {/*
           <p className="text-muted-foreground text-center text-sm">
             No account yet?{' '}
             <Link href="/auth/register" className="text-primary hover:underline">
               Request B2B access
             </Link>
           </p>
+          */}
         </CardContent>
       </Card>
     </div>

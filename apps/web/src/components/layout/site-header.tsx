@@ -18,7 +18,7 @@ export function SiteHeader(): JSX.Element {
     <header className="glass-nav border-border/60 sticky top-0 z-50 w-full border-b">
       <div className="container flex h-16 items-center justify-between">
         <Link
-          href="/"
+          href="/home"
           className="group flex items-center gap-2.5"
           aria-label={`${site.name} — home`}
         >

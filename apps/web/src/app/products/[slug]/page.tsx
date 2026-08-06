@@ -109,15 +109,17 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
             <CardContent className="p-5">
               <h3 className="font-display text-base font-semibold">Wholesale ordering</h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Pricing is available to verified B2B accounts.
+                Pricing and ordering are available after sign-in.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild>
                   <Link href="/auth/sign-in">Sign in</Link>
                 </Button>
+                {/*
                 <Button asChild variant="outline">
                   <Link href="/auth/register">Request access</Link>
                 </Button>
+                */}
               </div>
             </CardContent>
           </Card>

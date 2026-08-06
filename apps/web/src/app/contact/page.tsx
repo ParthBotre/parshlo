@@ -1,6 +1,5 @@
-import { ArrowRight, Mail, MapPin, Phone, UserPlus } from 'lucide-react';
+import { ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
 import { type Metadata } from 'next';
-import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,8 +17,8 @@ export default function ContactPage(): JSX.Element {
           Talk to our partnerships team
         </h1>
         <p className="text-muted-foreground">
-          For wholesale orders, please request B2B access. For partnerships, exports, and general
-          inquiries, email or call our team directly.
+          For product inquiries, partnerships, exports, and general support, email or call our team
+          directly.
         </p>
 
         <ul className="space-y-4 text-sm">
@@ -50,6 +49,7 @@ export default function ContactPage(): JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/*
           <Button asChild size="lg" className="w-full justify-between">
             <Link href="/auth/register">
               <span className="inline-flex items-center gap-2">
@@ -59,6 +59,7 @@ export default function ContactPage(): JSX.Element {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
+          */}
 
           <Button asChild variant="outline" size="lg" className="w-full justify-between">
             <a href={`mailto:${site.contact.email}`}>

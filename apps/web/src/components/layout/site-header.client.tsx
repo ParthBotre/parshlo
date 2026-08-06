@@ -78,9 +78,11 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
             <Button asChild size="sm">
               <Link href="/auth/sign-in">Sign in</Link>
             </Button>
+            {/*
             <Button asChild variant="outline" size="sm">
               <Link href="/auth/register">Request B2B Access</Link>
             </Button>
+            */}
           </>
         )}
       </div>
@@ -132,11 +134,13 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
                       Sign in
                     </Link>
                   </Button>
+                  {/*
                   <Button asChild variant="outline" size="sm">
                     <Link href="/auth/register" onClick={() => setOpen(false)}>
                       Request B2B Access
                     </Link>
                   </Button>
+                  */}
                 </>
               )}
             </div>
