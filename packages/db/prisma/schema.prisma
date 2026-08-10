@@ -447,9 +447,10 @@ model SecondarySalesEntry {
   product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   periodMonth DateTime
 
-  secondaryQuantity Int @default(0)
-  closingQuantity   Int @default(0)
-  notes             String?
+  secondaryQuantity   Int     @default(0)
+  closingQuantity     Int     @default(0)
+  secondarySalesPaise BigInt  @default(0)
+  notes               String?
 
   updatedById String?
   updatedBy   User?   @relation("SecondarySalesEntryUpdater", fields: [updatedById], references: [id], onDelete: SetNull)

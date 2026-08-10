@@ -3546,9 +3546,9 @@ export class AdminService {
         const primaryQuantity = primary.quantity;
         const primaryPaise = primary.paise;
         const secondaryQuantity = entry?.secondaryQuantity ?? 0;
-        const secondaryPaise = secondaryQuantity * Number(product.rateAPaise);
-        const closingQuantity = entry?.closingQuantity ?? 0;
-        const closingPaise = closingQuantity * Number(product.rateAPaise);
+        const secondaryPaise = Number(entry?.secondarySalesPaise ?? 0n);
+        const closingQuantity = 0;
+        const closingPaise = 0;
         return {
           productId: product.id,
           productName: product.name,
@@ -3559,8 +3559,8 @@ export class AdminService {
           secondaryPaise,
           closingQuantity,
           closingPaise,
-          balanceQuantity: primaryQuantity - secondaryQuantity - closingQuantity,
-          balancePaise: primaryPaise - secondaryPaise - closingPaise,
+          balanceQuantity: primaryQuantity - secondaryQuantity,
+          balancePaise: primaryPaise - secondaryPaise,
           notes: entry?.notes ?? null,
           updatedAt: entry?.updatedAt.toISOString() ?? null,
           updatedByName: entry?.updatedBy?.fullName ?? null,
@@ -3568,10 +3568,7 @@ export class AdminService {
       })
       .sort((a, b) => {
         const activityDelta =
-          b.primaryQuantity +
-          b.secondaryQuantity +
-          b.closingQuantity -
-          (a.primaryQuantity + a.secondaryQuantity + a.closingQuantity);
+          b.primaryPaise + b.secondaryPaise - (a.primaryPaise + a.secondaryPaise);
         return activityDelta !== 0 ? activityDelta : a.productName.localeCompare(b.productName);
       });
 
@@ -3654,14 +3651,16 @@ export class AdminService {
         stockistId: input.stockistId,
         productId: input.productId,
         periodMonth: periodMonthStart,
-        secondaryQuantity: input.secondaryQuantity,
-        closingQuantity: input.closingQuantity,
+        secondaryQuantity: 0,
+        closingQuantity: 0,
+        secondarySalesPaise: input.secondaryPaise,
         notes: notes && notes.length > 0 ? notes : null,
         updatedById: user.userId,
       },
       update: {
-        secondaryQuantity: input.secondaryQuantity,
-        closingQuantity: input.closingQuantity,
+        secondaryQuantity: 0,
+        closingQuantity: 0,
+        secondarySalesPaise: input.secondaryPaise,
         notes: notes && notes.length > 0 ? notes : null,
         updatedById: user.userId,
       },
@@ -3823,7 +3822,7 @@ export class AdminService {
           stockistId: true,
           secondaryQuantity: true,
           closingQuantity: true,
-          product: { select: { rateAPaise: true } },
+          secondarySalesPaise: true,
         },
       }),
     ]);
@@ -3860,9 +3859,7 @@ export class AdminService {
       const totals = totalsByStockist.get(entry.stockistId);
       if (totals) {
         totals.secondaryQuantity += entry.secondaryQuantity;
-        totals.secondaryPaise += entry.secondaryQuantity * Number(entry.product.rateAPaise);
-        totals.closingQuantity += entry.closingQuantity;
-        totals.closingPaise += entry.closingQuantity * Number(entry.product.rateAPaise);
+        totals.secondaryPaise += Number(entry.secondarySalesPaise);
       }
     }
 
@@ -3878,9 +3875,8 @@ export class AdminService {
           balanceQuantity: 0,
           balancePaise: 0,
         };
-        const balanceQuantity =
-          totals.primaryQuantity - totals.secondaryQuantity - totals.closingQuantity;
-        const balancePaise = totals.primaryPaise - totals.secondaryPaise - totals.closingPaise;
+        const balanceQuantity = totals.primaryQuantity - totals.secondaryQuantity;
+        const balancePaise = totals.primaryPaise - totals.secondaryPaise;
         return {
           stockistId: stockist.id,
           stockistName: stockist.name,
@@ -3897,10 +3893,7 @@ export class AdminService {
       })
       .sort((a, b) => {
         const activityDelta =
-          b.primaryQuantity +
-          b.secondaryQuantity +
-          b.closingQuantity -
-          (a.primaryQuantity + a.secondaryQuantity + a.closingQuantity);
+          b.primaryPaise + b.secondaryPaise - (a.primaryPaise + a.secondaryPaise);
         return activityDelta !== 0 ? activityDelta : a.stockistName.localeCompare(b.stockistName);
       });
   }

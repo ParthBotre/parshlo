@@ -26,15 +26,23 @@ function draftKey(row: Row): string {
   return row.productId;
 }
 
-function initialDrafts(
-  rows: Row[],
-): Record<string, { secondary: string; closing: string; notes: string }> {
+function formatRupeesInput(paise: number): string {
+  if (paise === 0) return '';
+  const rupees = paise / 100;
+  return Number.isInteger(rupees) ? String(rupees) : rupees.toFixed(2);
+}
+
+function rupeesToPaise(value: string): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric * 100) : 0;
+}
+
+function initialDrafts(rows: Row[]): Record<string, { secondary: string; notes: string }> {
   return Object.fromEntries(
     rows.map((row) => [
       draftKey(row),
       {
-        secondary: String(row.secondaryQuantity),
-        closing: String(row.closingQuantity),
+        secondary: formatRupeesInput(row.secondaryPaise),
         notes: row.notes ?? '',
       },
     ]),
@@ -75,16 +83,11 @@ export default function SecondarySalesClient({
     (employee) => !editorIds.has(employee.id),
   );
 
-  function updateDraft(
-    productId: string,
-    key: 'secondary' | 'closing' | 'notes',
-    value: string,
-  ): void {
+  function updateDraft(productId: string, key: 'secondary' | 'notes', value: string): void {
     setDrafts((current) => ({
       ...current,
       [productId]: {
         secondary: current[productId].secondary,
-        closing: current[productId].closing,
         notes: current[productId].notes,
         [key]: value,
       },
@@ -92,7 +95,7 @@ export default function SecondarySalesClient({
   }
 
   async function saveRow(row: Row): Promise<void> {
-    const draft = drafts[row.productId] ?? { secondary: '0', closing: '0', notes: '' };
+    const draft = drafts[row.productId] ?? { secondary: '', notes: '' };
     setSavingProductId(row.productId);
     setError('');
     setMessage('');
@@ -101,8 +104,7 @@ export default function SecondarySalesClient({
         stockistId: dashboard.selectedStockistId ?? '',
         productId: row.productId,
         periodMonth: dashboard.periodMonth,
-        secondaryQuantity: Number(draft.secondary || 0),
-        closingQuantity: Number(draft.closing || 0),
+        secondaryPaise: rupeesToPaise(draft.secondary),
         notes: draft.notes,
       });
       setDashboard(next);
@@ -189,27 +191,10 @@ export default function SecondarySalesClient({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label="Primary sales"
-          quantity={dashboard.totals.primaryQuantity}
-          amount={dashboard.totals.primaryPaise}
-        />
-        <Metric
-          label="Secondary sales"
-          quantity={dashboard.totals.secondaryQuantity}
-          amount={dashboard.totals.secondaryPaise}
-        />
-        <Metric
-          label="Closing stock"
-          quantity={dashboard.totals.closingQuantity}
-          amount={dashboard.totals.closingPaise}
-        />
-        <Metric
-          label="Variance"
-          quantity={dashboard.totals.balanceQuantity}
-          amount={dashboard.totals.balancePaise}
-        />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Metric label="Primary sales from Parshlo" amount={dashboard.totals.primaryPaise} />
+        <Metric label="Secondary sales reported" amount={dashboard.totals.secondaryPaise} />
+        <Metric label="Remaining stock value" amount={dashboard.totals.balancePaise} />
       </div>
 
       {dashboard.canManageEditors ? (
@@ -350,25 +335,24 @@ export default function SecondarySalesClient({
           <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
-            sales and closing stock are entered by approved editors.
+            sales are manually entered from each stockist&apos;s month-end statement.
           </p>
         </div>
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Stockist</th>
-                <th className="px-4 py-3 text-right">Primary value</th>
-                <th className="px-4 py-3 text-right">Secondary value</th>
-                <th className="px-4 py-3 text-right">Closing value</th>
-                <th className="px-4 py-3 text-right">Variance value</th>
+                <th className="px-4 py-3 text-right">Primary sales</th>
+                <th className="px-4 py-3 text-right">Secondary sales</th>
+                <th className="px-4 py-3 text-right">Remaining stock value</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {dashboard.stockistAnalysisRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-muted-foreground px-4 py-10 text-center">
+                  <td colSpan={5} className="text-muted-foreground px-4 py-10 text-center">
                     No stockists tracked yet.
                   </td>
                 </tr>
@@ -383,7 +367,6 @@ export default function SecondarySalesClient({
                     </td>
                     <AmountCell amount={row.primaryPaise} />
                     <AmountCell amount={row.secondaryPaise} />
-                    <AmountCell amount={row.closingPaise} />
                     <AmountCell amount={row.balancePaise} />
                     <td className="px-4 py-3 text-right">
                       <a
@@ -408,7 +391,9 @@ export default function SecondarySalesClient({
               {dashboard.selectedStockistName ?? 'Stockist'} · {dashboard.periodMonth}
             </h2>
             <p className="text-muted-foreground mt-1 text-sm">
-              {dashboard.canEdit ? 'Editable secondary sales register.' : 'Read-only view.'}
+              {dashboard.canEdit
+                ? 'Enter month-end secondary sales values reported by this stockist.'
+                : 'Read-only view.'}
             </p>
           </div>
           <label className="border-input bg-background flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm sm:w-80">
@@ -422,14 +407,13 @@ export default function SecondarySalesClient({
           </label>
         </div>
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3 text-right">Primary from Parshlo</th>
-                <th className="px-4 py-3 text-right">Secondary qty</th>
-                <th className="px-4 py-3 text-right">Closing qty</th>
-                <th className="px-4 py-3 text-right">Variance value</th>
+                <th className="px-4 py-3 text-right">Secondary sales reported</th>
+                <th className="px-4 py-3 text-right">Remaining stock value</th>
                 <th className="px-4 py-3">Notes</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
@@ -437,15 +421,14 @@ export default function SecondarySalesClient({
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-muted-foreground px-4 py-10 text-center">
+                  <td colSpan={6} className="text-muted-foreground px-4 py-10 text-center">
                     No matching products.
                   </td>
                 </tr>
               ) : (
                 visibleRows.map((row) => {
                   const draft = drafts[row.productId] ?? {
-                    secondary: String(row.secondaryQuantity),
-                    closing: String(row.closingQuantity),
+                    secondary: formatRupeesInput(row.secondaryPaise),
                     notes: row.notes ?? '',
                   };
                   return (
@@ -454,34 +437,15 @@ export default function SecondarySalesClient({
                         <p className="break-words font-medium">{row.productName}</p>
                         <p className="text-muted-foreground text-xs">{row.packaging}</p>
                       </td>
-                      <QuantityAmountCell
-                        quantity={row.primaryQuantity}
-                        amount={row.primaryPaise}
-                      />
+                      <AmountCell amount={row.primaryPaise} />
                       <td className="px-4 py-3 text-right">
-                        <QuantityInput
+                        <AmountInput
                           disabled={!dashboard.canEdit}
                           value={draft.secondary}
                           onChange={(value) => updateDraft(row.productId, 'secondary', value)}
                         />
-                        <p className="text-muted-foreground mt-1 font-mono text-xs">
-                          {formatINR(row.secondaryPaise)}
-                        </p>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <QuantityInput
-                          disabled={!dashboard.canEdit}
-                          value={draft.closing}
-                          onChange={(value) => updateDraft(row.productId, 'closing', value)}
-                        />
-                        <p className="text-muted-foreground mt-1 font-mono text-xs">
-                          {formatINR(row.closingPaise)}
-                        </p>
-                      </td>
-                      <QuantityAmountCell
-                        quantity={row.balanceQuantity}
-                        amount={row.balancePaise}
-                      />
+                      <AmountCell amount={row.balancePaise} />
                       <td className="px-4 py-3">
                         <input
                           disabled={!dashboard.canEdit}
@@ -522,36 +486,12 @@ export default function SecondarySalesClient({
   );
 }
 
-function Metric({
-  label,
-  quantity,
-  amount,
-}: {
-  label: string;
-  quantity: number;
-  amount: number;
-}): JSX.Element {
+function Metric({ label, amount }: { label: string; amount: number }): JSX.Element {
   return (
     <div className="bg-card rounded-lg border p-5">
       <p className="text-muted-foreground text-xs uppercase tracking-wider">{label}</p>
       <p className="font-display mt-1 text-2xl font-semibold">{formatINR(amount)}</p>
-      <p className="text-muted-foreground mt-1 font-mono text-sm">{quantity} strips/bottles</p>
     </div>
-  );
-}
-
-function QuantityAmountCell({
-  quantity,
-  amount,
-}: {
-  quantity: number;
-  amount: number;
-}): JSX.Element {
-  return (
-    <td className="px-4 py-3 text-right">
-      <p className="font-mono font-medium">{formatINR(amount)}</p>
-      <p className="text-muted-foreground mt-1 font-mono text-xs">{quantity} strips/bottles</p>
-    </td>
   );
 }
 
@@ -563,7 +503,7 @@ function AmountCell({ amount }: { amount: number }): JSX.Element {
   );
 }
 
-function QuantityInput({
+function AmountInput({
   value,
   disabled,
   onChange,
@@ -577,11 +517,12 @@ function QuantityInput({
       disabled={disabled}
       type="number"
       min={0}
-      step={1}
-      inputMode="numeric"
+      step="0.01"
+      inputMode="decimal"
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="border-input bg-background h-9 w-24 rounded-md border px-3 text-right font-mono text-sm disabled:opacity-70"
+      placeholder="0.00"
+      className="border-input bg-background h-9 w-32 rounded-md border px-3 text-right font-mono text-sm disabled:opacity-70"
     />
   );
 }

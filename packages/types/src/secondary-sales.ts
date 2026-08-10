@@ -97,8 +97,7 @@ export const UpsertSecondarySalesEntryInputSchema = z.object({
   stockistId: EntityId,
   productId: EntityId,
   periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
-  secondaryQuantity: z.coerce.number().int().min(0),
-  closingQuantity: z.coerce.number().int().min(0),
+  secondaryPaise: z.coerce.number().int().min(0),
   notes: z.string().trim().max(500).optional().nullable(),
 });
 export type UpsertSecondarySalesEntryInput = z.infer<typeof UpsertSecondarySalesEntryInputSchema>;

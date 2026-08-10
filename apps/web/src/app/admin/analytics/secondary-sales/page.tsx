@@ -90,8 +90,8 @@ export default async function SecondarySalesPage({
             Secondary sales
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Track stockist primary stock received from Parshlo against secondary sale and closing
-            stock.
+            Compare stockist primary sales from Parshlo orders against the month-end secondary sales
+            values they report after selling onward to chemists.
           </p>
         </div>
         <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-lg">
