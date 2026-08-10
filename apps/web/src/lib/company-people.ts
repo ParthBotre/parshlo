@@ -16,7 +16,7 @@ export interface CompanyPerson {
 export const companyPeople: readonly CompanyPerson[] = [
   {
     name: 'Hemant Botre',
-    designation: 'Managing Director',
+    designation: 'CRM HEAD',
     photoSrc: '/people/hemant-botre.webp',
   },
   // { name: 'Priya Kulkarni', designation: 'Chief Financial Officer' },
