@@ -1750,8 +1750,9 @@ export class AdminService {
             ? 'APPOINTMENT LETTER ACKNOWLEDGEMENT'
             : 'APPOINTMENT LETTER';
     const fileName = existingDocument?.fileName ?? `${referenceNumber.replace(/[/-]/g, '_')}.pdf`;
+    const documentDate = input.documentDate ? parseDateOnly(input.documentDate) : null;
     const lines = (() => {
-      if (input.type === 'OFFER_LETTER') return this.offerLetterLines(record);
+      if (input.type === 'OFFER_LETTER') return this.offerLetterLines(record, documentDate);
       if (input.type === 'INCREMENT_LETTER') {
         return this.incrementLetterLines(
           record,
@@ -1761,9 +1762,9 @@ export class AdminService {
         );
       }
       if (input.type === 'APPOINTMENT_ACKNOWLEDGEMENT') {
-        return this.appointmentAcknowledgementLines(record, referenceNumber);
+        return this.appointmentAcknowledgementLines(record, referenceNumber, documentDate);
       }
-      return this.appointmentLetterLines(record, referenceNumber);
+      return this.appointmentLetterLines(record, referenceNumber, documentDate);
     })();
     const bytes = await this.renderHrPdf(title, lines);
 
@@ -1782,6 +1783,7 @@ export class AdminService {
             roleTitle: record.roleTitle,
             incrementAmountPaise: input.incrementAmountPaise ?? undefined,
             effectiveDate: input.effectiveDate ?? undefined,
+            documentDate: input.documentDate ?? undefined,
             generatedOn: formatDateOnly(new Date()),
             delivery,
           },
@@ -2623,11 +2625,12 @@ export class AdminService {
 
   private offerLetterLines(
     record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
+    documentDate?: Date | null,
   ): string[] {
     const annualGross = toNumber(record.grossMonthlyPaise) * 12;
     const displayName = this.hrDisplayName(record);
     return [
-      `Date: ${formatDateDisplay(record.offerDate ?? new Date())}`,
+      `Date: ${formatDateDisplay(documentDate ?? record.offerDate ?? new Date())}`,
       'Place: Pune, MH, INDIA',
       '',
       displayName,
@@ -2656,6 +2659,7 @@ export class AdminService {
   private appointmentLetterLines(
     record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
     referenceNumber: string,
+    documentDate?: Date | null,
   ): string[] {
     const displayName = this.hrDisplayName(record);
     const terms = [
@@ -2677,7 +2681,7 @@ export class AdminService {
     ];
     return [
       `Ref No: ${referenceNumber}`,
-      `Date: ${formatDateDisplay(record.appointmentDate ?? new Date())}`,
+      `Date: ${formatDateDisplay(documentDate ?? record.appointmentDate ?? new Date())}`,
       '',
       displayName,
       record.address,
@@ -2719,10 +2723,11 @@ export class AdminService {
   private appointmentAcknowledgementLines(
     record: Awaited<ReturnType<AdminService['getHrRecordOrThrow']>>,
     referenceNumber: string,
+    documentDate?: Date | null,
   ): string[] {
     const displayName = this.hrDisplayName(record);
     return [
-      ...this.appointmentLetterLines(record, referenceNumber),
+      ...this.appointmentLetterLines(record, referenceNumber, documentDate),
       '',
       '',
       'ACKNOWLEDGEMENT',

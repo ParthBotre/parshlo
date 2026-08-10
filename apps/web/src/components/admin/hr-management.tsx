@@ -14,7 +14,7 @@ import {
   type HrExpenseSlip,
   type HrSalarySlip,
 } from '@/lib/api/admin';
-import { formatDateIst } from '@/lib/format-datetime';
+import { dateInputKeyIst, formatDateIst } from '@/lib/format-datetime';
 import { formatINR } from '@/lib/utils';
 
 const SELECT_CLASS =
@@ -62,6 +62,7 @@ interface EmailDocumentDraft {
   bccEmails: string;
   incrementAmountPaise?: number;
   effectiveDate?: string;
+  documentDate?: string;
 }
 
 interface HrRecordFormState {
@@ -236,6 +237,42 @@ function labelForLetterType(type: HrLetterType): string {
   if (type === 'APPOINTMENT_ACKNOWLEDGEMENT') return 'appointment acknowledgement';
   if (type === 'INCREMENT_LETTER') return 'increment letter';
   return 'appointment letter';
+}
+
+function documentDateLabel(type: HrLetterType): string {
+  if (type === 'OFFER_LETTER') return 'Offer letter date';
+  if (type === 'APPOINTMENT_ACKNOWLEDGEMENT') return 'Appointment acknowledgement date';
+  return 'Appointment letter date';
+}
+
+function documentDateDefault(record: HrEmployeeRecord, type: HrLetterType): string {
+  if (type === 'OFFER_LETTER') return dateInputValue(record.offerDate) || dateInputKeyIst();
+  if (type === 'APPOINTMENT_LETTER' || type === 'APPOINTMENT_ACKNOWLEDGEMENT') {
+    return dateInputValue(record.appointmentDate) || dateInputKeyIst();
+  }
+  return '';
+}
+
+function requiresDocumentDate(type: HrLetterType): boolean {
+  return (
+    type === 'OFFER_LETTER' ||
+    type === 'APPOINTMENT_LETTER' ||
+    type === 'APPOINTMENT_ACKNOWLEDGEMENT'
+  );
+}
+
+function promptDocumentDate(
+  record: HrEmployeeRecord,
+  type: HrLetterType,
+): string | null | undefined {
+  if (!requiresDocumentDate(type)) return undefined;
+  const value = window.prompt(documentDateLabel(type), documentDateDefault(record, type));
+  if (value === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    window.alert('Enter the date in YYYY-MM-DD format.');
+    return null;
+  }
+  return value;
 }
 
 function salaryYearOptions(): string[] {
@@ -668,7 +705,7 @@ export function HrManagement({
   async function fetchDocumentPdf(
     employeeId: string,
     type: HrLetterType,
-    options?: { incrementAmountPaise?: number; effectiveDate?: string },
+    options?: { incrementAmountPaise?: number; effectiveDate?: string; documentDate?: string },
   ): Promise<{ fileName: string; contentBase64: string }> {
     return submitJson<{ fileName: string; contentBase64: string }>(
       `/api/admin/hr/records/${encodeURIComponent(employeeId)}/documents`,
@@ -678,15 +715,19 @@ export function HrManagement({
     );
   }
 
-  async function generateDocument(employeeId: string, type: HrLetterType) {
+  async function generateDocument(record: HrEmployeeRecord, type: HrLetterType) {
     try {
-      let options: { incrementAmountPaise?: number; effectiveDate?: string } | undefined;
+      const documentDate = promptDocumentDate(record, type);
+      if (documentDate === null) return;
+      let options:
+        | { incrementAmountPaise?: number; effectiveDate?: string; documentDate?: string }
+        | undefined = documentDate ? { documentDate } : undefined;
       if (type === 'INCREMENT_LETTER') {
         const details = promptIncrementDetails();
         if (!details) return;
         options = details;
       }
-      const result = await fetchDocumentPdf(employeeId, type, options);
+      const result = await fetchDocumentPdf(record.employeeId, type, options);
       downloadBase64Pdf(result.fileName, result.contentBase64);
       setMessage('PDF generated and downloaded.');
     } catch (err) {
@@ -695,7 +736,11 @@ export function HrManagement({
   }
 
   function startEmailDocument(record: HrEmployeeRecord, type: HrLetterType): void {
-    let options: { incrementAmountPaise?: number; effectiveDate?: string } | undefined;
+    let options:
+      | { incrementAmountPaise?: number; effectiveDate?: string; documentDate?: string }
+      | undefined = requiresDocumentDate(type)
+      ? { documentDate: documentDateDefault(record, type) }
+      : undefined;
     if (type === 'INCREMENT_LETTER') {
       const details = promptIncrementDetails();
       if (!details) return;
@@ -719,6 +764,7 @@ export function HrManagement({
       const result = await fetchDocumentPdf(emailDraft.employeeId, emailDraft.type, {
         incrementAmountPaise: emailDraft.incrementAmountPaise,
         effectiveDate: emailDraft.effectiveDate,
+        documentDate: emailDraft.documentDate,
       });
       previewBase64Pdf(result.contentBase64);
       setMessage(`Preview opened for ${labelForLetterType(emailDraft.type)}.`);
@@ -737,6 +783,7 @@ export function HrManagement({
           type: emailDraft.type,
           incrementAmountPaise: emailDraft.incrementAmountPaise,
           effectiveDate: emailDraft.effectiveDate,
+          documentDate: emailDraft.documentDate,
           recipientEmail: emailDraft.recipientEmail,
           ccEmails: parseEmailList(emailDraft.ccEmails),
           bccEmails: parseEmailList(emailDraft.bccEmails),
@@ -949,6 +996,19 @@ export function HrManagement({
               <Field label="Required CC">
                 <Input value={REQUIRED_HR_DOCUMENT_CC} disabled />
               </Field>
+              {requiresDocumentDate(emailDraft.type) ? (
+                <Field label={documentDateLabel(emailDraft.type)}>
+                  <Input
+                    type="date"
+                    value={emailDraft.documentDate ?? dateInputKeyIst()}
+                    onChange={(event) =>
+                      setEmailDraft((current) =>
+                        current ? { ...current, documentDate: event.target.value } : current,
+                      )
+                    }
+                  />
+                </Field>
+              ) : null}
               <Field label="Additional CC">
                 <Textarea
                   rows={2}
@@ -1957,7 +2017,7 @@ export function HrManagement({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void generateDocument(record.employeeId, 'OFFER_LETTER')}
+                  onClick={() => void generateDocument(record, 'OFFER_LETTER')}
                 >
                   Offer
                 </Button>
@@ -1971,16 +2031,14 @@ export function HrManagement({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void generateDocument(record.employeeId, 'APPOINTMENT_LETTER')}
+                  onClick={() => void generateDocument(record, 'APPOINTMENT_LETTER')}
                 >
                   Appointment
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    void generateDocument(record.employeeId, 'APPOINTMENT_ACKNOWLEDGEMENT')
-                  }
+                  onClick={() => void generateDocument(record, 'APPOINTMENT_ACKNOWLEDGEMENT')}
                 >
                   Appointment Ack
                 </Button>
@@ -1994,7 +2052,7 @@ export function HrManagement({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void generateDocument(record.employeeId, 'INCREMENT_LETTER')}
+                  onClick={() => void generateDocument(record, 'INCREMENT_LETTER')}
                 >
                   Increment
                 </Button>

@@ -131,6 +131,7 @@ export const GenerateHrDocumentInputSchema = z.object({
   ]),
   incrementAmountPaise: HrMoneyPaise.optional().nullable(),
   effectiveDate: LeaveDateString.optional().nullable(),
+  documentDate: LeaveDateString.optional().nullable(),
 });
 export type GenerateHrDocumentInput = z.infer<typeof GenerateHrDocumentInputSchema>;
 

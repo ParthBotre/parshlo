@@ -15,6 +15,7 @@ function adminNav(roles: string[]): NavItem[] {
     { href: '/admin/kyc', label: 'KYC Queue', icon: 'kyc' },
     { href: '/admin/orders', label: 'Orders', icon: 'orders' },
     { href: '/admin/place-order', label: 'Place order', icon: 'place-order' },
+    { href: '/admin/analytics/secondary-sales', label: 'Secondary Sales', icon: 'secondary-sales' },
     { href: '/dashboard/reports', label: 'Work Reports', icon: 'reports' },
     { href: '/dashboard/salary-slips', label: 'Salary Slips', icon: 'salary' },
     { href: '/dashboard/expenses', label: 'My Expenses', icon: 'expenses' },

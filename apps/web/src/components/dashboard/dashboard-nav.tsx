@@ -2,6 +2,7 @@
 
 import {
   BadgeCheck,
+  BarChart3,
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
@@ -42,7 +43,8 @@ export type NavIconKey =
   | 'salary'
   | 'expenses'
   | 'reports'
-  | 'holidays';
+  | 'holidays'
+  | 'secondary-sales';
 
 const ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -59,6 +61,7 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   expenses: ReceiptText,
   reports: ClipboardList,
   holidays: CalendarDays,
+  'secondary-sales': BarChart3,
 };
 
 export interface NavItem {
@@ -70,12 +73,14 @@ export interface NavItem {
 export function DashboardNav({ items }: { items: readonly NavItem[] }): JSX.Element {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const activeItem = items.find(
-    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-  );
+  const isActive = (item: NavItem): boolean =>
+    item.href === '/admin'
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const activeItem = items.find(isActive);
   const renderLink = (item: NavItem, mode: 'mobile' | 'desktop'): JSX.Element => {
     const Icon = ICONS[item.icon];
-    const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const active = isActive(item);
     return (
       <Link
         key={`${mode}-${item.href}`}

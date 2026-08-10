@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 import { type ReactNode } from 'react';
@@ -145,13 +145,6 @@ export default async function GrossSalesByCityPage({
             Gross sales, product-wise sales, and city-wise sales for the selected period.
           </p>
         </div>
-        <Link
-          href="/admin/analytics/secondary-sales"
-          className="border-input bg-background hover:bg-secondary inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium"
-        >
-          <BarChart3 className="h-4 w-4" />
-          Secondary sales
-        </Link>
       </div>
 
       <Card className="min-w-0 overflow-hidden">

@@ -18,33 +18,59 @@ export const metadata: Metadata = {
 interface PageProps {
   searchParams: Promise<{
     month?: string;
+    year?: string;
     stockistId?: string;
   }>;
 }
+
+const MONTH_OPTIONS = [
+  ['01', 'January'],
+  ['02', 'February'],
+  ['03', 'March'],
+  ['04', 'April'],
+  ['05', 'May'],
+  ['06', 'June'],
+  ['07', 'July'],
+  ['08', 'August'],
+  ['09', 'September'],
+  ['10', 'October'],
+  ['11', 'November'],
+  ['12', 'December'],
+] as const;
 
 function defaultMonth(): string {
   return dateInputKeyIst().slice(0, 7);
 }
 
-function normalizeMonth(value: string | undefined): string {
-  return value && /^\d{4}-\d{2}$/.test(value) ? value : defaultMonth();
+function normalizePeriod(month: string | undefined, year: string | undefined): string {
+  if (month && /^\d{4}-\d{2}$/.test(month)) return month;
+  if (month && year && /^\d{2}$/.test(month) && /^\d{4}$/.test(year)) {
+    return `${year}-${month}`;
+  }
+  return defaultMonth();
 }
 
-function monthOptions(): { value: string; label: string }[] {
+function yearOptions(): string[] {
   const [yearRaw, monthRaw] = defaultMonth().split('-');
   const startYear = Number(yearRaw);
   const startMonth = Number(monthRaw);
-  const formatter = new Intl.DateTimeFormat('en-IN', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Kolkata',
-  });
 
-  return Array.from({ length: 36 }, (_, index) => {
-    const date = new Date(Date.UTC(startYear, startMonth - 1 - index, 1));
-    const value = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-    return { value, label: formatter.format(date) };
-  });
+  return Array.from(
+    new Set(
+      Array.from({ length: 36 }, (_, index) => {
+        const date = new Date(Date.UTC(startYear, startMonth - 1 - index, 1));
+        return String(date.getUTCFullYear());
+      }),
+    ),
+  );
+}
+
+function monthFromPeriod(periodMonth: string): string {
+  return periodMonth.slice(5, 7);
+}
+
+function yearFromPeriod(periodMonth: string): string {
+  return periodMonth.slice(0, 4);
 }
 
 export default async function SecondarySalesPage({
@@ -55,16 +81,16 @@ export default async function SecondarySalesPage({
     return <></>;
   }
 
-  const { month: rawMonth, stockistId } = await searchParams;
-  const month = normalizeMonth(rawMonth);
-  const months = monthOptions();
+  const { month: rawMonth, year: rawYear, stockistId } = await searchParams;
+  const periodMonth = normalizePeriod(rawMonth, rawYear);
+  const years = yearOptions();
 
   let dashboard: Awaited<ReturnType<typeof getSecondarySalesDashboard>> | null = null;
   let loadError: string | null = null;
   try {
     dashboard = await getSecondarySalesDashboard(
       session.accessToken,
-      { periodMonth: month, stockistId },
+      { periodMonth, stockistId },
       { next: { revalidate: 0 } },
     );
   } catch (err) {
@@ -106,12 +132,26 @@ export default async function SecondarySalesPage({
               Month
               <select
                 name="month"
-                defaultValue={dashboard?.periodMonth ?? month}
-                className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-52"
+                defaultValue={monthFromPeriod(dashboard?.periodMonth ?? periodMonth)}
+                className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-44"
               >
-                {months.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                {MONTH_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-muted-foreground grid gap-1 text-xs font-medium">
+              Year
+              <select
+                name="year"
+                defaultValue={yearFromPeriod(dashboard?.periodMonth ?? periodMonth)}
+                className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-32"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
                   </option>
                 ))}
               </select>

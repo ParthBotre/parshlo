@@ -65,7 +65,7 @@ export default function SecondarySalesClient({
   const [query, setQuery] = useState('');
   const [editorUserId, setEditorUserId] = useState('');
   const [stockistBuyerId, setStockistBuyerId] = useState('');
-  const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
   const [loadingStockist, setLoadingStockist] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -83,37 +83,81 @@ export default function SecondarySalesClient({
     (employee) => !editorIds.has(employee.id),
   );
 
-  function updateDraft(productId: string, key: 'secondary' | 'notes', value: string): void {
-    setDrafts((current) => ({
-      ...current,
-      [productId]: {
-        secondary: current[productId].secondary,
-        notes: current[productId].notes,
-        [key]: value,
-      },
-    }));
+  function draftFor(row: Row): { secondary: string; notes: string } {
+    return drafts[row.productId] ?? { secondary: formatRupeesInput(row.secondaryPaise), notes: '' };
   }
 
-  async function saveRow(row: Row): Promise<void> {
-    const draft = drafts[row.productId] ?? { secondary: '', notes: '' };
-    setSavingProductId(row.productId);
+  function draftSecondaryPaise(row: Row): number {
+    return rupeesToPaise(draftFor(row).secondary);
+  }
+
+  function rowIsDirty(row: Row): boolean {
+    const draft = draftFor(row);
+    return (
+      draftSecondaryPaise(row) !== row.secondaryPaise || draft.notes.trim() !== (row.notes ?? '')
+    );
+  }
+
+  const dirtyRows = dashboard.rows.filter(rowIsDirty);
+  const visibleTotals = visibleRows.reduce(
+    (total, row) => {
+      const secondaryPaise = draftSecondaryPaise(row);
+      return {
+        primaryPaise: total.primaryPaise + row.primaryPaise,
+        secondaryPaise: total.secondaryPaise + secondaryPaise,
+        remainingPaise: total.remainingPaise + row.primaryPaise - secondaryPaise,
+      };
+    },
+    { primaryPaise: 0, secondaryPaise: 0, remainingPaise: 0 },
+  );
+
+  function stockistLink(stockistId: string): string {
+    const [year, month] = dashboard.periodMonth.split('-');
+    return `/admin/analytics/secondary-sales?year=${year}&month=${month}&stockistId=${stockistId}`;
+  }
+
+  function updateDraft(productId: string, key: 'secondary' | 'notes', value: string): void {
+    setDrafts((current) => {
+      const existing = current[productId] ?? { secondary: '', notes: '' };
+      return {
+        ...current,
+        [productId]: { ...existing, [key]: value },
+      };
+    });
+  }
+
+  async function saveChanges(): Promise<void> {
+    if (dirtyRows.length === 0) {
+      setMessage('No secondary sales changes to save.');
+      return;
+    }
+    setSavingAll(true);
     setError('');
     setMessage('');
     try {
-      const next = await upsertSecondarySalesEntry(accessToken, {
-        stockistId: dashboard.selectedStockistId ?? '',
-        productId: row.productId,
+      await Promise.all(
+        dirtyRows.map((row) => {
+          const draft = draftFor(row);
+          return upsertSecondarySalesEntry(accessToken, {
+            stockistId: dashboard.selectedStockistId ?? '',
+            productId: row.productId,
+            periodMonth: dashboard.periodMonth,
+            secondaryPaise: rupeesToPaise(draft.secondary),
+            notes: draft.notes,
+          });
+        }),
+      );
+      const next = await getSecondarySalesDashboard(accessToken, {
         periodMonth: dashboard.periodMonth,
-        secondaryPaise: rupeesToPaise(draft.secondary),
-        notes: draft.notes,
+        stockistId: dashboard.selectedStockistId ?? undefined,
       });
       setDashboard(next);
       setDrafts(initialDrafts(next.rows));
-      setMessage(`Saved ${row.productName}.`);
+      setMessage(`Saved secondary sales for ${dirtyRows.length} product(s).`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
-      setSavingProductId(null);
+      setSavingAll(false);
     }
   }
 
@@ -259,8 +303,8 @@ export default function SecondarySalesClient({
                 <Building2 className="h-4 w-4" /> Stockist secondary sales
               </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Select an existing stockist to view or enter monthly secondary sales. Add a new
-                approved stockist only when it is not already tracked.
+                Select a tracked stockist to enter monthly reported sales, or link a newly approved
+                stockist buyer from the Buyers menu.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -295,8 +339,8 @@ export default function SecondarySalesClient({
                   >
                     <option value="">
                       {dashboard.eligibleStockistBuyers.length === 0
-                        ? 'All approved stockists already added'
-                        : 'Choose approved stockist buyer'}
+                        ? 'No untracked approved STOCKIST buyers'
+                        : 'Choose untracked STOCKIST buyer'}
                     </option>
                     {dashboard.eligibleStockistBuyers.map((buyer) => (
                       <option key={buyer.userId} value={buyer.userId}>
@@ -310,9 +354,13 @@ export default function SecondarySalesClient({
                     disabled={!stockistBuyerId}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <UserPlus className="h-4 w-4" /> Add
+                    <UserPlus className="h-4 w-4" /> Link
                   </button>
                 </div>
+                <p className="text-muted-foreground text-xs">
+                  This list only shows approved buyers marked STOCKIST that are not already tracked
+                  here. Add or fix the buyer in Buyers first.
+                </p>
               </label>
             </div>
           </div>
@@ -338,9 +386,9 @@ export default function SecondarySalesClient({
             sales are manually entered from each stockist&apos;s month-end statement.
           </p>
         </div>
-        <div className="w-full overflow-x-auto">
+        <div className="max-h-[360px] w-full overflow-auto">
           <table className="w-full min-w-[680px] text-sm">
-            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+            <thead className="bg-secondary text-muted-foreground sticky top-0 z-10 text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Stockist</th>
                 <th className="px-4 py-3 text-right">Primary sales</th>
@@ -370,7 +418,7 @@ export default function SecondarySalesClient({
                     <AmountCell amount={row.balancePaise} />
                     <td className="px-4 py-3 text-right">
                       <a
-                        href={`/admin/analytics/secondary-sales?month=${dashboard.periodMonth}&stockistId=${row.stockistId}`}
+                        href={stockistLink(row.stockistId)}
                         className="text-primary text-sm font-medium hover:underline"
                       >
                         Open
@@ -396,32 +444,46 @@ export default function SecondarySalesClient({
                 : 'Read-only view.'}
             </p>
           </div>
-          <label className="border-input bg-background flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm sm:w-80">
-            <Search className="text-muted-foreground h-4 w-4" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search product"
-              className="min-w-0 flex-1 bg-transparent outline-none"
-            />
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <label className="border-input bg-background flex h-9 w-full items-center gap-2 rounded-md border px-3 text-sm sm:w-80">
+              <Search className="text-muted-foreground h-4 w-4" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search product"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+              />
+            </label>
+            {dashboard.canEdit ? (
+              <button
+                type="button"
+                onClick={() => void saveChanges()}
+                disabled={savingAll || dirtyRows.length === 0}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" />
+                {savingAll
+                  ? 'Saving...'
+                  : `Save changes${dirtyRows.length ? ` (${dirtyRows.length})` : ''}`}
+              </button>
+            ) : null}
+          </div>
         </div>
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm">
-            <thead className="bg-secondary/40 text-muted-foreground text-left text-xs uppercase tracking-wider">
+        <div className="max-h-[70vh] w-full overflow-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead className="bg-secondary text-muted-foreground sticky top-0 z-10 text-left text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3 text-right">Primary from Parshlo</th>
                 <th className="px-4 py-3 text-right">Secondary sales reported</th>
                 <th className="px-4 py-3 text-right">Remaining stock value</th>
                 <th className="px-4 py-3">Notes</th>
-                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-muted-foreground px-4 py-10 text-center">
+                  <td colSpan={5} className="text-muted-foreground px-4 py-10 text-center">
                     No matching products.
                   </td>
                 </tr>
@@ -431,6 +493,7 @@ export default function SecondarySalesClient({
                     secondary: formatRupeesInput(row.secondaryPaise),
                     notes: row.notes ?? '',
                   };
+                  const secondaryPaise = draftSecondaryPaise(row);
                   return (
                     <tr key={row.productId} className="border-t align-top">
                       <td className="max-w-[280px] px-4 py-3">
@@ -445,7 +508,7 @@ export default function SecondarySalesClient({
                           onChange={(value) => updateDraft(row.productId, 'secondary', value)}
                         />
                       </td>
-                      <AmountCell amount={row.balancePaise} />
+                      <AmountCell amount={row.primaryPaise - secondaryPaise} />
                       <td className="px-4 py-3">
                         <input
                           disabled={!dashboard.canEdit}
@@ -457,28 +520,28 @@ export default function SecondarySalesClient({
                           placeholder="Optional"
                         />
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        {dashboard.canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => void saveRow(row)}
-                            disabled={savingProductId === row.productId}
-                            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium disabled:cursor-wait disabled:opacity-60"
-                          >
-                            <Save className="h-4 w-4" />
-                            {savingProductId === row.productId ? 'Saving' : 'Save'}
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">
-                            {row.updatedByName ? `Updated by ${row.updatedByName}` : 'View only'}
-                          </span>
-                        )}
-                      </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
+            <tfoot className="bg-secondary sticky bottom-0 border-t text-sm font-semibold">
+              <tr>
+                <td className="px-4 py-3">Total</td>
+                <td className="px-4 py-3 text-right font-mono">
+                  {formatINR(visibleTotals.primaryPaise)}
+                </td>
+                <td className="px-4 py-3 text-right font-mono">
+                  {formatINR(visibleTotals.secondaryPaise)}
+                </td>
+                <td className="px-4 py-3 text-right font-mono">
+                  {formatINR(visibleTotals.remainingPaise)}
+                </td>
+                <td className="text-muted-foreground px-4 py-3 text-xs font-normal">
+                  Totals update as you type.
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </section>
