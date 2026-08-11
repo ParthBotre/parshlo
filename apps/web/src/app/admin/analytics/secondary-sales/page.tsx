@@ -156,20 +156,9 @@ export default async function SecondarySalesPage({
                 ))}
               </select>
             </label>
-            <label className="text-muted-foreground grid gap-1 text-xs font-medium">
-              Stockist
-              <select
-                name="stockistId"
-                defaultValue={dashboard?.selectedStockistId ?? ''}
-                className="border-input bg-background text-foreground h-9 w-full rounded-md border px-3 text-sm sm:w-72"
-              >
-                {(dashboard?.stockists ?? []).map((stockist) => (
-                  <option key={stockist.id} value={stockist.id}>
-                    {stockist.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {dashboard?.selectedStockistId ? (
+              <input type="hidden" name="stockistId" value={dashboard.selectedStockistId} />
+            ) : null}
             <button
               type="submit"
               className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 rounded-md px-4 text-sm font-medium"
