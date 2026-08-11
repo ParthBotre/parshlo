@@ -67,6 +67,7 @@ export default function SecondarySalesClient({
   const [stockistBuyerId, setStockistBuyerId] = useState('');
   const [savingAll, setSavingAll] = useState(false);
   const [loadingStockist, setLoadingStockist] = useState(false);
+  const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -110,11 +111,6 @@ export default function SecondarySalesClient({
     },
     { primaryPaise: 0, secondaryPaise: 0, remainingPaise: 0 },
   );
-
-  function stockistLink(stockistId: string): string {
-    const [year, month] = dashboard.periodMonth.split('-');
-    return `/admin/analytics/secondary-sales?year=${year}&month=${month}&stockistId=${stockistId}`;
-  }
 
   function updateDraft(productId: string, key: 'secondary' | 'notes', value: string): void {
     setDrafts((current) => {
@@ -379,57 +375,81 @@ export default function SecondarySalesClient({
       ) : null}
 
       <section className="bg-card min-w-0 overflow-hidden rounded-lg border">
-        <div className="border-b p-5">
-          <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
-            sales are manually entered from each stockist&apos;s month-end statement.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">
+          <div>
+            <h2 className="font-display text-base font-semibold">Stockist analysis</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Primary sales are pulled from Parshlo orders for tracked STOCKIST buyers. Secondary
+              sales are manually entered from each stockist&apos;s month-end statement. Click a
+              stockist to work on it.
+            </p>
+          </div>
+          {dashboard.selectedStockistId ? (
+            <button
+              type="button"
+              onClick={() => setAnalysisExpanded((current) => !current)}
+              className="border-input bg-background hover:bg-secondary inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium"
+            >
+              {analysisExpanded ? 'Hide all stockists' : 'Show all stockists'}
+            </button>
+          ) : null}
         </div>
-        <div className="max-h-[360px] w-full overflow-auto">
-          <table className="w-full min-w-[680px] text-sm">
-            <thead className="bg-secondary text-muted-foreground sticky top-0 z-10 text-left text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3">Stockist</th>
-                <th className="px-4 py-3 text-right">Primary sales</th>
-                <th className="px-4 py-3 text-right">Secondary sales</th>
-                <th className="px-4 py-3 text-right">Remaining stock value</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboard.stockistAnalysisRows.length === 0 ? (
+        {!dashboard.selectedStockistId || analysisExpanded ? (
+          <div className="max-h-[360px] w-full overflow-auto">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead className="bg-secondary text-muted-foreground sticky top-0 z-10 text-left text-xs uppercase tracking-wider">
                 <tr>
-                  <td colSpan={5} className="text-muted-foreground px-4 py-10 text-center">
-                    No stockists tracked yet.
-                  </td>
+                  <th className="px-4 py-3">Stockist</th>
+                  <th className="px-4 py-3 text-right">Primary sales</th>
+                  <th className="px-4 py-3 text-right">Secondary sales</th>
+                  <th className="px-4 py-3 text-right">Remaining stock value</th>
                 </tr>
-              ) : (
-                dashboard.stockistAnalysisRows.map((row) => (
-                  <tr key={row.stockistId} className="border-t">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{row.stockistName}</p>
-                      {row.buyerBusinessName ? (
-                        <p className="text-muted-foreground text-xs">{row.buyerBusinessName}</p>
-                      ) : null}
-                    </td>
-                    <AmountCell amount={row.primaryPaise} />
-                    <AmountCell amount={row.secondaryPaise} />
-                    <AmountCell amount={row.balancePaise} />
-                    <td className="px-4 py-3 text-right">
-                      <a
-                        href={stockistLink(row.stockistId)}
-                        className="text-primary text-sm font-medium hover:underline"
-                      >
-                        Open
-                      </a>
+              </thead>
+              <tbody>
+                {dashboard.stockistAnalysisRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-muted-foreground px-4 py-10 text-center">
+                      No stockists tracked yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  dashboard.stockistAnalysisRows.map((row) => (
+                    <tr
+                      key={row.stockistId}
+                      className={`border-t ${
+                        row.stockistId === dashboard.selectedStockistId ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAnalysisExpanded(false);
+                            void selectTrackedStockist(row.stockistId);
+                          }}
+                          disabled={loadingStockist}
+                          className="text-left disabled:opacity-70"
+                        >
+                          <span className="text-primary block font-medium hover:underline">
+                            {row.stockistName}
+                          </span>
+                          {row.buyerBusinessName ? (
+                            <span className="text-muted-foreground block text-xs">
+                              {row.buyerBusinessName}
+                            </span>
+                          ) : null}
+                        </button>
+                      </td>
+                      <AmountCell amount={row.primaryPaise} />
+                      <AmountCell amount={row.secondaryPaise} />
+                      <AmountCell amount={row.balancePaise} />
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </section>
 
       <section className="bg-card min-w-0 overflow-hidden rounded-lg border">
