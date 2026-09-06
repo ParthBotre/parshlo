@@ -9,7 +9,10 @@ sudo docker run --rm \
   parshlo-api:staging \
   -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
 
-echo "==> [2/3] Restarting parshlo-api container..."
+echo "==> [2/4] Building API container..."
+sudo docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
+
+echo "==> [3/4] Restarting parshlo-api container..."
 sudo docker rm -f parshlo-api 2>/dev/null || true
 sudo docker run -d \
   --name parshlo-api \
@@ -19,7 +22,7 @@ sudo docker run -d \
   -p 127.0.0.1:4000:4000 \
   parshlo-api:staging
 
-echo "==> [3/3] Verifying API health..."
+echo "==> [4/4] Verifying API health..."
 sleep 3
 curl -s http://127.0.0.1:4000/v1/health
 echo ""
