@@ -15,10 +15,12 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 ## 2. Transport & network
 
-- **HTTPS only** in production (HSTS preload).
+- **HTTPS only** in staging and production (HSTS preload).
+- **Origin TLS Integrity**: Staging backend on Oracle Cloud terminates TLS using a dedicated 15-year Cloudflare Origin CA certificate mounted in Caddy (`/etc/ssl/caddy/`), enforcing Cloudflare **Full (strict)** SSL without insecure fallback or self-signed degradation.
+- **Edge Zero Trust**: `staging.parshlo.com` is protected by Cloudflare Access OTP.
 - **CSP** restricts script/image sources (`next.config.mjs` headers + `@fastify/helmet`).
 - **CORS** allowlist configured per environment (`CORS_ALLOWED_ORIGINS`).
-- **WAF / DDoS** at CDN tier (Cloudflare recommended).
+- **WAF / DDoS** at CDN tier (Cloudflare proxy).
 
 ## 3. Input handling
 
@@ -43,7 +45,7 @@ This document captures the controls baked into Parshlo and the STRIDE-style thre
 
 - All env vars validated at boot with Zod (`apps/api/src/config/validation.ts`). Missing variables fail fast in CI.
 - `.env*` and `*.pem/*.key/*.cert` ignored via `.gitignore`.
-- Auth0, Sentry, database, email, and object-storage secrets belong in the deployment platform secret store — Vercel environment variables, the root-only droplet env file for staging, and a managed secrets service for production. They must never be committed.
+- Auth0, Sentry, database, email, and object-storage secrets belong in the deployment platform secret store — Vercel environment variables, the protected staging env file on the Oracle VM (`/opt/parshlo/api.staging.env`), and a managed secrets service for production. They must never be committed.
 
 ## 7. Rate limiting
 

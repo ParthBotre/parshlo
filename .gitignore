@@ -89,3 +89,9 @@ crash.log
 
 # Local pnpm bootstrap helpers (not for commit)
 .pnpm-alias
+
+# Backups and SQL dumps
+backups/
+backup*.sql
+dump*.sql
+!packages/db/prisma/migrations/**/*.sql

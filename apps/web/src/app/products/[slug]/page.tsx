@@ -66,6 +66,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
             <ProductImage
               slug={product.slug}
               alt={product.name}
+              imageUrls={product.imageUrls}
               className="h-full w-full"
               iconClassName="h-24 w-24"
             />

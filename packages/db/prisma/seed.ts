@@ -267,7 +267,7 @@ async function main(): Promise<void> {
       businessProfile: {
         create: {
           businessName: 'Apex Pharmacy Pvt Ltd',
-          businessType: 'PHARMACY',
+          businessType: 'CHEMIST',
           gstin: '29AAFCA1234A1Z5',
           pan: 'AAFCA1234A',
           drugLicenseNumber: 'KA-BLR-20A-12345',

@@ -20,6 +20,7 @@ import { KycModule } from './modules/kyc/kyc.module.js';
 import { OrderModule } from './modules/order/order.module.js';
 import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { ProductModule } from './modules/product/product.module.js';
+import { ProductImagesModule } from './modules/product-images/product-images.module.js';
 import { QueueModule } from './modules/queue/queue.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { UserModule } from './modules/user/user.module.js';
@@ -76,6 +77,7 @@ import { UserModule } from './modules/user/user.module.js';
     UserModule,
     KycModule,
     ProductModule,
+    ProductImagesModule,
     OrderModule,
     AdminModule,
     FinanceLogisticsModule,

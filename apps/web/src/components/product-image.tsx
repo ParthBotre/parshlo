@@ -25,6 +25,10 @@ const EXTS = ['webp', 'jpg', 'png'] as const;
 export interface ProductImageProps {
   slug: string;
   alt: string;
+  /** Optional array of image URLs (e.g. from Cloudflare R2 uploads or product.imageUrls). */
+  imageUrls?: string[] | null;
+  /** Optional direct src URL. */
+  src?: string | null;
   /** Tailwind classes applied to the rendered <img> AND the fallback box. */
   className?: string;
   /** Tailwind classes for the fallback Pill icon (size, color). */
@@ -34,19 +38,33 @@ export interface ProductImageProps {
 export function ProductImage({
   slug,
   alt,
+  imageUrls,
+  src,
   className,
   iconClassName,
 }: ProductImageProps): JSX.Element {
   const candidates = useMemo(() => {
+    const list: string[] = [];
+    if (src) list.push(src);
+    if (imageUrls && imageUrls.length > 0) {
+      for (const url of imageUrls) {
+        if (url) list.push(url);
+      }
+    }
     const uploadedFile = PRODUCT_IMAGE_FILE_BY_SLUG[slug];
-    const conventionFiles = EXTS.map((ext) => `${slug}.${ext}`);
-    return uploadedFile ? [uploadedFile, ...conventionFiles] : conventionFiles;
-  }, [slug]);
+    if (uploadedFile) {
+      list.push(`/product-images/${uploadedFile}`);
+    }
+    for (const ext of EXTS) {
+      list.push(`/product-images/${slug}.${ext}`);
+    }
+    return list;
+  }, [slug, src, imageUrls]);
   const [imageIdx, setImageIdx] = useState(0);
 
   useEffect(() => {
     setImageIdx(0);
-  }, [slug]);
+  }, [slug, src, imageUrls]);
 
   if (imageIdx >= candidates.length) {
     return (

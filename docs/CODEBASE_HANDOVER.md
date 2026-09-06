@@ -10,17 +10,17 @@ Parshlo is a B2B pharmaceutical ordering and internal operations platform.
 
 The app has three main runtime surfaces:
 
-- **Web app**: Next.js app hosted on Vercel.
-- **API**: NestJS REST API running in Docker on the DigitalOcean droplet.
-- **Worker**: Background job processor for email and queue-based work, also running in Docker on the droplet.
+- **Web app**: Next.js app hosted on Vercel (`staging.parshlo.com` behind Cloudflare Access OTP).
+- **API**: NestJS REST API running in Docker on an Oracle Cloud Always-Free Compute VM (`163.192.211.151`).
+- **Worker**: Background job processor for email and queue-based work, also running in Docker on the Oracle VM.
 
 Supporting services:
 
-- **PostgreSQL**: Primary application database.
-- **Redis**: Queue/cache infrastructure.
+- **PostgreSQL**: Primary application database (PostgreSQL 16 Docker container).
+- **Redis**: Queue/cache infrastructure (Redis 7 Docker container).
 - **Auth0**: Authentication and login.
-- **Cloudflare**: DNS, proxying, email routing, and public domain management.
-- **Caddy**: Reverse proxy on the droplet for the API domain.
+- **Cloudflare**: DNS, proxying, Access OTP, and Origin CA SSL certificate.
+- **Caddy**: Reverse proxy on the Oracle VM with Cloudflare Origin CA certificate proxying to port 4000.
 - **Sentry**: Error monitoring for frontend/backend.
 - **Resend**: Transactional email delivery.
 
@@ -28,12 +28,12 @@ High-level request flow:
 
 ```text
 Browser
-  -> Cloudflare
-  -> Vercel Next.js web app
+  -> Cloudflare (Access OTP + WAF + SSL)
+  -> Vercel Next.js web app (staging.parshlo.com)
   -> staging-api.parshlo.com
-  -> Caddy on droplet
-  -> NestJS API container
-  -> Postgres / Redis
+  -> Caddy on Oracle VM (163.192.211.151:443)
+  -> NestJS API container (127.0.0.1:4000)
+  -> Postgres / Redis (parshlo_default Docker network)
 
 Background events
   -> API writes queue job / notification log
@@ -135,7 +135,7 @@ The worker consumes background jobs from Redis. It is used for:
 - Queue-based operational tasks.
 - Future document/email/background jobs.
 
-The worker must be deployed separately from the API. If email-related code changes, rebuild and restart `parshlo-worker` on the droplet.
+The worker must be deployed separately from the API. If email-related code changes, rebuild and restart `parshlo-worker` on the Oracle staging VM.
 
 ## 4. Shared Packages
 
@@ -369,7 +369,7 @@ Operational notes:
 - Reply-to for HR private documents should use `superadmin@parshlo.com`.
 - Worker logs show email job success/failure.
 
-Useful checks on the droplet:
+Useful checks on the Oracle staging VM (`163.192.211.151`):
 
 ```bash
 docker logs --tail=100 parshlo-worker
@@ -385,7 +385,7 @@ docker exec -i parshlo-postgres psql -U parshlo -d parshlo -c \
 
 ### Web
 
-The web app deploys through Vercel from the `staging` branch for staging.
+The web app deploys through Vercel from the `staging` branch for staging (`https://staging.parshlo.com`, secured behind Cloudflare Access OTP).
 
 Vercel build usually runs:
 
@@ -397,7 +397,7 @@ If Vercel fails on a type error, fix and push again. Do not assume local IDE war
 
 ### API And Worker
 
-The droplet runs Docker containers:
+The Oracle staging VM (`163.192.211.151`, user `ubuntu`) runs Docker containers:
 
 - `parshlo-api`
 - `parshlo-worker`
@@ -407,8 +407,8 @@ The droplet runs Docker containers:
 Common staging deploy flow:
 
 ```bash
-ssh root@168.144.68.124
-cd /opt/parshlo
+ssh ubuntu@163.192.211.151
+cd /opt/parshlo/repo
 git pull origin staging
 
 docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
@@ -439,7 +439,7 @@ curl https://staging-api.parshlo.com/v1/health
 If worker code changed:
 
 ```bash
-cd /opt/parshlo
+cd /opt/parshlo/repo
 docker build -f infra/docker/worker.Dockerfile -t parshlo-worker:staging .
 
 docker rm -f parshlo-worker
@@ -455,11 +455,11 @@ docker ps
 docker logs --tail=80 parshlo-worker
 ```
 
-## 13. Docker Storage
+## 13. Docker Storage & Resource Management
 
-The staging droplet is small, so Docker storage can fill during builds.
+The Oracle staging VM provides 100 GB of NVMe storage and 2 GB configured swap space on `VM.Standard.E2.1.Micro`.
 
-Safe cleanup commands used on staging:
+Safe cleanup commands:
 
 ```bash
 docker system df
@@ -470,7 +470,7 @@ df -h
 docker system df
 ```
 
-Do not run `docker volume prune` unless there is a verified backup and an explicit plan. Volumes can contain database data.
+Do not run `docker volume prune` unless there is a verified backup and an explicit plan. Volumes contain PostgreSQL database data (`parshlo_pg_data`).
 
 ## 14. Database Rules
 
@@ -482,7 +482,7 @@ Checklist for DB changes:
 2. Add a migration under `packages/db/prisma/migrations`.
 3. Run `pnpm --filter @parshlo/db build`.
 4. Run API/web builds if generated types are consumed.
-5. On droplet, run `prisma migrate deploy` before restarting the API if the new code needs the new schema.
+5. On Oracle staging VM, run `prisma migrate deploy` before restarting the API if the new code needs the new schema.
 
 Avoid:
 
@@ -611,5 +611,5 @@ For a typical feature:
 7. Run builds/lints for affected packages.
 8. Check mobile layouts for operational pages.
 9. Push to `staging`.
-10. Deploy API/worker on droplet if backend/worker changed.
+10. Deploy API/worker on Oracle staging VM if backend/worker changed.
 11. Verify health checks and relevant user flow.

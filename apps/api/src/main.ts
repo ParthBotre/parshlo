@@ -23,6 +23,7 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { type AppConfig } from './config/configuration.js';
+import { registerImageBodyParser } from './modules/product-images/image-body-parser.js';
 /* eslint-enable import/order, import/no-duplicates */
 
 async function bootstrap(): Promise<void> {
@@ -43,6 +44,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.useLogger(app.get(Logger));
+  registerImageBodyParser(app.getHttpAdapter().getInstance());
 
   const config = app.get(ConfigService<AppConfig>);
 

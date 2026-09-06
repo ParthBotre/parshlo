@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { type BusinessType, type GstRate as PrismaGstRate } from '@parshlo/db';
 import {
   type AdminProductView,
@@ -37,6 +37,14 @@ export function priceTierForBusinessType(businessType?: BusinessType | null): Pr
 @Injectable()
 export class ProductService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private imageUrls(keys: string[]): string[] {
+    const base = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+    return keys.flatMap((key) => {
+      const match = /^product-images\/([0-9a-f-]{36})\.webp$/.exec(key);
+      return match ? [new URL(`/api/product-images/${match[1]}`, base).toString()] : [];
+    });
+  }
 
   private static slugify(value: string): string {
     return value
@@ -114,7 +122,7 @@ export class ProductService {
       description: p.description,
       category: p.category.name,
       manufacturer: p.manufacturer,
-      imageUrls: [],
+      imageUrls: this.imageUrls(p.imageKeys),
       prescriptionRequired: p.prescriptionRequired,
       scheduleDrug: p.scheduleDrug,
       status: p.status,
@@ -151,7 +159,7 @@ export class ProductService {
       description: p.description,
       category: p.category.name,
       manufacturer: p.manufacturer,
-      imageUrls: [], // resolved by web layer via signed URLs in production
+      imageUrls: this.imageUrls(p.imageKeys),
       prescriptionRequired: p.prescriptionRequired,
       scheduleDrug: p.scheduleDrug,
       status: p.status,
@@ -184,7 +192,7 @@ export class ProductService {
       description: p.description,
       category: p.category.name,
       manufacturer: p.manufacturer,
-      imageUrls: [],
+      imageUrls: this.imageUrls(p.imageKeys),
       prescriptionRequired: p.prescriptionRequired,
       scheduleDrug: p.scheduleDrug,
       status: p.status,
@@ -218,6 +226,12 @@ export class ProductService {
   }
 
   async createAdminProduct(input: ProductWriteInput): Promise<AdminProductView> {
+    if (input.imageKeys.length > 0) {
+      throw new BadRequestException({
+        code: 'IMAGE_UPLOAD_REQUIRED',
+        message: 'Create the product first, then upload its images.',
+      });
+    }
     const category = await this.prisma.productCategory.upsert({
       where: { slug: ProductService.slugify(input.category) || 'uncategorized' },
       create: {
@@ -282,7 +296,7 @@ export class ProductService {
         manufacturer: input.manufacturer.trim(),
         hsnCode: input.hsnCode.trim(),
         categoryId: category.id,
-        imageKeys: input.imageKeys,
+        // Image keys are owned by the image service; stale product edits must not overwrite them.
         prescriptionRequired: input.prescriptionRequired,
         scheduleDrug: input.scheduleDrug,
         wholesalePricePaise: BigInt(input.wholesalePricePaise),

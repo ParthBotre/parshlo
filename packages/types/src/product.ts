@@ -54,7 +54,7 @@ export const PublicProductView = z.object({
   description: z.string(),
   category: z.string(),
   manufacturer: z.string(),
-  imageUrls: z.array(z.string().url()),
+  imageUrls: z.array(z.string()),
   prescriptionRequired: z.boolean(),
   scheduleDrug: ScheduleDrug,
   status: ProductStatus,

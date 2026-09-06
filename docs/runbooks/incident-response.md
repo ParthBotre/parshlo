@@ -19,8 +19,8 @@
 3. **Check status pages** and dashboards in order:
    - Sentry error feed (filter: last 30 min)
    - Vercel deployment/runtime logs for `apps/web`
-   - Droplet/Caddy/API logs for `apps/api`
-   - Auth0 status, Cloudflare status, DigitalOcean status
+   - Oracle staging VM (`parshlo-staging`) / Caddy / API logs for `apps/api`
+   - Auth0 status, Cloudflare status, Oracle Cloud Infrastructure (OCI) status
    - AWS health only for environments using the future AWS stack
 4. **Mitigate first, root-cause later.** If a recent deploy is suspected, **roll back immediately** — do not pause to diagnose.
 5. **Communicate** every 15 minutes to stakeholders even with "no update".
@@ -51,7 +51,7 @@
 - Page Security on-call immediately.
 - Freeze deployments.
 - Rotate Auth0 application secrets, Sentry tokens/DSNs if exposed, object-storage credentials, and database passwords.
-- Preserve logs (Sentry, Vercel, droplet/Caddy/API logs, and Postgres `AuditLog`) — do not delete or rotate retention.
+- Preserve logs (Sentry, Vercel, Oracle VM/Caddy/API logs, and Postgres `AuditLog`) — do not delete or rotate retention.
 - Engage external counsel per the incident playbook.
 
 ## Post-incident

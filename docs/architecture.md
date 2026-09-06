@@ -2,7 +2,7 @@
 
 This document walks through how Parshlo is put together today: the request flow, the data model, and the trust boundaries.
 
-Current staging runs the web app on Vercel and the API on a DigitalOcean droplet behind Caddy. The worker, email sender, document storage, and Terraform AWS stack are present as foundations/plans, but they are not required for the current staging website.
+Current staging runs the web app on Vercel (`staging.parshlo.com` behind Cloudflare Access OTP) and the API on an Oracle Cloud Always-Free Compute VM (`163.192.211.151`) behind Caddy with a 15-year Cloudflare Origin CA certificate. The worker, email sender, document storage, and Terraform AWS stack are present as foundations/plans, but they are not required for the current staging website.
 
 ## 1. High-level diagram
 
@@ -15,7 +15,7 @@ flowchart LR
   end
 
   subgraph Edge
-    CDN[Cloudflare<br/>DNS + proxy]
+    CDN[Cloudflare<br/>DNS + proxy + Access OTP]
   end
 
   subgraph Frontend
@@ -27,8 +27,8 @@ flowchart LR
   end
 
   subgraph Backend
-    Caddy[Caddy<br/>staging-api.parshlo.com]
-    API[Droplet Docker<br/>apps/api<br/>NestJS + Fastify]
+    Caddy[Caddy<br/>staging-api.parshlo.com<br/>Cloudflare Origin CA]
+    API[Oracle VM Docker<br/>apps/api<br/>NestJS + Fastify]
   end
 
   subgraph Data

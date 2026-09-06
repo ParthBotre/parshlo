@@ -44,6 +44,7 @@ export function AdminCatalogGrid({ products }: { products: BuyerProductView[] })
                   <ProductImage
                     slug={p.slug}
                     alt={p.name}
+                    imageUrls={p.imageUrls}
                     className="h-full w-full"
                     iconClassName="h-16 w-16"
                   />

@@ -1,6 +1,6 @@
 # Terraform — Parshlo AWS infrastructure
 
-Future production-grade IaC for deploying Parshlo on AWS. This is not the current staging deployment path. Current staging uses Vercel for `apps/web` and a DigitalOcean droplet for `apps/api`, Postgres, and Redis.
+Future production-grade IaC for deploying Parshlo on AWS. This is not the current staging deployment path. Current staging uses Vercel for `apps/web` and an Oracle Cloud Infrastructure Always-Free Compute VM (`163.192.211.151`) for `apps/api`, Postgres, and Redis.
 
 The configuration is split into reusable modules with remote state in S3 + DynamoDB locks.
 

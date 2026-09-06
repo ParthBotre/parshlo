@@ -44,8 +44,40 @@ export const configValidationSchema = z
     EMAIL_NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false'),
     INVOICE_GENERATION_ENABLED: z.enum(['true', 'false']).default('false'),
     STORAGE_ENABLED: z.enum(['true', 'false']).default('false'),
+    PRODUCT_IMAGES_ENABLED: z.enum(['true', 'false']).default('false'),
+    PRODUCT_IMAGES_ENV: z.enum(['staging', 'production']).optional(),
+    R2_PRODUCT_IMAGES_ENDPOINT: optionalUrl,
+    R2_PRODUCT_IMAGES_ACCESS_KEY_ID: optionalNonEmptyString,
+    R2_PRODUCT_IMAGES_SECRET_ACCESS_KEY: optionalNonEmptyString,
   })
   .superRefine((env, ctx) => {
+    if (env.PRODUCT_IMAGES_ENABLED === 'true') {
+      for (const key of [
+        'PRODUCT_IMAGES_ENV',
+        'R2_PRODUCT_IMAGES_ENDPOINT',
+        'R2_PRODUCT_IMAGES_ACCESS_KEY_ID',
+        'R2_PRODUCT_IMAGES_SECRET_ACCESS_KEY',
+      ] as const) {
+        if (!env[key])
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when PRODUCT_IMAGES_ENABLED=true`,
+          });
+      }
+      if (
+        env.R2_PRODUCT_IMAGES_ENDPOINT &&
+        !/^https:\/\/[a-f0-9]{32}\.r2\.cloudflarestorage\.com\/?$/.test(
+          env.R2_PRODUCT_IMAGES_ENDPOINT,
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['R2_PRODUCT_IMAGES_ENDPOINT'],
+          message: 'Use the HTTPS R2 account S3 endpoint.',
+        });
+      }
+    }
     if (env.NODE_ENV === 'production' && env.AUTH_MODE === 'dev') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

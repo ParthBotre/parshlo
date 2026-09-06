@@ -23,6 +23,7 @@ import {
   HrWorkLogView,
   AdminProductView,
   ApiErrorResponse,
+  ProductImagesView,
   OrderView,
   ReviewHrExpenseInputSchema,
   ProductWriteInput,
@@ -1108,4 +1109,81 @@ export function listLogisticsStatements(
     accessToken,
     ...options,
   });
+}
+
+export function listAdminProductImages(
+  accessToken: string,
+  productId: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<ProductImagesView> {
+  return apiCall(`/v1/admin/products/${encodeURIComponent(productId)}/images`, ProductImagesView, {
+    method: 'GET',
+    accessToken,
+    ...options,
+  });
+}
+
+export async function uploadAdminProductImage(
+  accessToken: string,
+  productId: string,
+  imageBuffer: ArrayBuffer | Uint8Array | Blob,
+  contentType: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<ProductImagesView> {
+  const url = new URL(
+    `/v1/admin/products/${encodeURIComponent(productId)}/images`,
+    options.baseUrl ??
+      process.env.NEXT_PUBLIC_API_BASE_URL ??
+      process.env.API_BASE_URL ??
+      'http://localhost:4000',
+  ).toString();
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': contentType,
+      Accept: 'application/json',
+    },
+    body: imageBuffer,
+  });
+
+  if (!res.ok) {
+    let problem: z.infer<typeof ApiErrorResponse> = {
+      type: 'about:blank',
+      title: res.statusText,
+      status: res.status,
+      code: 'UNKNOWN_ERROR',
+    };
+    try {
+      const json: unknown = await res.json();
+      const parsed = ApiErrorResponse.safeParse(json);
+      if (parsed.success) {
+        problem = parsed.data;
+      }
+    } catch {
+      // ignore — keep default problem
+    }
+    throw new ApiError(res.status, problem);
+  }
+
+  const json: unknown = await res.json();
+  return ProductImagesView.parse(json);
+}
+
+export function deleteAdminProductImage(
+  accessToken: string,
+  productId: string,
+  imageId: string,
+  options: Pick<ApiCallOptions, 'baseUrl'> = {},
+): Promise<ProductImagesView> {
+  return apiCall(
+    `/v1/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
+    ProductImagesView,
+    {
+      method: 'DELETE',
+      accessToken,
+      ...options,
+    },
+  );
 }

@@ -1,6 +1,6 @@
 # Release process
 
-Parshlo currently uses `staging` for employee testing and `main` as the future production release line. Staging web deploys through Vercel automatically after pushes to `staging`; the staging API is deployed manually on the DigitalOcean droplet.
+Parshlo currently uses `staging` for employee testing and `main` as the future production release line. Staging web deploys through Vercel automatically after pushes to `staging`; the staging API is deployed on the Oracle Cloud Always-Free VM (`163.192.211.151`).
 
 ## Branch model
 
@@ -23,11 +23,13 @@ docs(deploy): refresh terraform variable matrix
 ## Current Staging Release
 
 1. Land the code on `staging`.
-2. Vercel builds and deploys `apps/web`.
-3. SSH into the staging droplet and deploy the API:
+2. Vercel builds and deploys `apps/web` (`staging.parshlo.com`).
+3. SSH into the Oracle Cloud staging VM (`163.192.211.151`) and deploy the API:
 
 ```bash
-cd /opt/parshlo
+ssh ubuntu@163.192.211.151
+
+cd /opt/parshlo/repo
 git pull origin staging
 
 docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .

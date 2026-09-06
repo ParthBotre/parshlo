@@ -2,19 +2,25 @@
 
 This guide has two parts:
 
-- **Current staging**: Vercel web plus a DigitalOcean droplet running Caddy, API, Postgres, and Redis.
+- **Current staging**: Vercel web (`https://staging.parshlo.com` behind Cloudflare Access OTP) plus an Oracle Cloud Always-Free Compute VM (`163.192.211.151`) running Caddy (with Cloudflare Origin CA certificate), API (`parshlo-api`), Postgres 16 (`parshlo-postgres`), and Redis 7 (`parshlo-redis`).
 - **Future production**: production database cluster plus a hardened app/runtime deployment. The Terraform/AWS section is a reference target, not the current staging path.
 
-## Current staging API deploy
+## Current staging API deploy (Oracle Cloud VM)
 
-Staging web deploys automatically from Vercel after a push to `staging`. The API must be deployed on the droplet:
+Staging web deploys automatically from Vercel after a push to `staging`. The API must be deployed on the Oracle Cloud VM (`163.192.211.151`):
 
 ```bash
-cd /opt/parshlo
+# 1. SSH into the Oracle Cloud staging instance
+ssh ubuntu@163.192.211.151
+
+# 2. Pull latest staging code
+cd /opt/parshlo/repo
 git pull origin staging
 
+# 3. Build API container image
 docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
 
+# 4. Run Prisma database migrations
 docker run --rm \
   --env-file /opt/parshlo/api.staging.env \
   --network parshlo_default \
@@ -22,6 +28,7 @@ docker run --rm \
   parshlo-api:staging \
   -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
 
+# 5. Restart API container
 docker rm -f parshlo-api
 docker run -d \
   --name parshlo-api \
@@ -31,6 +38,7 @@ docker run -d \
   -p 127.0.0.1:4000:4000 \
   parshlo-api:staging
 
+# 6. Verify health
 sleep 10
 curl http://127.0.0.1:4000/v1/health
 curl http://127.0.0.1:4000/v1/health/ready
@@ -38,6 +46,16 @@ curl https://staging-api.parshlo.com/v1/health
 ```
 
 Run the migration step for every deploy. Prisma will report "No pending migrations" when no schema change exists.
+
+### Oracle Staging Server Specifications & Network Security
+
+- **Host**: `parshlo-staging` (`163.192.211.151` public, `10.0.0.68` private)
+- **Shape**: Always-Free `VM.Standard.E2.1.Micro` (1 OCPU AMD x86_64, 1 GB RAM + 2 GB Swap, 100 GB NVMe boot volume)
+- **Region**: `us-chicago-1` (VCN: `parshlo-vcn`, Subnet: `subnet-parshlo-vcn`)
+- **Ingress Firewall**:
+  - OCI VCN Security List: TCP ports 22 (SSH), 80 (HTTP), 443 (HTTPS), 4000 (API test)
+  - Ubuntu iptables: `sudo iptables -I INPUT 1 -p tcp -m multiport --dports 80,443,4000 -j ACCEPT`
+- **TLS & Reverse Proxy**: Caddy with a 15-year Cloudflare Origin CA certificate (`/etc/ssl/caddy/cert.pem` and `/etc/ssl/caddy/key.pem`) proxying `staging-api.parshlo.com` to `127.0.0.1:4000`, preserving Cloudflare **Full (strict)** encryption.
 
 ## Future production architecture reference
 

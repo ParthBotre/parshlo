@@ -69,6 +69,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
           code = res.code;
         }
       }
+    } else if (isErrorBody(exception) && exception.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      status = HttpStatus.PAYLOAD_TOO_LARGE;
+      code = 'FILE_TOO_LARGE';
+      title = 'Payload Too Large';
+      detail = 'The upload exceeds the allowed file size.';
     } else if (exception instanceof Error) {
       detail = exception.message;
     }

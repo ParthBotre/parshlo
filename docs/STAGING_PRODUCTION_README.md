@@ -233,18 +233,31 @@ Never use dummy AWS, email, database, or Auth0 production secrets. Missing servi
 5. Smoke test production.
 6. Watch logs, Sentry, API errors, and queue failures.
 
-## Current Staging Droplet Deploy Flow
+## Current Staging Oracle Cloud Deploy Flow
 
-The current staging API runs as a Docker container on the droplet, while the web frontend deploys from Vercel.
+The current staging API runs as a Docker container on an Oracle Cloud Infrastructure Always-Free VM (`163.192.211.151`), while the web frontend deploys from Vercel (`staging.parshlo.com` behind Cloudflare Access OTP).
+
+- **Host**: `parshlo-staging` (`163.192.211.151`, user `ubuntu`)
+- **Repo Directory**: `/opt/parshlo/repo`
+- **Environment File**: `/opt/parshlo/api.staging.env`
+- **Reverse Proxy**: Caddy with Cloudflare Origin CA TLS certificate (`/etc/ssl/caddy/`)
+- **Database**: PostgreSQL 16 Docker container (`parshlo-postgres`) on network `parshlo_default`
+- **Cache**: Redis 7 Docker container (`parshlo-redis`) on network `parshlo_default`
 
 For API/backend changes:
 
 ```bash
-cd /opt/parshlo
+# 1. SSH into the Oracle staging VM
+ssh ubuntu@163.192.211.151
+
+# 2. Pull latest staging code
+cd /opt/parshlo/repo
 git pull origin staging
 
+# 3. Build API container
 docker build -f infra/docker/api.Dockerfile -t parshlo-api:staging .
 
+# 4. Run database migrations
 docker run --rm \
   --env-file /opt/parshlo/api.staging.env \
   --network parshlo_default \
@@ -252,6 +265,7 @@ docker run --rm \
   parshlo-api:staging \
   -lc "cd /app && ./packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma"
 
+# 5. Restart API container
 docker rm -f parshlo-api
 docker run -d \
   --name parshlo-api \
@@ -261,6 +275,7 @@ docker run -d \
   -p 127.0.0.1:4000:4000 \
   parshlo-api:staging
 
+# 6. Verify health
 sleep 10
 curl http://127.0.0.1:4000/v1/health
 curl http://127.0.0.1:4000/v1/health/ready
@@ -272,7 +287,8 @@ Important:
 - Run migrations before restarting into code that expects new tables/columns.
 - A first curl immediately after container start can fail while Nest is still booting; wait a few seconds and retry.
 - `https://staging-api.parshlo.com/` returning 404 is normal because the API root is not a website. Use `/v1/health`.
-- If Docker reports no space left on device, check `df -h` and `docker system df`; prune stopped containers and unused images, but do not remove Postgres volumes.
+- If Docker reports no space left on device, check `df -h` and `docker system df`; prune stopped containers and unused images with `docker builder prune -af && docker image prune -af`, but do not remove Postgres volumes.
+- All staging records (96 users, 52 catalog products, 361 historical orders) are preserved on the persistent Docker volume `parshlo_pg_data` on the Oracle NVMe storage.
 
 ## Shipping Updates After Launch
 

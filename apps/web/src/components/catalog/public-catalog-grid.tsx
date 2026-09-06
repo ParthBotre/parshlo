@@ -46,6 +46,7 @@ export function PublicCatalogGrid({ products }: { products: PublicProductView[] 
                   <ProductImage
                     slug={p.slug}
                     alt={p.name}
+                    imageUrls={p.imageUrls}
                     className="h-full w-full"
                     iconClassName="h-20 w-20"
                   />

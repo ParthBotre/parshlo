@@ -82,6 +82,7 @@ function ProductCard({ product }: { product: BuyerProductView }): JSX.Element {
         <ProductImage
           slug={product.slug}
           alt={product.name}
+          imageUrls={product.imageUrls}
           className="h-full w-full"
           iconClassName="h-16 w-16"
         />
