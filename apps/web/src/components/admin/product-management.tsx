@@ -6,8 +6,10 @@ import {
   ProductImagesView,
   type ProductWriteInput as ProductWriteInputType,
 } from '@parshlo/types';
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
+import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -69,6 +71,10 @@ export function ProductManagement({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState({
     name: '',
     composition: '',
@@ -86,64 +92,139 @@ export function ProductManagement({
     status: 'DRAFT',
   });
 
-  async function createProduct(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setMessage(null);
-    setError(null);
-    const rateAPaise = rupeesToPaise(draft.rateA);
-    const rateBPaise = rupeesToPaise(draft.rateB);
-    const body: ProductWriteInputType = {
-      name: draft.name,
-      composition: draft.composition,
-      strength: draft.strength,
-      form: draft.form as ProductWriteInputType['form'],
-      packaging: draft.packaging,
-      description: draft.description,
-      category: draft.category,
-      manufacturer: draft.manufacturer,
-      imageKeys: [],
-      prescriptionRequired: true,
-      scheduleDrug: 'NONE',
-      wholesalePricePaise: rateAPaise,
-      rateAPaise,
-      rateBPaise,
-      mrpPaise: rupeesToPaise(draft.mrp),
-      gstRate: draft.gstRate as ProductWriteInputType['gstRate'],
-      moq: Number(draft.moq || '1'),
-      hsnCode: '3004',
-      status: draft.status as ProductWriteInputType['status'],
-    };
+  function handleSelectImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    const res = await fetch('/api/admin/products', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const json: unknown = await res.json().catch(() => null);
-    if (!res.ok) {
-      setError(readProblem(json, 'Could not add product.'));
+    if (file.size > 4_000_000) {
+      setImageError('Image file must be under 4 MB.');
       return;
     }
-    setProducts((current) =>
-      [json as AdminProduct, ...current].sort((a, b) => a.name.localeCompare(b.name)),
-    );
-    setDraft({
-      name: '',
-      composition: '',
-      strength: '',
-      form: 'TABLET',
-      packaging: '',
-      description: '',
-      category: 'Catalog',
-      manufacturer: 'Parshlo',
-      rateA: '',
-      rateB: '',
-      mrp: '',
-      gstRate: '5',
-      moq: '1',
-      status: 'DRAFT',
-    });
-    setMessage('Product added. Keep it as draft until the team verifies it.');
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setImageError('Only JPEG, PNG, and WebP images are supported.');
+      return;
+    }
+
+    setImageError(null);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+  }
+
+  function handleClearImage() {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setImageError(null);
+  }
+
+  async function createProduct(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    setError(null);
+    setImageError(null);
+
+    try {
+      const rateAPaise = rupeesToPaise(draft.rateA);
+      const rateBPaise = rupeesToPaise(draft.rateB);
+      const body: ProductWriteInputType = {
+        name: draft.name,
+        composition: draft.composition,
+        strength: draft.strength,
+        form: draft.form as ProductWriteInputType['form'],
+        packaging: draft.packaging,
+        description: draft.description,
+        category: draft.category,
+        manufacturer: draft.manufacturer,
+        imageKeys: [],
+        prescriptionRequired: true,
+        scheduleDrug: 'NONE',
+        wholesalePricePaise: rateAPaise,
+        rateAPaise,
+        rateBPaise,
+        mrpPaise: rupeesToPaise(draft.mrp),
+        gstRate: draft.gstRate as ProductWriteInputType['gstRate'],
+        moq: Number(draft.moq || '1'),
+        hsnCode: '3004',
+        status: draft.status as ProductWriteInputType['status'],
+      };
+
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(readProblem(json, 'Could not add product.'));
+        return;
+      }
+
+      let newProduct = json as AdminProduct;
+
+      if (imageFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', imageFile);
+          const imgRes = await fetch(
+            `/api/admin/products/${encodeURIComponent(newProduct.id)}/images`,
+            {
+              method: 'POST',
+              body: formData,
+            },
+          );
+          if (imgRes.ok) {
+            const imgJson: unknown = await imgRes.json();
+            const updatedView = ProductImagesView.parse(imgJson);
+            newProduct = {
+              ...newProduct,
+              imageKeys: updatedView.images.map((i) => i.key),
+              imageUrls: updatedView.images.map((i) => `/api/product-images/${i.id}`),
+            };
+          } else {
+            const imgJson: unknown = await imgRes.json().catch(() => null);
+            setImageError(
+              readProblem(imgJson, 'Product was created, but failed to upload the image.'),
+            );
+          }
+        } catch (imgErr: unknown) {
+          const msg = imgErr instanceof Error ? imgErr.message : 'Failed to upload image.';
+          setImageError(`Product was created, but image upload failed: ${msg}`);
+        }
+      }
+
+      setProducts((current) =>
+        [newProduct, ...current].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setDraft({
+        name: '',
+        composition: '',
+        strength: '',
+        form: 'TABLET',
+        packaging: '',
+        description: '',
+        category: 'Catalog',
+        manufacturer: 'Parshlo',
+        rateA: '',
+        rateB: '',
+        mrp: '',
+        gstRate: '5',
+        moq: '1',
+        status: 'DRAFT',
+      });
+      handleClearImage();
+      setMessage(
+        imageFile
+          ? `Product "${newProduct.name}" added with photo uploaded to Cloudflare R2.`
+          : `Product "${newProduct.name}" added. Keep it as draft until the team verifies it.`,
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function updateProduct(id: string, body: ProductWriteInputType): Promise<void> {
@@ -354,8 +435,63 @@ export function ProductManagement({
                 required
               />
             </Field>
+            <div className="border-border bg-muted/20 rounded-lg border border-dashed p-4 lg:col-span-4">
+              <Label htmlFor="product-image-file" className="block text-sm font-medium">
+                Product Image (Optional)
+              </Label>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Upload a JPEG, PNG, or WebP (up to 4 MB). It will automatically be compressed to
+                WebP and stored in Cloudflare R2.
+              </p>
+
+              {imagePreviewUrl ? (
+                <div className="mt-3 flex items-center gap-4">
+                  <div className="bg-background relative h-20 w-20 shrink-0 overflow-hidden rounded-md border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Selected product preview"
+                      className="h-full w-full object-contain p-1"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium leading-none">{imageFile?.name}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {imageFile ? `${(imageFile.size / 1024).toFixed(1)} KB` : ''}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearImage}
+                      className="text-destructive hover:bg-destructive/10 h-7 text-xs"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Remove image
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2.5 flex items-center gap-3">
+                  <Input
+                    id="product-image-file"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleSelectImage}
+                    className="file:bg-primary/10 file:text-primary hover:file:bg-primary/20 max-w-md cursor-pointer text-sm file:mr-3 file:rounded file:border-0 file:px-3 file:py-1 file:text-xs file:font-semibold"
+                  />
+                </div>
+              )}
+              {imageError ? (
+                <p className="text-destructive mt-2 text-xs" role="alert">
+                  {imageError}
+                </p>
+              ) : null}
+            </div>
             <div className="lg:col-span-4">
-              <Button type="submit">Add product</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Adding product...' : 'Add product'}
+              </Button>
             </div>
           </form>
           {error ? (
@@ -426,8 +562,26 @@ function ProductRow({
   return (
     <tr>
       <td className="px-4 py-3">
-        <p className="font-medium">{product.name}</p>
-        <p className="text-muted-foreground text-xs">{product.packaging}</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onManageImages(product)}
+            className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded border bg-slate-50 transition-opacity hover:opacity-80"
+            title="Click to manage images"
+          >
+            <ProductImage
+              slug={product.slug}
+              alt={product.name}
+              imageUrls={product.imageUrls}
+              className="h-full w-full object-contain"
+              iconClassName="h-5 w-5 text-slate-400"
+            />
+          </button>
+          <div>
+            <p className="font-medium">{product.name}</p>
+            <p className="text-muted-foreground text-xs">{product.packaging}</p>
+          </div>
+        </div>
       </td>
       <td className="px-4 py-3">
         <select

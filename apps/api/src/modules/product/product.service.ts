@@ -39,10 +39,12 @@ export class ProductService {
   constructor(private readonly prisma: PrismaService) {}
 
   private imageUrls(keys: string[]): string[] {
-    const base = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+    const base = process.env.WEB_BASE_URL;
     return keys.flatMap((key) => {
       const match = /^product-images\/([0-9a-f-]{36})\.webp$/.exec(key);
-      return match ? [new URL(`/api/product-images/${match[1]}`, base).toString()] : [];
+      if (!match) return [];
+      const path = `/api/product-images/${match[1]}`;
+      return [base ? new URL(path, base).toString() : path];
     });
   }
 

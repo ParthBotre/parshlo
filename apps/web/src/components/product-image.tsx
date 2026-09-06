@@ -48,7 +48,11 @@ export function ProductImage({
     if (src) list.push(src);
     if (imageUrls && imageUrls.length > 0) {
       for (const url of imageUrls) {
-        if (url) list.push(url);
+        if (!url) continue;
+        const normalized = url.startsWith('http://localhost')
+          ? url.replace(/^http:\/\/localhost(:\d+)?/, '')
+          : url;
+        list.push(normalized);
       }
     }
     const uploadedFile = PRODUCT_IMAGE_FILE_BY_SLUG[slug];
