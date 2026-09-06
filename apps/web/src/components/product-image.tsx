@@ -88,7 +88,7 @@ export function ProductImage({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/product-images/${candidates[imageIdx]}`}
+      src={candidates[imageIdx]}
       alt={alt}
       // `object-contain` shows the full product (no cropping). White letterbox
       // bands keep the pharma photo on a clean clinical background regardless of
