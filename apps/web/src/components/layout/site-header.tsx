@@ -7,6 +7,7 @@ import { site } from '@/lib/site';
 
 const NAV = [
   { href: '/products', label: 'Products' },
+  { href: '/gynae-spotlight', label: 'Gynae Spotlight' },
   { href: '/about', label: 'About' },
   { href: '/people', label: 'People' },
   { href: '/certifications', label: 'Certifications' },

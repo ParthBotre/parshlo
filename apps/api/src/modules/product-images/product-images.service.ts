@@ -64,7 +64,8 @@ export class ProductImagesService {
 
   private async lock(tx: Prisma.TransactionClient, bucket: string): Promise<void> {
     // Transaction-scoped, shared across all API processes using this database.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`product-images:${bucket}`}))`;
+    // PostgreSQL returns void for this lock; cast it so Prisma can deserialize the result.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`product-images:${bucket}`}))::text`;
   }
 
   async list(productId: string): Promise<ProductImagesView> {
