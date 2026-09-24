@@ -1,5 +1,7 @@
 import {
   Activity,
+  ArrowRight,
+  ArrowUpRight,
   CircuitBoard,
   FileCheck2,
   Globe2,
@@ -11,9 +13,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { listPublicProducts } from '@/lib/api/products';
+import { ApiError } from '@/lib/api-client';
 
 const PARTNER_TYPES = [
   // { icon: Building2, label: 'Hospitals' },
@@ -82,7 +87,14 @@ const CONCEPTS = [
   },
 ] as const;
 
-export default function HomePage(): JSX.Element {
+export default async function HomePage(): Promise<JSX.Element> {
+  let featuredProducts: Awaited<ReturnType<typeof listPublicProducts>> = [];
+  try {
+    featuredProducts = (await listPublicProducts({ cache: 'no-store' })).slice(0, 4);
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err;
+  }
+
   return (
     <>
       {/* HERO ---------------------------------------------------------- */}
@@ -118,26 +130,119 @@ export default function HomePage(): JSX.Element {
             </p>
           </div>
 
-          {/* Hero visual ---------------------------------------------- */}
+          {/* Product-led hero visual --------------------------------- */}
           <div className="relative hidden md:block">
             <div className="grid-noise absolute inset-0 -z-10 opacity-40" aria-hidden />
-            <div className="relative grid gap-3.5 lg:grid-cols-2">
-              {PARTNER_TYPES.map((p, i) => (
-                <Card
-                  key={p.label}
-                  className="lift group"
-                  style={{ animationDelay: `${String(i * 60)}ms` }}
-                >
-                  <CardContent className="flex items-center gap-3 p-4">
-                    <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
-                      <p.icon className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm font-medium">{p.label}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="bg-primary/15 absolute -right-10 -top-10 h-64 w-64 rounded-full blur-3xl" />
+            <div className="relative grid gap-3 sm:grid-cols-2">
+              {featuredProducts.length > 0
+                ? featuredProducts.map((product, index) => (
+                    <Link
+                      key={product.slug}
+                      href={`/products/${product.slug}`}
+                      className={`group ${index === 0 ? 'sm:col-span-2' : ''}`}
+                    >
+                      <Card className="lift h-full overflow-hidden">
+                        <div
+                          className={`relative overflow-hidden bg-white ${index === 0 ? 'aspect-[2.4/1]' : 'aspect-[1.35/1]'}`}
+                        >
+                          <ProductImage
+                            slug={product.slug}
+                            alt={product.name}
+                            imageUrls={product.imageUrls}
+                            className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                            iconClassName="h-12 w-12"
+                          />
+                          <span className="bg-background/80 absolute left-3 top-3 rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] backdrop-blur">
+                            {index === 0 ? 'Featured product' : 'Portfolio'}
+                          </span>
+                        </div>
+                        <CardContent className="flex items-center justify-between gap-3 p-4">
+                          <div>
+                            <p className="font-display font-semibold">
+                              {product.name.toUpperCase()}
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-xs uppercase tracking-wider">
+                              {product.form} · {product.packaging}
+                            </p>
+                          </div>
+                          <ArrowUpRight className="text-primary h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))
+                : PARTNER_TYPES.map((p) => (
+                    <Card key={p.label} className="lift group">
+                      <CardContent className="flex items-center gap-3 p-4">
+                        <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
+                          <p.icon className="h-5 w-5" />
+                        </div>
+                        <p className="text-sm font-medium">{p.label}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* PRODUCT COLLECTION ------------------------------------------ */}
+      <section className="border-border/40 bg-card/30 border-b">
+        <div className="container py-20 md:py-24">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+            <div className="max-w-2xl">
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
+              >
+                Product-first procurement
+              </Badge>
+              <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
+                Start with the right SKU.
+              </h2>
+              <p className="text-muted-foreground mt-4 text-lg leading-relaxed">
+                Open the product profile, check the pack, and move from discovery to a confident B2B
+                order.
+              </p>
+            </div>
+            <Link
+              href="/products"
+              className="text-primary group inline-flex items-center gap-2 text-sm font-semibold"
+            >
+              View full portfolio{' '}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
+          {featuredProducts.length > 0 ? (
+            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {featuredProducts.map((product) => (
+                <Link key={product.slug} href={`/products/${product.slug}`} className="group">
+                  <Card className="h-full overflow-hidden transition-transform duration-300 group-hover:-translate-y-1">
+                    <div className="aspect-square overflow-hidden border-b bg-white">
+                      <ProductImage
+                        slug={product.slug}
+                        alt={product.name}
+                        imageUrls={product.imageUrls}
+                        className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                        iconClassName="h-16 w-16"
+                      />
+                    </div>
+                    <CardContent className="p-5">
+                      <p className="text-primary text-[10px] font-semibold uppercase tracking-[0.18em]">
+                        Product profile
+                      </p>
+                      <h3 className="font-display mt-2 text-lg font-semibold">
+                        {product.name.toUpperCase()}
+                      </h3>
+                      <p className="text-muted-foreground mt-2 text-xs uppercase tracking-wider">
+                        {product.form} · {product.packaging}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 

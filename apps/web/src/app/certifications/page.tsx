@@ -1,6 +1,7 @@
 import { BadgeCheck, FlaskConical, Globe2, Pill, ShieldCheck } from 'lucide-react';
 import { type Metadata } from 'next';
 
+import { ProductCta } from '@/components/layout/product-cta';
 import { Card, CardContent } from '@/components/ui/card';
 
 export const metadata: Metadata = {
@@ -65,6 +66,14 @@ export default function CertificationsPage(): JSX.Element {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mt-12">
+        <ProductCta
+          eyebrow="Confidence in every SKU"
+          title="Review the products behind the paperwork."
+          description="Our catalog keeps product details close to the compliance information that helps B2B partners make confident decisions."
+        />
       </div>
     </div>
   );

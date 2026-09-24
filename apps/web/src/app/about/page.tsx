@@ -1,5 +1,6 @@
 import { type Metadata } from 'next';
 
+import { ProductCta } from '@/components/layout/product-cta';
 import { Card, CardContent } from '@/components/ui/card';
 
 export const metadata: Metadata = {
@@ -37,6 +38,14 @@ export default function AboutPage(): JSX.Element {
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-10">
+        <ProductCta
+          eyebrow="The Parshlo portfolio"
+          title="Our product range is where the partnership starts."
+          description="Explore the formulations and pack formats our verified B2B partners rely on, then sign in when you are ready to order."
+        />
       </div>
     </div>
   );

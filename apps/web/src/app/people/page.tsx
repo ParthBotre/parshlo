@@ -1,6 +1,7 @@
 import { type Metadata } from 'next';
 import Image from 'next/image';
 
+import { ProductCta } from '@/components/layout/product-cta';
 import { Card } from '@/components/ui/card';
 import { companyPeople } from '@/lib/company-people';
 import { cn } from '@/lib/utils';
@@ -79,6 +80,14 @@ export default function PeoplePage(): JSX.Element {
             </div>
           </Card>
         ))}
+      </div>
+
+      <div className="mt-12">
+        <ProductCta
+          eyebrow="Meet the work"
+          title="The team is behind every product detail."
+          description="From formulation to dispatch, our people keep the Parshlo portfolio clear, compliant, and ready for partners."
+        />
       </div>
     </div>
   );
