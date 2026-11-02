@@ -1,358 +1,249 @@
-import {
-  Activity,
-  ArrowRight,
-  ArrowUpRight,
-  CircuitBoard,
-  FileCheck2,
-  Globe2,
-  Lock,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Truck,
-} from 'lucide-react';
+import { ArrowRight, ArrowUpRight, PackageCheck, ShieldCheck } from 'lucide-react';
+import { type Metadata } from 'next';
 import Link from 'next/link';
 
 import { ProductImage } from '@/components/product-image';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { listPublicProducts } from '@/lib/api/products';
 import { ApiError } from '@/lib/api-client';
+import { latestProducts } from '@/lib/latest-products';
 
-const PARTNER_TYPES = [
-  // { icon: Building2, label: 'Hospitals' },
-  { icon: Truck, label: 'Distributors' },
-  // { icon: BadgeCheck, label: 'Pharmacies' },
-  { icon: CircuitBoard, label: 'Stockists' },
-  { icon: Activity, label: 'Chemists' },
-  { icon: Globe2, label: 'Wholesalers' },
-] as const;
+export const metadata: Metadata = {
+  title: 'Latest products',
+  description: 'Discover the newest additions to the Parshlo pharmaceutical portfolio.',
+};
 
-const FEATURES = [
-  {
-    icon: ShieldCheck,
-    title: 'Focused Therapeutic Portfolio',
-    body: 'A curated product range built for gynecology, wellness, and everyday clinical demand.',
-  },
-  {
-    icon: Lock,
-    title: 'Quality-First Access',
-    body: 'Product details, packaging, and compliance information stay easy to inspect before ordering.',
-  },
-  {
-    icon: FileCheck2,
-    title: 'Clear Product Records',
-    body: 'Each SKU is maintained with form, packaging, prescription status, and marketed-by details.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Built for Repeat Demand',
-    body: 'The catalog supports fast discovery for products that partners order and reorder often.',
-  },
-  {
-    icon: Sparkles,
-    title: 'Simple Product Discovery',
-    body: 'Searchable public product pages make it easier to find the right medicine quickly.',
-  },
-  {
-    icon: Globe2,
-    title: 'Pan-India Availability',
-    body: 'Parshlo supports partners across India from Pune, Maharashtra.',
-  },
-] as const;
-
-const STATS = [
-  { value: '23', label: 'Years in Pharma Industry' },
-  { value: '100', label: 'Verified B2B partners' },
-  { value: '28', label: 'States served' },
-  { value: '100%', label: 'On-time dispatch rate' },
-] as const;
-
-const CONCEPTS = [
-  {
-    prefix: 'PAR',
-    meaning: 'Can symbolize “Parenthood, Pregnancy, Protection”',
-    body: 'Core aspects of gynecology.',
-  },
-  {
-    prefix: 'SH',
-    meaning: 'Suggests “She, Shield, Support”',
-    body: "Directly tied to women's wellness.",
-  },
-  {
-    prefix: 'LO',
-    meaning: 'Resonates with “Love, Longevity, Life”',
-    body: 'Emotional and holistic care.',
-  },
-] as const;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage(): Promise<JSX.Element> {
-  let featuredProducts: Awaited<ReturnType<typeof listPublicProducts>> = [];
+  let products: Awaited<ReturnType<typeof listPublicProducts>> = [];
   try {
-    featuredProducts = (await listPublicProducts({ cache: 'no-store' })).slice(0, 4);
-  } catch (err) {
-    if (!(err instanceof ApiError)) throw err;
+    products = await listPublicProducts({ cache: 'no-store' });
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
   }
+
+  const spotlight = latestProducts(products);
+  const lead = spotlight.at(0);
+  const more = spotlight.slice(1);
 
   return (
     <>
-      {/* HERO ---------------------------------------------------------- */}
-      <section className="grid-hero border-border/40 relative overflow-hidden border-b">
-        <div className="container relative grid gap-12 py-24 md:grid-cols-2 md:py-32">
-          <div className="animate-fade-in flex flex-col justify-center gap-7">
-            <Badge
-              variant="outline"
-              className="border-primary/30 bg-primary/10 text-primary w-fit gap-2 backdrop-blur"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" /> Strictly B2B · Not for retail sale
-            </Badge>
-            <h1 className="tracking-display-tight font-display text-balance text-5xl font-bold leading-[1.05] md:text-7xl">
-              The trusted platform for{' '}
-              <span className="from-primary via-primary to-brand-300 bg-gradient-to-br bg-clip-text text-transparent">
-                B2B Pharmaceuticals.
-              </span>
-            </h1>
-            <p className="text-muted-foreground max-w-xl text-balance text-lg leading-relaxed md:text-xl">
-              Explore Parshlo’s therapeutic portfolio, packaging, prescription status, and marketed
-              by information through a clean catalog built for fast product discovery.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-3">
-              <Button asChild size="xl">
-                <Link href="/products">View Products</Link>
-              </Button>
-              <Button asChild size="xl" variant="outline">
-                <Link href="/auth/sign-in">SIGN IN</Link>
-              </Button>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Public catalog for product discovery. Pricing and ordering remain account-protected.
-            </p>
-          </div>
+      <section className="relative overflow-hidden border-b border-[#d9e9df] bg-[#eef5ee] text-[#102823] dark:border-white/10 dark:bg-[#0b1917] dark:text-white">
+        <div className="pointer-events-none absolute -right-24 -top-40 h-[34rem] w-[34rem] rounded-full border border-[#a8d6c3]/50 dark:border-teal-300/10" />
+        <div className="pointer-events-none absolute -right-4 -top-20 h-[27rem] w-[27rem] rounded-full border border-[#a8d6c3]/60 dark:border-teal-300/10" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(104,194,151,0.18),transparent_38%)] dark:bg-[radial-gradient(circle_at_78%_18%,rgba(45,212,191,0.11),transparent_40%)]" />
 
-          {/* Product-led hero visual --------------------------------- */}
-          <div className="relative hidden md:block">
-            <div className="grid-noise absolute inset-0 -z-10 opacity-40" aria-hidden />
-            <div className="bg-primary/15 absolute -right-10 -top-10 h-64 w-64 rounded-full blur-3xl" />
-            <div className="relative grid gap-3 sm:grid-cols-2">
-              {featuredProducts.length > 0
-                ? featuredProducts.map((product, index) => (
-                    <Link
-                      key={product.slug}
-                      href={`/products/${product.slug}`}
-                      className={`group ${index === 0 ? 'sm:col-span-2' : ''}`}
-                    >
-                      <Card className="lift h-full overflow-hidden">
-                        <div
-                          className={`relative overflow-hidden bg-white ${index === 0 ? 'aspect-[2.4/1]' : 'aspect-[1.35/1]'}`}
-                        >
-                          <ProductImage
-                            slug={product.slug}
-                            alt={product.name}
-                            imageUrls={product.imageUrls}
-                            className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-                            iconClassName="h-12 w-12"
-                          />
-                          <span className="bg-background/80 absolute left-3 top-3 rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] backdrop-blur">
-                            {index === 0 ? 'Featured product' : 'Portfolio'}
-                          </span>
-                        </div>
-                        <CardContent className="flex items-center justify-between gap-3 p-4">
-                          <div>
-                            <p className="font-display font-semibold">
-                              {product.name.toUpperCase()}
-                            </p>
-                            <p className="text-muted-foreground mt-1 text-xs uppercase tracking-wider">
-                              {product.form} · {product.packaging}
-                            </p>
-                          </div>
-                          <ArrowUpRight className="text-primary h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                        </CardContent>
-                      </Card>
+        <div className="container relative grid gap-10 py-12 md:min-h-[620px] md:grid-cols-[0.92fr_1.08fr] md:items-center md:gap-14 md:py-20">
+          <div className="max-w-2xl">
+            <div className="mb-7 inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.24em] text-[#176b56] dark:text-teal-300">
+              <span className="h-2 w-2 rounded-full bg-[#21a67b] shadow-[0_0_0_6px_rgba(33,166,123,0.12)]" />
+              The latest from Parshlo
+            </div>
+            {lead ? (
+              <>
+                <p className="mb-3 text-sm font-medium text-[#45675c] dark:text-teal-100/70">
+                  A new addition to the portfolio
+                </p>
+                <h1 className="font-display max-w-2xl text-balance text-5xl font-semibold leading-[0.96] tracking-[-0.065em] sm:text-6xl lg:text-[5.5rem]">
+                  {lead.name}
+                </h1>
+                <p className="mt-7 max-w-lg text-base leading-7 text-[#4f6860] md:text-lg dark:text-slate-300">
+                  {lead.composition || lead.description}
+                </p>
+                <div className="mt-7 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#285c4d] dark:text-teal-100/80">
+                  <span className="rounded-full border border-[#a9cdbd] px-4 py-2 dark:border-white/20">
+                    {lead.form}
+                  </span>
+                  <span className="rounded-full border border-[#a9cdbd] px-4 py-2 dark:border-white/20">
+                    {lead.packaging}
+                  </span>
+                </div>
+                <div className="mt-9 flex flex-wrap items-center gap-5">
+                  <Button
+                    asChild
+                    size="xl"
+                    className="bg-[#125741] text-white hover:bg-[#0b4433] dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200"
+                  >
+                    <Link href={`/products/${lead.slug}`}>
+                      Explore this product <ArrowUpRight className="h-4 w-4" />
                     </Link>
-                  ))
-                : PARTNER_TYPES.map((p) => (
-                    <Card key={p.label} className="lift group">
-                      <CardContent className="flex items-center gap-3 p-4">
-                        <div className="bg-primary/10 text-primary ring-primary/20 flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-110">
-                          <p.icon className="h-5 w-5" />
-                        </div>
-                        <p className="text-sm font-medium">{p.label}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  </Button>
+                  <Link
+                    href="/products"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-[#195c49] hover:text-[#0b382b] dark:text-teal-200 dark:hover:text-white"
+                  >
+                    View all products <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-balance text-5xl font-semibold leading-[0.98] tracking-[-0.06em] md:text-7xl">
+                  Discover the Parshlo portfolio.
+                </h1>
+                <p className="mt-7 max-w-lg text-lg leading-7 text-[#4f6860] dark:text-slate-300">
+                  Product information is being updated. Explore the catalog for available details.
+                </p>
+                <Button asChild size="xl" className="mt-9">
+                  <Link href="/products">
+                    Explore products <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </>
+            )}
+          </div>
+
+          <div className="relative mx-auto w-full max-w-[620px]">
+            <div className="absolute -inset-5 rounded-[2.75rem] border border-[#b8d9c8]/70 dark:border-teal-200/10" />
+            <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-[#dcebe1] p-3 shadow-[0_32px_80px_-40px_rgba(22,77,54,0.45)] sm:p-5 dark:border-white/10 dark:bg-[#16322b]">
+              <div className="relative aspect-[1.1/1] overflow-hidden rounded-[1.5rem] bg-white">
+                {lead ? (
+                  <ProductImage
+                    slug={lead.slug}
+                    alt={lead.name}
+                    imageUrls={lead.imageUrls}
+                    priority
+                    className="h-full w-full p-7 sm:p-10"
+                    iconClassName="h-24 w-24"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[#83bca1]">
+                    <PackageCheck className="h-24 w-24" strokeWidth={1} />
+                  </div>
+                )}
+                <span className="absolute left-4 top-4 rounded-full border border-[#dce9df] bg-white/90 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#1c634a] backdrop-blur sm:left-6 sm:top-6">
+                  Product spotlight
+                </span>
+              </div>
+              <div className="flex items-end justify-between gap-4 px-2 pb-1 pt-5 sm:px-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#39705c] dark:text-teal-200/70">
+                    Parshlo / latest addition
+                  </p>
+                  <p className="font-display mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+                    {lead?.name ?? 'The Parshlo collection'}
+                  </p>
+                </div>
+                <span className="font-display text-3xl font-light text-[#73a48c] dark:text-teal-200/50">
+                  01
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* PRODUCT COLLECTION ------------------------------------------ */}
-      <section className="border-border/40 bg-card/30 border-b">
-        <div className="container py-20 md:py-24">
-          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div className="max-w-2xl">
-              <Badge
-                variant="outline"
-                className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
-              >
-                Product-first procurement
-              </Badge>
-              <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
-                Start with the right SKU.
-              </h2>
-              <p className="text-muted-foreground mt-4 text-lg leading-relaxed">
-                Open the product profile, check the pack, and move from discovery to a confident B2B
-                order.
-              </p>
-            </div>
-            <Link
-              href="/products"
-              className="text-primary group inline-flex items-center gap-2 text-sm font-semibold"
-            >
-              View full portfolio{' '}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-          {featuredProducts.length > 0 ? (
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {featuredProducts.map((product) => (
-                <Link key={product.slug} href={`/products/${product.slug}`} className="group">
-                  <Card className="h-full overflow-hidden transition-transform duration-300 group-hover:-translate-y-1">
-                    <div className="aspect-square overflow-hidden border-b bg-white">
-                      <ProductImage
-                        slug={product.slug}
-                        alt={product.name}
-                        imageUrls={product.imageUrls}
-                        className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-                        iconClassName="h-16 w-16"
-                      />
-                    </div>
-                    <CardContent className="p-5">
-                      <p className="text-primary text-[10px] font-semibold uppercase tracking-[0.18em]">
-                        Product profile
-                      </p>
-                      <h3 className="font-display mt-2 text-lg font-semibold">
-                        {product.name.toUpperCase()}
-                      </h3>
-                      <p className="text-muted-foreground mt-2 text-xs uppercase tracking-wider">
-                        {product.form} · {product.packaging}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      {/* CONCEPT ------------------------------------------------------- */}
-      <section className="border-border/40 bg-card/30 border-b">
-        <div className="container grid gap-8 py-20 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="container py-16 md:py-24" aria-labelledby="latest-products-heading">
+        <div className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <Badge
-              variant="outline"
-              className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
+            <p className="text-primary text-[11px] font-bold uppercase tracking-[0.24em]">
+              Fresh in the catalog
+            </p>
+            <h2
+              id="latest-products-heading"
+              className="font-display mt-3 text-3xl font-semibold tracking-[-0.04em] md:text-5xl"
             >
-              Conceptual Connection
-            </Badge>
-            <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
-              PARSHLO represents care through every stage.
+              More to discover.
             </h2>
           </div>
-          <div className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-3">
-              {CONCEPTS.map((item) => (
-                <Card key={item.prefix} className="h-full">
-                  <CardContent className="space-y-3 p-5">
-                    <p className="text-primary font-display text-3xl font-bold">{item.prefix}</p>
-                    <p className="font-medium">{item.meaning}</p>
-                    <p className="text-muted-foreground text-sm leading-relaxed">{item.body}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            <p className="text-muted-foreground text-balance text-lg leading-relaxed">
-              Together, PARSHLO can be positioned as a brand that protects and supports women with
-              love and care throughout their reproductive journey.
+          <Link
+            href="/products"
+            className="text-primary inline-flex items-center gap-2 text-sm font-semibold hover:underline"
+          >
+            Browse the full portfolio <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
+        {more.length > 0 ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {more.map((product) => (
+              <Link
+                key={product.slug}
+                href={`/products/${product.slug}`}
+                className="border-border/70 bg-card hover:border-primary/40 focus-visible:ring-primary group overflow-hidden rounded-[1.75rem] border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              >
+                <div className="relative aspect-[1.35/1] overflow-hidden bg-white p-4">
+                  <ProductImage
+                    slug={product.slug}
+                    alt={product.name}
+                    imageUrls={product.imageUrls}
+                    className="h-full w-full"
+                    iconClassName="h-14 w-14"
+                  />
+                  <span className="absolute left-5 top-5 rounded-full bg-[#edf5ee] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1d664e]">
+                    New addition
+                  </span>
+                </div>
+                <div className="flex items-end justify-between gap-3 p-6">
+                  <div className="min-w-0">
+                    <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.18em]">
+                      {product.form} · {product.packaging}
+                    </p>
+                    <h3 className="font-display mt-2 text-xl font-semibold tracking-tight">
+                      {product.name}
+                    </h3>
+                    <p className="text-muted-foreground mt-2 line-clamp-2 text-sm leading-6">
+                      {product.composition}
+                    </p>
+                  </div>
+                  <span className="text-primary border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-muted-foreground border-border rounded-3xl border border-dashed p-10 text-center text-sm">
+            The latest products will appear here as the catalog is updated.
+          </div>
+        )}
+      </section>
+
+      <section className="border-border/60 dark:bg-card/40 border-y bg-[#f6f8f5]">
+        <div className="container grid gap-9 py-16 md:grid-cols-[1fr_auto] md:items-center md:py-20">
+          <div className="max-w-2xl">
+            <p className="text-primary text-[11px] font-bold uppercase tracking-[0.24em]">
+              The complete range
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-semibold tracking-[-0.04em] md:text-5xl">
+              Every product, in one place.
+            </h2>
+            <p className="text-muted-foreground mt-4 text-base leading-7">
+              Explore compositions, strengths, pack formats, and prescription information before
+              reaching out to order.
             </p>
           </div>
+          <Button asChild size="xl">
+            <Link href="/products">
+              See {products.length ? `all ${products.length}` : 'all'} products{' '}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </section>
 
-      {/* STATS --------------------------------------------------------- */}
-      <section className="border-border/40 bg-card/30 border-b">
-        <div className="container grid grid-cols-2 gap-6 py-16 md:grid-cols-4 md:gap-10">
-          {STATS.map((s) => (
-            <div key={s.label} className="space-y-2">
-              <div className="tracking-display-tight from-foreground to-foreground/60 font-display bg-gradient-to-br bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
-                {s.value}
-              </div>
-              <div className="text-muted-foreground text-sm">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES ------------------------------------------------------ */}
-      <section className="container py-24 md:py-28">
-        <div className="mx-auto max-w-2xl text-center">
-          <Badge
-            variant="outline"
-            className="border-primary/30 bg-primary/10 text-primary mb-4 backdrop-blur"
-          >
-            Built for compliance
-          </Badge>
-          <h2 className="tracking-display-tight font-display text-4xl font-bold md:text-5xl">
-            Product information
-            <br />
-            built for confident review.
-          </h2>
-          <p className="text-muted-foreground mt-5 text-lg leading-relaxed">
-            The public website now keeps products first, while account-only ordering workflows stay
-            behind sign-in for authorized teams.
-          </p>
-        </div>
-
-        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <Card key={f.title} className="lift group h-full">
-              <CardContent className="space-y-4 p-7">
-                <div className="bg-primary/10 text-primary ring-primary/20 flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-110">
-                  <f.icon className="h-5 w-5" />
-                </div>
-                <h3 className="font-display text-lg font-semibold">{f.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{f.body}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA STRIP ----------------------------------------------------- */}
-      <section className="container pb-24">
-        <div className="border-primary/20 from-primary/15 via-card to-card relative overflow-hidden rounded-3xl border bg-gradient-to-br p-10 md:p-14">
-          <div
-            className="absolute inset-0 -z-10 opacity-50"
-            style={{
-              backgroundImage:
-                'radial-gradient(at 80% 20%, hsl(var(--primary) / 0.35) 0px, transparent 50%)',
-            }}
-            aria-hidden
-          />
-          <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
-            <div className="max-w-xl space-y-2">
-              <h2 className="tracking-display-tight font-display text-3xl font-bold md:text-4xl">
-                Looking for product details?
-              </h2>
-              <p className="text-muted-foreground text-base md:text-lg">
-                Browse the catalog first, then sign in when you need account-protected ordering.
-              </p>
-            </div>
-            <Button asChild size="xl">
-              <Link href="/products">View products</Link>
-            </Button>
+      <section className="container py-16 md:py-20">
+        <div className="flex flex-col gap-7 rounded-[2rem] bg-[#103c32] p-8 text-white sm:p-10 md:flex-row md:items-center md:justify-between md:p-12">
+          <div className="max-w-2xl">
+            <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-teal-200">
+              <ShieldCheck className="h-4 w-4" /> For verified B2B partners
+            </p>
+            <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
+              Ready to bring these products into your next order?
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-teal-50/75">
+              Product details are public. Wholesale pricing and ordering are available after
+              sign-in.
+            </p>
           </div>
+          <Link
+            href="/auth/sign-in"
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-[#103c32] transition-colors hover:bg-teal-100"
+          >
+            Sign in to order <ArrowUpRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
     </>

@@ -33,6 +33,8 @@ export interface ProductImageProps {
   className?: string;
   /** Tailwind classes for the fallback Pill icon (size, color). */
   iconClassName?: string;
+  /** Load above-the-fold product imagery immediately. */
+  priority?: boolean;
 }
 
 export function ProductImage({
@@ -42,6 +44,7 @@ export function ProductImage({
   src,
   className,
   iconClassName,
+  priority = false,
 }: ProductImageProps): JSX.Element {
   const candidates = useMemo(() => {
     const list: string[] = [];
@@ -49,9 +52,11 @@ export function ProductImage({
     if (imageUrls && imageUrls.length > 0) {
       for (const url of imageUrls) {
         if (!url) continue;
-        const normalized = url.startsWith('http://localhost')
-          ? url.replace(/^http:\/\/localhost(:\d+)?/, '')
-          : url;
+        // Public API responses can name the staging website, which may be
+        // access-protected. The image proxy exists on the current site too.
+        const normalized = url
+          .replace(/^https?:\/\/[^/]+(?=\/api\/product-images\/)/, '')
+          .replace(/^http:\/\/localhost(:\d+)?(?=\/)/, '');
         list.push(normalized);
       }
     }
@@ -95,7 +100,8 @@ export function ProductImage({
       // the image's own aspect ratio.
       className={cn('h-full w-full bg-white object-contain p-2', className)}
       onError={() => setImageIdx((i) => i + 1)}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
     />
   );

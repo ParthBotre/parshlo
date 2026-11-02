@@ -61,10 +61,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground min-h-screen font-sans">
+        <a
+          href="#main-content"
+          className="focus:bg-background focus:text-foreground focus:ring-primary sr-only fixed left-4 top-4 z-[100] rounded-lg px-4 py-3 shadow-lg focus:not-sr-only focus:ring-2"
+        >
+          Skip to content
+        </a>
         <Providers>
           <div className="flex min-h-screen flex-col">
             <SiteHeader />
-            <main className="flex-1">{children}</main>
+            <main id="main-content" className="flex-1">
+              {children}
+            </main>
             <SiteFooter />
           </div>
         </Providers>

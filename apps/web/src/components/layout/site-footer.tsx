@@ -76,7 +76,7 @@ export function SiteFooter(): JSX.Element {
           <ul className="text-muted-foreground space-y-2 text-sm">
             <li>{site.contact.address}</li>
             <li>
-              <a href={`mailto:${site.contact.email}`} className="hover:text-foreground">
+              <a href={`mailto:${site.contact.email}`} className="hover:text-foreground break-all">
                 {site.contact.email}
               </a>
             </li>

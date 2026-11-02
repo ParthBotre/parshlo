@@ -43,7 +43,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
 
   return (
     <>
-      <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+      <nav className="hidden items-center gap-3 md:flex lg:gap-4" aria-label="Primary">
         {nav.map((item) => (
           <Link
             key={item.href}

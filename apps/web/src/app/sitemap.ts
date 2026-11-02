@@ -7,7 +7,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
   return [
     { url: `${base}/`, lastModified, priority: 1, changeFrequency: 'monthly' },
-    { url: `${base}/home`, lastModified, priority: 1, changeFrequency: 'monthly' },
     { url: `${base}/products`, lastModified, priority: 0.9, changeFrequency: 'weekly' },
     { url: `${base}/gynae-spotlight`, lastModified, priority: 0.9, changeFrequency: 'weekly' },
     { url: `${base}/about`, lastModified, priority: 0.6 },

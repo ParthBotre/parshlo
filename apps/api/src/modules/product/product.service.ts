@@ -165,6 +165,7 @@ export class ProductService {
       prescriptionRequired: p.prescriptionRequired,
       scheduleDrug: p.scheduleDrug,
       status: p.status,
+      createdAt: p.createdAt.toISOString(),
     }));
   }
 
@@ -198,6 +199,7 @@ export class ProductService {
       prescriptionRequired: p.prescriptionRequired,
       scheduleDrug: p.scheduleDrug,
       status: p.status,
+      createdAt: p.createdAt.toISOString(),
     };
   }
 

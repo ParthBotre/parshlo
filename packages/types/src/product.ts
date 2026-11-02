@@ -58,6 +58,8 @@ export const PublicProductView = z.object({
   prescriptionRequired: z.boolean(),
   scheduleDrug: ScheduleDrug,
   status: ProductStatus,
+  /** When this product was added to the catalog; optional for older API deployments. */
+  createdAt: IsoDateString.optional(),
 });
 export type PublicProductView = z.infer<typeof PublicProductView>;
 

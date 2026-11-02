@@ -90,6 +90,7 @@
 
   html {
     @apply antialiased;
+    scroll-padding-top: 4rem;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
