@@ -43,7 +43,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
 
   return (
     <>
-      <nav className="hidden items-center gap-3 md:flex lg:gap-4" aria-label="Primary">
+      <nav className="hidden items-center gap-3 lg:flex xl:gap-4" aria-label="Primary">
         {nav.map((item) => (
           <Link
             key={item.href}
@@ -58,7 +58,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
         ))}
       </nav>
 
-      <div className="hidden items-center gap-3 md:flex">
+      <div className="hidden items-center gap-3 lg:flex">
         <ThemeToggleCompact />
         {session ? (
           <>
@@ -87,11 +87,12 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
         )}
       </div>
 
-      <div className="flex items-center gap-1 md:hidden">
+      <div className="flex items-center gap-1 lg:hidden">
         <ThemeToggleCompact />
         <button
           type="button"
           aria-label="Toggle menu"
+          className="focus-visible:outline-primary flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           onClick={() => {
             setOpen((v) => !v);
           }}
@@ -101,7 +102,7 @@ export function HeaderClient({ nav, session }: HeaderClientProps): JSX.Element {
       </div>
 
       {open ? (
-        <div className="border-border/60 bg-background absolute inset-x-0 top-16 border-t md:hidden">
+        <div className="border-border/60 bg-background absolute inset-x-0 top-16 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t lg:hidden">
           <nav className="container flex flex-col py-4" aria-label="Mobile">
             {nav.map((item) => (
               <Link

@@ -29,6 +29,11 @@ export function SiteFooter(): JSX.Element {
               </Link>
             </li>
             <li>
+              <Link className="hover:text-foreground" href="/protilo">
+                Protilo
+              </Link>
+            </li>
+            <li>
               <Link className="hover:text-foreground" href="/certifications">
                 Certifications
               </Link>
