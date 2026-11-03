@@ -29,7 +29,7 @@ export function HomeShowcase({ spotlight, productCount }: HomeShowcaseProps): JS
     <>
       <section className="relative isolate overflow-hidden bg-[#f7faf7] text-[#172b26] dark:bg-[#0b1513] dark:text-white">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-[radial-gradient(ellipse_at_50%_85%,rgba(133,193,155,0.24),transparent_58%)] dark:bg-[radial-gradient(ellipse_at_50%_85%,rgba(36,122,98,0.22),transparent_58%)]" />
-        <div className="container relative flex flex-col items-center px-4 pb-12 pt-14 text-center sm:pt-20 md:pb-16 md:pt-24">
+        <div className="container relative flex min-h-[calc(100svh-4rem)] flex-col items-center justify-center px-4 py-[clamp(1.25rem,3.5svh,4rem)] text-center">
           <motion.p
             {...reveal()}
             className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#176b56] dark:text-teal-300"
@@ -38,7 +38,7 @@ export function HomeShowcase({ spotlight, productCount }: HomeShowcaseProps): JS
           </motion.p>
           <motion.h1
             {...reveal(0.07)}
-            className="font-display mt-4 max-w-4xl text-balance text-4xl font-semibold leading-[1.06] tracking-[-0.045em] sm:text-5xl md:text-[3.75rem]"
+            className="font-display mt-4 max-w-4xl text-balance text-[clamp(2.25rem,4.25vw,3.75rem)] font-semibold leading-[1.06] tracking-[-0.045em]"
           >
             {lead?.name ?? 'Discover the Parshlo portfolio.'}
           </motion.h1>
@@ -75,7 +75,7 @@ export function HomeShowcase({ spotlight, productCount }: HomeShowcaseProps): JS
               delay: reducedMotion ? 0 : 0.2,
               ease: easing,
             }}
-            className="relative mt-10 flex h-[230px] w-full max-w-[620px] items-center justify-center sm:mt-12 sm:h-[330px] md:h-[370px]"
+            className="relative mt-5 flex h-[clamp(110px,26svh,230px)] w-full max-w-[620px] items-center justify-center sm:mt-8 sm:h-[clamp(190px,39svh,330px)] md:h-[clamp(200px,42svh,370px)] md:max-w-[min(620px,70vw)]"
           >
             {lead && (
               <ProductImage
@@ -91,7 +91,7 @@ export function HomeShowcase({ spotlight, productCount }: HomeShowcaseProps): JS
           {lead && (
             <motion.p
               {...reveal(0.25)}
-              className="mt-5 text-xs font-medium text-[#667b70] dark:text-slate-400"
+              className="mt-4 text-xs font-medium text-[#667b70] dark:text-slate-400"
             >
               {lead.form} <span aria-hidden="true">·</span> {lead.packaging}
             </motion.p>
