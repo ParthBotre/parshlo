@@ -87,14 +87,14 @@ export function ProtiloShowcase({ products }: ProtiloShowcaseProps): JSX.Element
                 delay: reducedMotion ? 0 : 0.2,
                 ease: easing,
               }}
-              className="mt-5 flex h-[clamp(150px,30svh,230px)] w-full max-w-[400px] items-center justify-center sm:mt-8 sm:h-[clamp(210px,40svh,360px)]"
+              className="mt-5 flex h-[clamp(150px,30svh,230px)] w-full max-w-[400px] items-center justify-center overflow-hidden sm:mt-8 sm:h-[clamp(210px,40svh,360px)]"
             >
               <ProductImage
                 slug={featured.slug}
                 alt={`${featured.name} product packaging`}
                 imageUrls={featured.imageUrls}
                 priority
-                className="h-full w-full rounded-xl bg-transparent object-contain p-2 shadow-[0_28px_55px_-42px_rgba(28,80,51,0.5)] sm:p-4"
+                className="h-full w-full scale-[1.1] rounded-xl bg-transparent object-contain p-2 shadow-[0_28px_55px_-42px_rgba(28,80,51,0.5)] sm:p-4"
                 iconClassName="h-20 w-20"
               />
             </motion.div>
@@ -155,12 +155,12 @@ export function ProtiloShowcase({ products }: ProtiloShowcaseProps): JSX.Element
                   <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[#176b56] group-hover:underline dark:text-teal-200">
                     View product <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                   </span>
-                  <div className="mt-auto flex h-[215px] w-full max-w-[390px] items-end justify-center pt-7 sm:h-[265px]">
+                  <div className="mt-auto flex h-[215px] w-full max-w-[390px] items-end justify-center overflow-hidden pt-7 sm:h-[265px]">
                     <ProductImage
                       slug={product.slug}
                       alt={`${product.name} product packaging`}
                       imageUrls={product.imageUrls}
-                      className="h-full w-full rounded-lg bg-transparent object-contain p-2 transition-transform duration-500 ease-out group-hover:scale-[1.025] sm:p-4"
+                      className="h-full w-full scale-[1.16] rounded-lg bg-transparent object-contain p-2 transition-transform duration-500 ease-out group-hover:scale-[1.2] sm:p-4"
                       iconClassName="h-16 w-16"
                     />
                   </div>
