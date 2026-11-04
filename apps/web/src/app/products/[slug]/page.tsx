@@ -7,29 +7,26 @@ import { ProductImage } from '@/components/product-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getPublicProduct, listPublicProducts } from '@/lib/api/products';
+import { getPublicProduct } from '@/lib/api/products';
 import { ApiError } from '@/lib/api-client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Public product details change infrequently. Keep a recent rendered page available
+// when the API is temporarily unreachable.
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams(): Promise<{ slug: string }[]> {
-  try {
-    const products = await listPublicProducts({ cache: 'no-store' });
-    return products.map((p) => ({ slug: p.slug }));
-  } catch {
-    return [];
-  }
+export function generateStaticParams(): { slug: string }[] {
+  // Generate pages on first visit so a build never depends on the API being up.
+  return [];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const p = await getPublicProduct(slug, { cache: 'no-store' });
+    const p = await getPublicProduct(slug, { next: { revalidate: 300 } });
     return {
       title: p.name,
       description: `${p.form} · ${p.packaging}.`,
@@ -43,7 +40,7 @@ export default async function ProductDetailPage({ params }: PageProps): Promise<
   const { slug } = await params;
   let product;
   try {
-    product = await getPublicProduct(slug, { cache: 'no-store' });
+    product = await getPublicProduct(slug, { next: { revalidate: 300 } });
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       notFound();

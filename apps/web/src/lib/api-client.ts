@@ -35,7 +35,10 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly problem: z.infer<typeof ApiErrorResponse>,
   ) {
-    super(problem.detail ?? problem.title);
+    super(
+      [problem.detail, problem.title].find((part) => part?.trim()) ??
+        `API request failed with status ${status}`,
+    );
     this.name = 'ApiError';
   }
 }
@@ -85,7 +88,7 @@ export async function apiCall<TOutput, TDef extends z.ZodTypeDef, TInput>(
   if (!res.ok) {
     let problem: z.infer<typeof ApiErrorResponse> = {
       type: 'about:blank',
-      title: res.statusText,
+      title: res.statusText.trim() ? res.statusText : `HTTP ${res.status}`,
       status: res.status,
       code: 'UNKNOWN_ERROR',
     };
